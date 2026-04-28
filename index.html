@@ -10353,3 +10353,103 @@ async function init(){css();closeNav();supplierSelect();await syncAll();reportPa
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
 </script>
+
+<!-- final-sync-sidebar-scroll-fix -->
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+function toast(m){ if(window.toast) window.toast(m); else alert(m); }
+function safeRoot(){ return window.FIREBASE_ROOT || window.CASHIER_FIREBASE_CONFIG?.firebaseRoot || 'cashier_units_pro_default'; }
+function uid(p){ return p+'_'+Date.now()+'_'+Math.random().toString(16).slice(2); }
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
+function money(v){ if(window.money) return window.money(v); return '₪ '+(Number(v)||0).toFixed(2); }
+function num(v){ if(window.cleanNumber) return window.cleanNumber(v); const n=Number(String(v??'').replace(',','.')); return Number.isFinite(n)?n:0; }
+async function saveNewStore(store,item){
+  window.state=window.state||{}; window.state[store]=Array.isArray(window.state[store])?window.state[store]:[];
+  if(!item.id) item.id=uid(store); item.updatedAt=Date.now(); if(!item.createdAt)item.createdAt=Date.now();
+  const i=window.state[store].findIndex(x=>x.id===item.id); if(i>=0) window.state[store][i]=item; else window.state[store].push(item);
+  if(window.idbPut){ try{ await window.idbPut(store,item); }catch(e){} }
+  if(window.enqueueSync){ try{ await window.enqueueSync({type:'set',store,itemId:item.id,data:item}); }catch(e){} }
+  if(navigator.onLine && window.db && window.ref && window.set){ try{ await window.set(window.ref(window.db, safeRoot()+'/'+store+'/'+item.id), item); }catch(e){ console.warn(e); } }
+  bumpSyncBadge();
+  return item;
+}
+async function deleteNewStore(store,id){
+  window.state=window.state||{}; window.state[store]=(window.state[store]||[]).filter(x=>x.id!==id);
+  if(window.idbDelete){ try{ await window.idbDelete(store,id); }catch(e){} }
+  if(window.enqueueSync){ try{ await window.enqueueSync({type:'remove',store,itemId:id,data:null}); }catch(e){} }
+  if(navigator.onLine && window.db && window.ref && window.remove){ try{ await window.remove(window.ref(window.db, safeRoot()+'/'+store+'/'+id)); }catch(e){ console.warn(e); } }
+  bumpSyncBadge();
+}
+function bumpSyncBadge(){ if(window.refreshPendingCount) window.refreshPendingCount(); }
+async function pullNewStores(){
+  if(!(navigator.onLine&&window.db&&window.ref&&window.get)) return;
+  for(const store of ['suppliers','workers','workerWages']){
+    try{
+      const snap=await window.get(window.ref(window.db,safeRoot()+'/'+store));
+      if(snap.exists&&snap.exists()){
+        const arr=Object.values(snap.val()||{}).filter(Boolean);
+        window.state[store]=arr;
+        if(window.idbPut) for(const it of arr) await window.idbPut(store,it).catch(()=>{});
+      }
+    }catch(e){console.warn('pull '+store,e)}
+  }
+}
+function patchSyncButton(){
+  const old=window.syncNow;
+  window.syncNow=async function(show){
+    await pullNewStores();
+    if(typeof old==='function') await old(show);
+    await pushAllNewStores();
+    renderNewPages();
+  };
+}
+async function pushAllNewStores(){
+  if(!(navigator.onLine&&window.db&&window.ref&&window.set)) return;
+  for(const store of ['suppliers','workers','workerWages']){
+    for(const it of (window.state?.[store]||[])){
+      try{ await window.set(window.ref(window.db,safeRoot()+'/'+store+'/'+it.id),it); }catch(e){console.warn(e)}
+    }
+  }
+}
+function ensureStyles(){
+ if($('finalMobileSyncStyle'))return; const st=document.createElement('style'); st.id='finalMobileSyncStyle'; st.textContent=`
+ .sidebar{z-index:7000!important;overflow-y:auto!important;overscroll-behavior:contain!important;touch-action:pan-y!important;padding-bottom:120px!important;}
+ body.sidebar-open,html.sidebar-open{overflow:hidden!important;}
+ .table-wrap,.new-mobile-scroll{overflow-x:auto!important;overflow-y:hidden!important;-webkit-overflow-scrolling:touch!important;max-width:100%!important;display:block!important;direction:rtl!important;touch-action:pan-x!important;}
+ .table-wrap table,.new-mobile-scroll table{min-width:980px!important;width:max-content!important;}
+ @media(max-width:900px){.sidebar.open{transform:translateX(0)!important}.sidebar{bottom:88px!important;height:auto!important}.card{overflow:hidden!important}.section{max-width:100vw!important;overflow-x:hidden!important}.main{overflow-x:hidden!important}.new-page-table-holder{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important}.new-page-table-holder table{min-width:980px!important}}
+ `; document.head.appendChild(st);
+}
+function closeSidebar(){ const sb=$('sidebar'); if(sb) sb.classList.remove('open'); document.body.classList.remove('sidebar-open'); document.documentElement.classList.remove('sidebar-open'); }
+function patchSidebarClose(){ document.addEventListener('click',e=>{ const btn=e.target.closest('.sidebar [data-page], .nav-btn[data-page], .bottom-btn[data-page]'); if(btn){ setTimeout(closeSidebar,60); } const open=e.target.closest('#openMenuBtn'); if(open){ document.body.classList.add('sidebar-open'); document.documentElement.classList.add('sidebar-open'); }},true); }
+function ensurePages(){
+ const main=document.querySelector('main.main'); const side=$('sidebar'); if(!main||!side)return;
+ if(!$('page-customersNew')) main.insertAdjacentHTML('beforeend',`<section id="page-customersNew" class="section"><div class="card"><h1 style="font-size:24px;font-weight:900;margin:0 0 14px"><i class="fa-solid fa-users"></i> العملاء</h1><div class="new-page-table-holder"><table><thead><tr><th>الاسم</th><th>الهاتف</th><th>الرصيد</th><th>المبيعات</th><th>الدفعات</th><th>الفواتير</th><th>الإجراءات</th></tr></thead><tbody id="newCustomersTable"></tbody></table></div></div></section>`);
+ if(!$('page-suppliersNew')) main.insertAdjacentHTML('beforeend',`<section id="page-suppliersNew" class="section"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px"><h1 style="font-size:24px;font-weight:900;margin:0"><i class="fa-solid fa-truck-field"></i> الموردين</h1><button id="newAddSupplierBtn" class="primary-btn"><i class="fa-solid fa-plus"></i> إضافة مورد</button></div><div class="card"><div class="new-page-table-holder"><table><thead><tr><th>الاسم</th><th>الهاتف</th><th>العنوان</th><th>ملاحظات</th><th>الإجراءات</th></tr></thead><tbody id="newSuppliersTable"></tbody></table></div></div></section>`);
+ if(!$('page-workersNew')) main.insertAdjacentHTML('beforeend',`<section id="page-workersNew" class="section"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px"><h1 style="font-size:24px;font-weight:900;margin:0"><i class="fa-solid fa-user-gear"></i> العمال والأجور</h1><button id="newAddWorkerBtn" class="primary-btn"><i class="fa-solid fa-plus"></i> إضافة عامل</button></div><div class="card" style="margin-bottom:14px"><div id="newWorkersCards"></div></div><div class="card"><h2 style="font-size:19px;font-weight:900;margin:0 0 12px">سجل الأجور</h2><div class="new-page-table-holder"><table><thead><tr><th>التاريخ</th><th>العامل</th><th>النوع</th><th>المبلغ</th><th>ملاحظات</th><th>الإجراءات</th></tr></thead><tbody id="newWagesTable"></tbody></table></div></div></section>`);
+ const addNav=(page,icon,label)=>{ if(!side.querySelector(`[data-page="${page}"]`)) side.insertAdjacentHTML('beforeend',`<button class="nav-btn" data-page="${page}"><span class="nav-icon"><i class="fa-solid ${icon}"></i></span> ${label}</button>`); };
+ addNav('customersNew','fa-users','العملاء'); addNav('suppliersNew','fa-truck-field','الموردين'); addNav('workersNew','fa-user-gear','العمال والأجور');
+}
+function switchNewPage(page){ document.querySelectorAll('.section').forEach(s=>s.classList.remove('active')); $('page-'+page)?.classList.add('active'); document.querySelectorAll('.nav-btn,.bottom-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===page)); closeSidebar(); renderNewPages(); }
+function bindNewNav(){ document.addEventListener('click',e=>{ const b=e.target.closest('[data-page="customersNew"],[data-page="suppliersNew"],[data-page="workersNew"]'); if(b){ e.preventDefault(); e.stopImmediatePropagation(); switchNewPage(b.dataset.page); }},true); }
+function renderNewPages(){
+ const cs=$('newCustomersTable'); if(cs){ cs.innerHTML=(window.state?.customers||[]).map(c=>`<tr><td><b>${escapeHtml(c.name||'')}</b></td><td>${escapeHtml(c.phone||'-')}</td><td>${money(c.balance||0)}</td><td>${money(c.totalSales||0)}</td><td>${money(c.totalPaid||0)}</td><td>${c.invoicesCount||0}</td><td><button class="ghost-btn" data-open-customer="${c.id}"><i class="fa-solid fa-eye"></i> عرض</button></td></tr>`).join('')||`<tr><td colspan="7" class="muted" style="text-align:center">لا يوجد عملاء</td></tr>`; }
+ const ss=$('newSuppliersTable'); if(ss){ ss.innerHTML=(window.state?.suppliers||[]).map(s=>`<tr><td><b>${escapeHtml(s.name)}</b></td><td>${escapeHtml(s.phone||'-')}</td><td>${escapeHtml(s.address||'-')}</td><td>${escapeHtml(s.notes||'-')}</td><td><button class="ghost-btn" data-edit-new-supplier="${s.id}">تعديل</button><button class="danger-btn" data-del-new-supplier="${s.id}">حذف</button></td></tr>`).join('')||`<tr><td colspan="5" class="muted" style="text-align:center">لا يوجد موردين</td></tr>`; }
+ const wc=$('newWorkersCards'); if(wc){ wc.innerHTML=(window.state?.workers||[]).map(w=>`<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid #e5e7eb;border-radius:18px;padding:12px;margin-bottom:8px;background:#fff"><div><b>${escapeHtml(w.name)}</b><div class="muted">${w.type==='percent'?'نسبة من الأرباح '+w.value+'%':w.type==='monthly'?'راتب شهري '+money(w.value):'أجرة يومية '+money(w.value)}</div></div><div><button class="success-btn" data-pay-new-worker="${w.id}">تسجيل أجرة</button><button class="ghost-btn" data-edit-new-worker="${w.id}">تعديل</button><button class="danger-btn" data-del-new-worker="${w.id}">حذف</button></div></div>`).join('')||'<div class="muted">لا يوجد عمال</div>'; }
+ const wt=$('newWagesTable'); if(wt){ wt.innerHTML=(window.state?.workerWages||[]).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(w=>`<tr><td>${new Date(w.createdAt||Date.now()).toLocaleString('ar')}</td><td>${escapeHtml(w.workerName||'-')}</td><td>${escapeHtml(w.type||'-')}</td><td>${money(w.amount||0)}</td><td>${escapeHtml(w.notes||'-')}</td><td><button class="danger-btn" data-del-new-wage="${w.id}">حذف</button></td></tr>`).join('')||`<tr><td colspan="6" class="muted" style="text-align:center">لا يوجد أجور</td></tr>`; }
+ patchPurchaseSupplierSelect();
+}
+function openSupplierForm(id){ const old=(window.state?.suppliers||[]).find(x=>x.id===id)||{}; openModalMini(id?'تعديل مورد':'إضافة مورد',`<form id="newSupplierForm"><label class="field-label">اسم المورد</label><input id="newSupplierName" class="input" required value="${escapeHtml(old.name||'')}"><label class="field-label">الهاتف</label><input id="newSupplierPhone" class="input" value="${escapeHtml(old.phone||'')}"><label class="field-label">العنوان</label><input id="newSupplierAddress" class="input" value="${escapeHtml(old.address||'')}"><label class="field-label">ملاحظات</label><textarea id="newSupplierNotes" class="textarea">${escapeHtml(old.notes||'')}</textarea><button class="primary-btn" style="width:100%;margin-top:12px">حفظ</button></form>`); $('newSupplierForm').onsubmit=async e=>{e.preventDefault(); await saveNewStore('suppliers',{...old,id:old.id||uid('sup'),name:$('newSupplierName').value.trim(),phone:$('newSupplierPhone').value.trim(),address:$('newSupplierAddress').value.trim(),notes:$('newSupplierNotes').value.trim()}); closeModalMini(); renderNewPages(); toast(id?'تم تعديل المورد':'تم إضافة المورد');}; }
+function openWorkerForm(id){ const old=(window.state?.workers||[]).find(x=>x.id===id)||{}; openModalMini(id?'تعديل عامل':'إضافة عامل',`<form id="newWorkerForm"><label class="field-label">اسم العامل</label><input id="newWorkerName" class="input" required value="${escapeHtml(old.name||'')}"><label class="field-label">نوع الأجرة</label><select id="newWorkerType" class="select"><option value="daily" ${old.type==='daily'?'selected':''}>يومية</option><option value="percent" ${old.type==='percent'?'selected':''}>نسبة من الأرباح %</option><option value="monthly" ${old.type==='monthly'?'selected':''}>راتب شهري</option></select><label class="field-label">القيمة</label><input id="newWorkerValue" type="number" class="input" value="${old.value||0}"><button class="primary-btn" style="width:100%;margin-top:12px">حفظ</button></form>`); $('newWorkerForm').onsubmit=async e=>{e.preventDefault(); await saveNewStore('workers',{...old,id:old.id||uid('wrk'),name:$('newWorkerName').value.trim(),type:$('newWorkerType').value,value:num($('newWorkerValue').value)}); closeModalMini(); renderNewPages(); toast(id?'تم تعديل العامل':'تم إضافة العامل');}; }
+function openPayWorker(id){ const w=(window.state?.workers||[]).find(x=>x.id===id); if(!w)return; openModalMini('تسجيل أجرة',`<form id="newPayWorkerForm"><div class="muted">${escapeHtml(w.name)}</div><label class="field-label">المبلغ</label><input id="newWageAmount" type="number" class="input" value="${w.type==='percent'?0:w.value||0}"><label class="field-label">ملاحظات</label><input id="newWageNotes" class="input"><button class="success-btn" style="width:100%;margin-top:12px">تسجيل</button></form>`); $('newPayWorkerForm').onsubmit=async e=>{e.preventDefault(); await saveNewStore('workerWages',{id:uid('wage'),workerId:w.id,workerName:w.name,type:w.type,amount:num($('newWageAmount').value),notes:$('newWageNotes').value.trim(),createdAt:Date.now()}); closeModalMini(); renderNewPages(); toast('تم تسجيل أجرة العامل وخصمها من الأرباح');}; }
+function openModalMini(title,html){ if($('modalTitle')&&$('modalBody')&&$('modalBackdrop')){ $('modalTitle').textContent=title; $('modalBody').innerHTML=html; $('modalBackdrop').classList.add('show'); } }
+function closeModalMini(){ $('modalBackdrop')?.classList.remove('show'); }
+function bindActions(){ document.addEventListener('click',async e=>{ if(e.target.closest('#newAddSupplierBtn')){openSupplierForm();return} if(e.target.closest('#newAddWorkerBtn')){openWorkerForm();return} const es=e.target.closest('[data-edit-new-supplier]'); if(es){openSupplierForm(es.dataset.editNewSupplier);return} const ds=e.target.closest('[data-del-new-supplier]'); if(ds&&confirm('حذف المورد؟')){await deleteNewStore('suppliers',ds.dataset.delNewSupplier);renderNewPages();toast('تم حذف المورد');return} const ew=e.target.closest('[data-edit-new-worker]'); if(ew){openWorkerForm(ew.dataset.editNewWorker);return} const dw=e.target.closest('[data-del-new-worker]'); if(dw&&confirm('حذف العامل؟')){await deleteNewStore('workers',dw.dataset.delNewWorker);renderNewPages();toast('تم حذف العامل');return} const pw=e.target.closest('[data-pay-new-worker]'); if(pw){openPayWorker(pw.dataset.payNewWorker);return} const dww=e.target.closest('[data-del-new-wage]'); if(dww&&confirm('حذف الأجرة؟')){await deleteNewStore('workerWages',dww.dataset.delNewWage);renderNewPages();toast('تم حذف الأجرة');return} },true); }
+function patchPurchaseSupplierSelect(){ const inp=$('purchaseSupplier'); if(!inp||$('purchaseSupplierSelectPatch'))return; const sel=document.createElement('select'); sel.id='purchaseSupplierSelectPatch'; sel.className='select'; sel.innerHTML='<option value="">اختر مورد محفوظ</option>'+(window.state?.suppliers||[]).map(s=>`<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join(''); inp.parentNode.appendChild(sel); sel.onchange=()=>{ if(sel.value){ inp.value=sel.value; inp.dispatchEvent(new Event('input',{bubbles:true})); } } }
+function patchReportNet(){ const old=window.renderReports; if(typeof old==='function'&&!window.__wageReportPatch){ window.__wageReportPatch=true; window.renderReports=function(...args){ const r=old.apply(this,args); const total=(window.state?.workerWages||[]).reduce((s,w)=>s+num(w.amount),0); const el=$('reportNet'); if(el){ const txt=el.textContent||''; const base=num(txt.replace(/[^0-9.\-]/g,'')); el.textContent=money(base-total); } return r; }; } }
+async function init(){ ensureStyles(); ensurePages(); patchSidebarClose(); bindNewNav(); bindActions(); patchSyncButton(); await pullNewStores(); renderNewPages(); patchReportNet(); setInterval(renderNewPages,2500); }
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
