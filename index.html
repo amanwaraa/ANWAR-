@@ -3221,6 +3221,120 @@
       return state.settings?.adminPasswordHash || simpleHash(DEFAULT_ADMIN_PIN);
     }
 
+
+    function setButtonLoading(btn, loading, text = "جاري التنفيذ...") {
+      if (!btn) return;
+      if (loading) {
+        if (!btn.dataset.oldHtml) btn.dataset.oldHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${text}`;
+      } else {
+        btn.disabled = false;
+        if (btn.dataset.oldHtml) btn.innerHTML = btn.dataset.oldHtml;
+        delete btn.dataset.oldHtml;
+      }
+    }
+
+    function isDefaultAdminPassword() {
+      return getAdminPasswordHash() === simpleHash(DEFAULT_ADMIN_PIN);
+    }
+
+    async function fetchFreshSettingsFromFirebase() {
+      if (!navigator.onLine) return state.settings || defaultSettings;
+      try {
+        const snap = await get(ref(db, `${FIREBASE_ROOT}/settings/main`));
+        if (snap.exists()) {
+          const current = state.settings || defaultSettings;
+          const remote = snap.val() || {};
+          const remoteSettings = {
+            ...defaultSettings,
+            ...remote,
+            id: "main",
+            localLogo: current.localLogo || "",
+            logoMode: current.localLogo ? "local" : (remote.logo ? "url" : "default")
+          };
+          await idbPut("settings", remoteSettings);
+          state.settings = remoteSettings;
+          applySettingsToUI();
+          return remoteSettings;
+        }
+      } catch (e) {
+        console.warn("fetchFreshSettingsFromFirebase failed", e);
+      }
+      return state.settings || defaultSettings;
+    }
+
+    async function saveSettingsToFirebaseNow(settings) {
+      const cleanSettings = stripLocalOnlySettings(settings);
+      await idbPut("settings", settings);
+      if (navigator.onLine) {
+        await set(ref(db, `${FIREBASE_ROOT}/settings/main`), cleanSettings);
+      } else {
+        await enqueueSync({ type: "set", store: "settings", itemId: "main", data: cleanSettings });
+      }
+    }
+
+    function openForceAdminPasswordModal() {
+      if (!isAdminUser() || !isDefaultAdminPassword()) return;
+      openModal("تغيير كلمة مرور المدير إجباري", `
+        <div class="card" style="box-shadow:none">
+          <div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:18px;padding:12px;margin-bottom:14px;font-weight:900;line-height:1.8">
+            لا يمكن استخدام النظام بكلمة المرور الافتراضية 0000. يجب تغيير كلمة مرور المدير الآن، وسيتم حفظها في Firebase.
+          </div>
+          <form id="forceAdminPasswordForm">
+            <div class="form-grid-compact">
+              <div>
+                <label class="field-label">كلمة المرور الجديدة</label>
+                <input id="forceAdminPassword1" type="password" class="input" required placeholder="اكتب كلمة مرور جديدة">
+              </div>
+              <div>
+                <label class="field-label">تأكيد كلمة المرور</label>
+                <input id="forceAdminPassword2" type="password" class="input" required placeholder="أعد كتابة كلمة المرور">
+              </div>
+            </div>
+            <button id="forceAdminPasswordBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px">
+              <i class="fa-solid fa-floppy-disk"></i> حفظ كلمة المرور والمتابعة
+            </button>
+          </form>
+        </div>
+      `);
+      if ($("modalCloseBtn")) $("modalCloseBtn").style.display = "none";
+      const backdrop = $("modalBackdrop");
+      if (backdrop) backdrop.onclick = null;
+      $("forceAdminPasswordForm").onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = $("forceAdminPasswordBtn");
+        const p1 = $("forceAdminPassword1").value.trim();
+        const p2 = $("forceAdminPassword2").value.trim();
+        if (p1.length < 4) return toast("كلمة المرور يجب أن تكون 4 خانات على الأقل");
+        if (p1 === DEFAULT_ADMIN_PIN) return toast("لا يمكن استخدام كلمة المرور الافتراضية 0000");
+        if (p1 !== p2) return toast("كلمتا المرور غير متطابقتين");
+        setButtonLoading(btn, true, "جاري الحفظ في Firebase...");
+        try {
+          state.settings = { ...defaultSettings, ...state.settings, id: "main", adminPasswordHash: simpleHash(p1), updatedAt: Date.now() };
+          await saveSettingsToFirebaseNow(state.settings);
+          if ($("modalCloseBtn")) $("modalCloseBtn").style.display = "";
+          closeModal();
+          bindModalCloseAgain();
+          toast("تم حفظ كلمة مرور المدير في Firebase بنجاح");
+        } catch (err) {
+          console.error(err);
+          toast("فشل حفظ كلمة المرور في Firebase، تأكد من الاتصال");
+        } finally {
+          setButtonLoading(btn, false);
+        }
+      };
+    }
+
+    function bindModalCloseAgain() {
+      if ($("modalCloseBtn")) $("modalCloseBtn").onclick = closeModal;
+      if ($("modalBackdrop")) {
+        $("modalBackdrop").onclick = (e) => {
+          if (e.target.id === "modalBackdrop") closeModal();
+        };
+      }
+    }
+
     function setAuthUser(user) {
       state.auth.user = user;
       state.auth.ready = true;
@@ -3228,9 +3342,11 @@
       if (user) {
         saveAuthSession(user);
         $("authLock")?.classList.add("hide");
+        if ($("authLock")) $("authLock").style.display = "none";
       } else {
         clearAuthSession();
         $("authLock")?.classList.remove("hide");
+        if ($("authLock")) $("authLock").style.display = "flex";
       }
 
       applyPermissionsUI();
@@ -3333,12 +3449,14 @@
       }
 
       if (saved.role === "admin") {
+        await fetchFreshSettingsFromFirebase();
         setAuthUser({
           id: "admin",
           name: "المدير",
           role: "admin",
           permissions: [ADMIN_PERMISSION]
         });
+        if (isDefaultAdminPassword()) setTimeout(() => openForceAdminPasswordModal(), 250);
         return;
       }
 
@@ -3373,53 +3491,57 @@
         $("employeeLoginForm").style.display = "block";
       };
 
-      $("adminLoginForm").onsubmit = (e) => {
+      $("adminLoginForm").onsubmit = async (e) => {
         e.preventDefault();
-
+        const btn = e.submitter || $("adminLoginForm").querySelector("button[type='submit']");
         const pass = $("adminPasswordInput").value.trim();
-
-        if (simpleHash(pass) !== getAdminPasswordHash()) {
-          toast("كلمة مرور المدير غير صحيحة");
-          return;
+        setButtonLoading(btn, true, "جاري فحص كلمة المرور...");
+        try {
+          await fetchFreshSettingsFromFirebase();
+          if (simpleHash(pass) !== getAdminPasswordHash()) {
+            toast("كلمة مرور المدير غير صحيحة");
+            return;
+          }
+          $("adminPasswordInput").value = "";
+          setAuthUser({ id: "admin", name: "المدير", role: "admin", permissions: [ADMIN_PERMISSION] });
+          toast("تم دخول المدير");
+          if (isDefaultAdminPassword()) setTimeout(() => openForceAdminPasswordModal(), 250);
+        } catch (err) {
+          console.error(err);
+          toast("تعذر فحص كلمة المرور من Firebase");
+        } finally {
+          setButtonLoading(btn, false);
         }
-
-        setAuthUser({
-          id: "admin",
-          name: "المدير",
-          role: "admin",
-          permissions: [ADMIN_PERMISSION]
-        });
-
-        toast("تم دخول المدير");
       };
 
-      $("employeeLoginForm").onsubmit = (e) => {
+      $("employeeLoginForm").onsubmit = async (e) => {
         e.preventDefault();
-
+        const btn = e.submitter || $("employeeLoginForm").querySelector("button[type='submit']");
         const name = $("employeeNameInput").value.trim();
         const pass = $("employeePasswordInput").value.trim();
-
-        const emp = state.employees.find(x =>
-          x.active !== false &&
-          String(x.name || "").trim() === name &&
-          x.passwordHash === simpleHash(pass)
-        );
-
-        if (!emp) {
-          toast("بيانات الموظف غير صحيحة أو الحساب موقوف");
-          return;
+        setButtonLoading(btn, true, "جاري تسجيل الدخول...");
+        try {
+          if (navigator.onLine) {
+            await loadFirebaseRoot(FIREBASE_ROOT);
+            await loadLocalData(true);
+          }
+          const emp = state.employees.find(x => x.active !== false && String(x.name || "").trim() === name && x.passwordHash === simpleHash(pass));
+          if (!emp) {
+            toast("بيانات الموظف غير صحيحة أو الحساب موقوف");
+            return;
+          }
+          $("employeePasswordInput").value = "";
+          setAuthUser({ id: emp.id, name: emp.name, role: emp.permissions.includes(ADMIN_PERMISSION) ? "admin" : "employee", permissions: emp.permissions || [] });
+          toast(`أهلاً ${emp.name}`);
+        } catch (err) {
+          console.error(err);
+          toast("حدث خطأ أثناء تسجيل دخول الموظف");
+        } finally {
+          setButtonLoading(btn, false);
         }
-
-        setAuthUser({
-          id: emp.id,
-          name: emp.name,
-          role: emp.permissions.includes(ADMIN_PERMISSION) ? "admin" : "employee",
-          permissions: emp.permissions || []
-        });
-
-        toast(`أهلاً ${emp.name}`);
       };
     }
+
     function unitLabel(unit, custom = "") {
       const map = {
         piece: "قطعة",
@@ -4753,63 +4875,57 @@
     }
 
     async function changeAdminPassword() {
-  if (!isAdminUser()) {
-    toast("تغيير كلمة مرور المدير للمدير فقط");
-    return;
-  }
+      if (!isAdminUser()) {
+        toast("تغيير كلمة مرور المدير للمدير فقط");
+        return;
+      }
 
-  const p1Input = $("settingAdminPassword");
-  const p2Input = $("settingAdminPassword2");
+      const btn = $("saveAdminPasswordBtn");
+      const p1Input = $("settingAdminPassword");
+      const p2Input = $("settingAdminPassword2");
+      const p1 = String(p1Input?.value || "").trim();
+      const p2 = String(p2Input?.value || "").trim();
 
-  const p1 = String(p1Input?.value || "").trim();
-  const p2 = String(p2Input?.value || "").trim();
+      if (!p1) {
+        toast("أدخل كلمة مرور المدير الجديدة");
+        p1Input?.focus();
+        return;
+      }
+      if (!p2) {
+        toast("أعد كتابة كلمة مرور المدير للتأكيد");
+        p2Input?.focus();
+        return;
+      }
+      if (p1.length < 4) {
+        toast("كلمة مرور المدير يجب أن تكون 4 خانات على الأقل");
+        p1Input?.focus();
+        return;
+      }
+      if (p1 === DEFAULT_ADMIN_PIN) {
+        toast("لا يمكن استخدام كلمة المرور الافتراضية 0000");
+        p1Input?.focus();
+        return;
+      }
+      if (p1 !== p2) {
+        toast("كلمتا المرور غير متطابقتين");
+        p2Input?.focus();
+        return;
+      }
 
-  if (!p1) {
-    toast("أدخل كلمة مرور المدير الجديدة");
-    p1Input?.focus();
-    return;
-  }
-
-  if (!p2) {
-    toast("أعد كتابة كلمة مرور المدير للتأكيد");
-    p2Input?.focus();
-    return;
-  }
-
-  if (p1.length < 4) {
-    toast("كلمة مرور المدير يجب أن تكون 4 خانات على الأقل");
-    p1Input?.focus();
-    return;
-  }
-
-  if (p1 !== p2) {
-    toast("كلمتا المرور غير متطابقتين");
-    p2Input?.focus();
-    return;
-  }
-
-  state.settings = {
-    ...defaultSettings,
-    ...state.settings,
-    id: "main",
-    adminPasswordHash: simpleHash(p1),
-    updatedAt: Date.now()
-  };
-
-  await idbPut("settings", state.settings);
-
-  await enqueueSync({
-    type: "set",
-    store: "settings",
-    itemId: "main",
-    data: stripLocalOnlySettings(state.settings)
-  });
-
-  p1Input.value = "";
-  p2Input.value = "";
-
-  toast("تم تغيير كلمة مرور المدير بنجاح");
-}
+      setButtonLoading(btn, true, "جاري الحفظ في Firebase...");
+      try {
+        state.settings = { ...defaultSettings, ...state.settings, id: "main", adminPasswordHash: simpleHash(p1), updatedAt: Date.now() };
+        await saveSettingsToFirebaseNow(state.settings);
+        p1Input.value = "";
+        p2Input.value = "";
+        toast("تم تغيير كلمة مرور المدير وحفظها في Firebase");
+      } catch (err) {
+        console.error(err);
+        toast("فشل حفظ كلمة المرور في Firebase");
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    }
 
     function addToCart(product, selectedUnit = "") {
       if (!product) return;
@@ -9824,6 +9940,8 @@
 
       $("saveSettingsBtn").onclick = saveSettings;
 
+      if ($("saveAdminPasswordBtn")) $("saveAdminPasswordBtn").onclick = changeAdminPassword;
+
       $("exportBackupBtn").onclick = exportBackup;
 
       $("importBackupInput").onchange = (e) => importBackup(e.target.files[0]);
@@ -9981,6 +10099,10 @@
 
       await loadLocalData(true);
 
+      if (navigator.onLine) {
+        await fetchFreshSettingsFromFirebase();
+      }
+
       if (!state.freeLines.length) {
         state.freeLines = [{ id: uid("free"), name: "", qty: 1, cost: 0, price: 0 }];
       }
@@ -10110,498 +10232,103 @@
   
 
 <script>
+/* direct-auth-final-fix-v4: login messages, recovery email, sidebar z-index */
 (function(){
   "use strict";
-  var D=document,$=function(id){return D.getElementById(id)}, ADMIN='__admin__';
-  function toast(m){ if(window.toast) window.toast(m); else alert(m); }
-  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]})}
-  function uid(p){return p+'_'+Date.now()+'_'+Math.random().toString(16).slice(2)}
-  function n(v){ if(window.cleanNumber) return window.cleanNumber(v); var x=Number(String(v||0).replace(',','.')); return isFinite(x)?x:0 }
-  function money(v){ if(window.money) return window.money(v); return '₪ '+n(v).toFixed(2) }
-  function st(){ window.state=window.state||{}; ['customers','suppliers','workers','workerWages','purchases','expenses','supplierPayments','invoices'].forEach(function(k){window.state[k]=Array.isArray(window.state[k])?window.state[k]:[]}); return window.state }
-  function fmt(t){try{return new Date(Number(t||Date.now())).toLocaleString('ar',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}catch(e){return '-'}}
-  function save(store,item){ if(window.saveLocal) return window.saveLocal(store,item,true); if(window.idbPut) return window.idbPut(store,item); return Promise.resolve() }
-  function del(store,id){ if(window.removeLocal) return window.removeLocal(store,id,true); if(window.idbDelete) return window.idbDelete(store,id); return Promise.resolve() }
-  function openModal(title,html){ var t=$('modalTitle'),b=$('modalBody'),back=$('modalBackdrop'),box=$('modalBox'); if(!t||!b||!back){alert(title);return} t.textContent=title; b.innerHTML=html; if(box)box.classList.add('large'); back.classList.add('show') }
-  function closeModal(){ $('modalBackdrop')&&$('modalBackdrop').classList.remove('show'); $('modalBox')&&$('modalBox').classList.remove('large') }
-  function period(items,per,field){ if(window.periodFilter) return window.periodFilter(items,per,field||'createdAt',''); if(per==='all')return items; var now=new Date(),a=new Date(),b=new Date(); if(per==='today'){a.setHours(0,0,0,0);b.setHours(23,59,59,999)} else if(per==='week'){a.setDate(now.getDate()-7);a.setHours(0,0,0,0);b.setHours(23,59,59,999)} else if(per==='month'){a.setMonth(now.getMonth()-1);a.setHours(0,0,0,0);b.setHours(23,59,59,999)} else if(per==='year'){a.setFullYear(now.getFullYear()-1);a.setHours(0,0,0,0);b.setHours(23,59,59,999)} return items.filter(function(x){var t=Number(x[field||'createdAt']||0);return t>=a.getTime()&&t<=b.getTime()}) }
-  function css(){ if($('cswCss'))return; var x=D.createElement('style'); x.id='cswCss'; x.textContent='.csw-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}.csw-stat,.csw-card{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:13px;box-shadow:0 8px 22px rgba(15,23,42,.05)}.csw-stat span{display:block;color:#64748b;font-size:12px;font-weight:900}.csw-stat b{display:block;color:#1d4ed8;font-size:20px;margin-top:6px}.csw-card{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}.csw-actions{display:flex;gap:7px;flex-wrap:wrap}@media(max-width:900px){.csw-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}'; D.head.appendChild(x) }
-  function nav(){ if(D.querySelector('[data-page="customersPage"]'))return; var ref=D.querySelector('.nav-btn[data-page="debts"]')||D.querySelector('.nav-btn[data-page="settings"]'); if(ref)ref.insertAdjacentHTML('afterend','<button class="nav-btn" data-page="customersPage"><span class="nav-icon"><i class="fa-solid fa-users"></i></span> العملاء</button><button class="nav-btn" data-page="suppliersPage"><span class="nav-icon"><i class="fa-solid fa-truck-field"></i></span> الموردين</button><button class="nav-btn" data-page="workersPage"><span class="nav-icon"><i class="fa-solid fa-people-carry-box"></i></span> العمال والأجور</button>') }
-  function sections(){ var main=D.querySelector('main.main'); if(!main)return; if(!$('page-customersPage'))main.insertAdjacentHTML('beforeend','<section id="page-customersPage" class="section"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap"><h1 style="font-size:24px;font-weight:900;margin:0"><i class="fa-solid fa-users"></i> العملاء</h1><button id="cswAddCustomer" class="gold-btn"><i class="fa-solid fa-user-plus"></i> إضافة عميل</button></div><div class="csw-grid"><div class="csw-stat"><span>عدد العملاء</span><b id="cswCustCount">0</b></div><div class="csw-stat"><span>إجمالي عليه</span><b id="cswCustOwed">₪ 0</b></div><div class="csw-stat"><span>إجمالي له</span><b id="cswCustCredit">₪ 0</b></div><div class="csw-stat"><span>فواتير العملاء</span><b id="cswCustInv">0</b></div></div><div class="card"><input id="cswCustSearch" class="input" placeholder="بحث باسم العميل أو الهاتف..." style="margin-bottom:12px"><div class="table-wrap"><table><thead><tr><th>الاسم</th><th>الهاتف</th><th>الرصيد</th><th>المبيعات</th><th>الدفعات</th><th>الفواتير</th><th>آخر حركة</th><th>الإجراءات</th></tr></thead><tbody id="cswCustTable"></tbody></table></div></div></section>'); if(!$('page-suppliersPage'))main.insertAdjacentHTML('beforeend','<section id="page-suppliersPage" class="section"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap"><h1 style="font-size:24px;font-weight:900;margin:0"><i class="fa-solid fa-truck-field"></i> الموردين</h1><button id="cswAddSupplier" class="primary-btn"><i class="fa-solid fa-plus"></i> إضافة مورد</button></div><div class="csw-grid"><div class="csw-stat"><span>عدد الموردين</span><b id="cswSupCount">0</b></div><div class="csw-stat"><span>إجمالي مشتريات</span><b id="cswSupPurch">₪ 0</b></div><div class="csw-stat"><span>إجمالي دفعات</span><b id="cswSupPay">₪ 0</b></div><div class="csw-stat"><span>عدد الفواتير</span><b id="cswSupInv">0</b></div></div><div class="card"><input id="cswSupSearch" class="input" placeholder="بحث باسم المورد أو الهاتف..." style="margin-bottom:12px"><div id="cswSupList"></div></div></section>'); if(!$('page-workersPage'))main.insertAdjacentHTML('beforeend','<section id="page-workersPage" class="section"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap"><h1 style="font-size:24px;font-weight:900;margin:0"><i class="fa-solid fa-people-carry-box"></i> العمال والأجور</h1><div class="csw-actions"><button id="cswAddWorker" class="primary-btn"><i class="fa-solid fa-user-plus"></i> إضافة عامل</button><button id="cswAddWage" class="gold-btn"><i class="fa-solid fa-money-check-dollar"></i> تسجيل أجرة</button></div></div><div class="csw-grid"><div class="csw-stat"><span>عدد العمال</span><b id="cswWorkCount">0</b></div><div class="csw-stat"><span>أجور الفترة</span><b id="cswWagePeriod">₪ 0</b></div><div class="csw-stat"><span>أجور اليوم</span><b id="cswWageToday">₪ 0</b></div><div class="csw-stat"><span>خصم من الأرباح</span><b>فعال</b></div></div><div class="card" style="margin-bottom:14px"><div class="form-grid"><input id="cswWorkSearch" class="input" placeholder="بحث عن عامل..."><select id="cswWorkPeriod" class="select"><option value="today">اليوم</option><option value="week">أسبوع</option><option value="month">شهر</option><option value="year">سنة</option><option value="all">كل السجل</option></select></div></div><div class="card"><div id="cswWorkList"></div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>التاريخ</th><th>العامل</th><th>طريقة الحساب</th><th>النسبة/الراتب</th><th>المبلغ</th><th>ملاحظات</th><th>الإجراءات</th></tr></thead><tbody id="cswWageTable"></tbody></table></div></div></section>') }
-  function bal(c){var b=n(c.balance); if(b>0)return {t:'عليه '+money(b),c:'#dc2626'}; if(b<0)return {t:'له '+money(Math.abs(b)),c:'#16a34a'}; return {t:'مسدّد',c:'#16a34a'}}
-  function renderCustomers(){var S=st(),q=($('cswCustSearch')&&$('cswCustSearch').value||'').toLowerCase(),ow=0,cr=0,ic=0; S.customers.forEach(function(c){var b=n(c.balance); if(b>0)ow+=b; else cr+=Math.abs(b); ic+=n(c.invoicesCount)}); if($('cswCustCount'))$('cswCustCount').textContent=S.customers.length; if($('cswCustOwed'))$('cswCustOwed').textContent=money(ow); if($('cswCustCredit'))$('cswCustCredit').textContent=money(cr); if($('cswCustInv'))$('cswCustInv').textContent=ic; var list=S.customers.filter(function(c){return !q||String(c.name||'').toLowerCase().includes(q)||String(c.phone||'').includes(q)}); if($('cswCustTable'))$('cswCustTable').innerHTML=list.map(function(c){var b=bal(c);return '<tr><td><b>'+esc(c.name)+'</b></td><td>'+esc(c.phone||'-')+'</td><td style="color:'+b.c+';font-weight:900">'+esc(b.t)+'</td><td>'+money(c.totalSales||0)+'</td><td>'+money(c.totalPaid||0)+'</td><td>'+n(c.invoicesCount||0)+'</td><td>'+fmt(c.updatedAt||c.createdAt)+'</td><td><button class="ghost-btn" data-csw-open-cust="'+c.id+'">عرض</button><button class="ghost-btn" data-csw-edit-cust="'+c.id+'">تعديل</button></td></tr>'}).join('')||'<tr><td colspan="8" class="muted" style="text-align:center">لا يوجد عملاء</td></tr>'}
-  function customerForm(id){var S=st(),o=id?S.customers.find(function(x){return x.id===id}):null; openModal(o?'تعديل عميل':'إضافة عميل','<form id="cswCustomerForm"><div class="form-grid-compact"><div><label class="field-label">اسم العميل</label><input id="cswCustomerName" class="input" required value="'+esc(o&&o.name||'')+'"></div><div><label class="field-label">الهاتف</label><input id="cswCustomerPhone" class="input" value="'+esc(o&&o.phone||'')+'"></div></div><button class="gold-btn" type="submit" style="width:100%;margin-top:14px">حفظ العميل</button></form>'); $('cswCustomerForm').onsubmit=function(e){e.preventDefault(); var item=Object.assign({},o||{},{id:o&&o.id||uid('cus'),name:$('cswCustomerName').value.trim(),phone:$('cswCustomerPhone').value.trim(),createdAt:o&&o.createdAt||Date.now(),updatedAt:Date.now()}); save('customers',item).then(function(){var i=S.customers.findIndex(function(x){return x.id===item.id}); if(i>=0)S.customers[i]=item; else S.customers.push(item); closeModal(); renderCustomers(); toast('تم حفظ العميل')})}}
-  function supStats(id){var S=st(),sup=S.suppliers.find(function(x){return x.id===id})||{},ps=S.purchases.filter(function(p){return p.supplierId===id||(!p.supplierId&&sup.name&&p.supplier===sup.name)}),pays=S.supplierPayments.filter(function(p){return p.supplierId===id||(!p.supplierId&&sup.name&&p.supplierName===sup.name)}); return {cnt:ps.length,purch:ps.reduce(function(a,x){return a+n(x.total||x.cost)},0),pay:pays.reduce(function(a,x){return a+n(x.amount)},0)}}
-  function renderSuppliers(){var S=st(),q=($('cswSupSearch')&&$('cswSupSearch').value||'').toLowerCase(),tp=0,ta=0,ci=0; S.suppliers.forEach(function(s){var x=supStats(s.id);tp+=x.purch;ta+=x.pay;ci+=x.cnt}); if($('cswSupCount'))$('cswSupCount').textContent=S.suppliers.length; if($('cswSupPurch'))$('cswSupPurch').textContent=money(tp); if($('cswSupPay'))$('cswSupPay').textContent=money(ta); if($('cswSupInv'))$('cswSupInv').textContent=ci; var list=S.suppliers.filter(function(s){return !q||String(s.name||'').toLowerCase().includes(q)||String(s.phone||'').includes(q)}); if($('cswSupList'))$('cswSupList').innerHTML=list.map(function(s){var x=supStats(s.id);return '<div class="csw-card"><div><b>'+esc(s.name)+'</b><div class="muted">'+esc(s.phone||'بدون رقم')+' · مشتريات: '+money(x.purch)+' · دفعات: '+money(x.pay)+'</div><div class="muted">'+esc(s.notes||'')+'</div></div><div class="csw-actions"><button class="ghost-btn" data-csw-edit-sup="'+s.id+'">تعديل</button><button class="danger-btn" data-csw-del-sup="'+s.id+'">حذف</button></div></div>'}).join('')||'<div class="muted" style="text-align:center;padding:20px">لا يوجد موردين</div>'}
-  function supplierForm(id){var S=st(),o=id?S.suppliers.find(function(x){return x.id===id}):null; openModal(o?'تعديل مورد':'إضافة مورد','<form id="cswSupplierForm"><div class="form-grid-compact"><div><label class="field-label">اسم المورد</label><input id="cswSupplierName" class="input" required value="'+esc(o&&o.name||'')+'"></div><div><label class="field-label">الهاتف</label><input id="cswSupplierPhone" class="input" value="'+esc(o&&o.phone||'')+'"></div><div class="full-row"><label class="field-label">ملاحظات</label><textarea id="cswSupplierNotes" class="textarea">'+esc(o&&o.notes||'')+'</textarea></div></div><button class="primary-btn" type="submit" style="width:100%;margin-top:14px">حفظ المورد</button></form>'); $('cswSupplierForm').onsubmit=function(e){e.preventDefault(); var item=Object.assign({},o||{},{id:o&&o.id||uid('sup'),name:$('cswSupplierName').value.trim(),phone:$('cswSupplierPhone').value.trim(),notes:$('cswSupplierNotes').value.trim(),createdAt:o&&o.createdAt||Date.now(),updatedAt:Date.now()}); save('suppliers',item).then(function(){var i=S.suppliers.findIndex(function(x){return x.id===item.id}); if(i>=0)S.suppliers[i]=item; else S.suppliers.push(item); closeModal(); renderSuppliers(); patchSupplierSelect(); toast('تم حفظ المورد')})}}
-  function patchSupplierSelect(){var input=$('purchaseSupplier'); if(!input||$('purchaseSupplierSelect'))return; var S=st(),d=D.createElement('div'); d.innerHTML='<label class="field-label">اختيار مورد محفوظ</label><select id="purchaseSupplierSelect" class="select"><option value="">كتابة يدوية / بدون مورد</option>'+S.suppliers.map(function(s){return '<option value="'+s.id+'">'+esc(s.name)+(s.phone?' - '+esc(s.phone):'')+'</option>'}).join('')+'</select>'; input.parentNode.insertAdjacentElement('afterend',d); $('purchaseSupplierSelect').onchange=function(){var s=S.suppliers.find(function(x){return x.id===$('purchaseSupplierSelect').value}); if(s)input.value=s.name}}
-  function profit(per){var S=st(),iv=period(S.invoices,per,'createdAt'),ex=period(S.expenses,per,'createdAt'),sp=period(S.supplierPayments,per,'createdAt'); return Math.max(0,iv.reduce(function(a,x){return a+n(x.profit)},0)-ex.reduce(function(a,x){return a+n(x.amount)},0)-sp.reduce(function(a,x){return a+n(x.amount)},0))}
-  function renderWorkers(){var S=st(),q=($('cswWorkSearch')&&$('cswWorkSearch').value||'').toLowerCase(),per=$('cswWorkPeriod')&&$('cswWorkPeriod').value||'today',ws=period(S.workerWages,per,'createdAt'),tw=period(S.workerWages,'today','createdAt'); if($('cswWorkCount'))$('cswWorkCount').textContent=S.workers.length; if($('cswWagePeriod'))$('cswWagePeriod').textContent=money(ws.reduce(function(a,x){return a+n(x.amount)},0)); if($('cswWageToday'))$('cswWageToday').textContent=money(tw.reduce(function(a,x){return a+n(x.amount)},0)); var workers=S.workers.filter(function(w){return !q||String(w.name||'').toLowerCase().includes(q)}); if($('cswWorkList'))$('cswWorkList').innerHTML=workers.map(function(w){return '<div class="csw-card"><div><b>'+esc(w.name)+'</b><div class="muted">'+(w.payType==='percent'?'نسبة من الأرباح: '+n(w.percent)+'%':w.payType==='monthly'?'راتب شهري: '+money(w.monthlySalary):'أجرة يومية: '+money(w.dailyRate))+'</div><div class="muted">'+esc(w.notes||'')+'</div></div><div class="csw-actions"><button class="ghost-btn" data-csw-edit-worker="'+w.id+'">تعديل</button><button class="gold-btn" data-csw-wage-worker="'+w.id+'">أجرة</button><button class="danger-btn" data-csw-del-worker="'+w.id+'">حذف</button></div></div>'}).join('')||'<div class="muted" style="text-align:center;padding:20px">لا يوجد عمال</div>'; if($('cswWageTable'))$('cswWageTable').innerHTML=ws.sort(function(a,b){return n(b.createdAt)-n(a.createdAt)}).map(function(g){return '<tr><td>'+fmt(g.createdAt)+'</td><td><b>'+esc(g.workerName||'-')+'</b></td><td>'+(g.payType==='percent'?'نسبة أرباح':g.payType==='monthly'?'راتب شهري':'أجرة يومية')+'</td><td>'+(g.payType==='percent'?n(g.percent)+'%':money(g.baseAmount||g.amount))+'</td><td class="money">'+money(g.amount)+'</td><td>'+esc(g.notes||'-')+'</td><td><button class="danger-btn" data-csw-del-wage="'+g.id+'">حذف</button></td></tr>'}).join('')||'<tr><td colspan="7" class="muted" style="text-align:center">لا توجد أجور</td></tr>'}
-  function workerForm(id){var S=st(),o=id?S.workers.find(function(x){return x.id===id}):null; openModal(o?'تعديل عامل':'إضافة عامل','<form id="cswWorkerForm"><div class="form-grid-compact"><div><label class="field-label">اسم العامل</label><input id="cswWorkerName" class="input" required value="'+esc(o&&o.name||'')+'"></div><div><label class="field-label">طريقة الأجرة</label><select id="cswWorkerPayType" class="select"><option value="daily">أجرة يومية ثابتة</option><option value="percent">نسبة من الأرباح</option><option value="monthly">راتب شهري</option></select></div><div><label class="field-label">أجرة يومية</label><input id="cswWorkerDaily" type="number" class="input" value="'+n(o&&o.dailyRate)+'"></div><div><label class="field-label">نسبة الأرباح %</label><input id="cswWorkerPercent" type="number" class="input" value="'+n(o&&o.percent)+'"></div><div><label class="field-label">راتب شهري</label><input id="cswWorkerMonthly" type="number" class="input" value="'+n(o&&o.monthlySalary)+'"></div><div><label class="field-label">ملاحظات</label><input id="cswWorkerNotes" class="input" value="'+esc(o&&o.notes||'')+'"></div></div><button class="primary-btn" type="submit" style="width:100%;margin-top:14px">حفظ العامل</button></form>'); if(o)$('cswWorkerPayType').value=o.payType||'daily'; $('cswWorkerForm').onsubmit=function(e){e.preventDefault(); var item=Object.assign({},o||{},{id:o&&o.id||uid('wrk'),name:$('cswWorkerName').value.trim(),payType:$('cswWorkerPayType').value,dailyRate:n($('cswWorkerDaily').value),percent:n($('cswWorkerPercent').value),monthlySalary:n($('cswWorkerMonthly').value),notes:$('cswWorkerNotes').value.trim(),createdAt:o&&o.createdAt||Date.now(),updatedAt:Date.now()}); save('workers',item).then(function(){var i=S.workers.findIndex(function(x){return x.id===item.id}); if(i>=0)S.workers[i]=item; else S.workers.push(item); closeModal(); renderWorkers(); toast('تم حفظ العامل')})}}
-  function wageForm(wid){var S=st(); openModal('تسجيل أجرة عامل','<form id="cswWageForm"><div class="form-grid-compact"><div><label class="field-label">العامل</label><select id="cswWageWorker" class="select" required>'+S.workers.map(function(w){return '<option value="'+w.id+'" '+(wid===w.id?'selected':'')+'>'+esc(w.name)+'</option>'}).join('')+'</select></div><div><label class="field-label">الفترة لحساب النسبة</label><select id="cswWagePeriodSelect" class="select"><option value="today">اليوم</option><option value="week">أسبوع</option><option value="month">شهر</option><option value="all">كل السجل</option></select></div><div><label class="field-label">المبلغ</label><input id="cswWageAmount" class="input" type="number" step="0.01"></div><div><label class="field-label">ملاحظات</label><input id="cswWageNotes" class="input"></div></div><button class="gold-btn" type="button" id="cswCalcWage" style="margin-top:12px">حساب تلقائي</button><button class="primary-btn" type="submit" style="width:100%;margin-top:12px">حفظ الأجرة وخصمها من الأرباح</button></form>'); function calc(){var w=S.workers.find(function(x){return x.id===$('cswWageWorker').value}); if(!w)return; var a=w.payType==='percent'?profit($('cswWagePeriodSelect').value)*n(w.percent)/100:w.payType==='monthly'?n(w.monthlySalary):n(w.dailyRate); $('cswWageAmount').value=a.toFixed(2)} $('cswCalcWage').onclick=calc; $('cswWageWorker').onchange=calc; $('cswWagePeriodSelect').onchange=calc; setTimeout(calc,50); $('cswWageForm').onsubmit=function(e){e.preventDefault(); var w=S.workers.find(function(x){return x.id===$('cswWageWorker').value}); var a=n($('cswWageAmount').value); if(!w||a<=0)return toast('أدخل بيانات صحيحة'); var item={id:uid('wage'),workerId:w.id,workerName:w.name,payType:w.payType,percent:n(w.percent),baseAmount:w.payType==='monthly'?n(w.monthlySalary):n(w.dailyRate),amount:a,notes:$('cswWageNotes').value.trim(),createdAt:Date.now(),updatedAt:Date.now()}; save('workerWages',item).then(function(){S.workerWages.push(item); closeModal(); renderWorkers(); renderReportsFix(); toast('تم تسجيل الأجرة وخصمها من الأرباح')})}}
-  function renderReportsFix(){var S=st(),per=$('reportsPeriod')&&$('reportsPeriod').value||'today',w=period(S.workerWages,per,'createdAt').reduce(function(a,x){return a+n(x.amount)},0); if(!$('reportWorkerWages')&&$('reportNet')){var d=D.createElement('div'); d.className='stat red'; d.innerHTML='<div class="stat-title"><i class="fa-solid fa-people-carry-box"></i> أجور العمال</div><div id="reportWorkerWages" class="stat-value">'+money(w)+'</div>'; $('reportNet').closest('.stat-grid').appendChild(d)} if($('reportWorkerWages'))$('reportWorkerWages').textContent=money(w); if($('reportNet')){var pr=n(($('reportProfit')&&$('reportProfit').textContent||'').replace(/[^0-9.,-]/g,'')), ex=n(($('reportExpenses')&&$('reportExpenses').textContent||'').replace(/[^0-9.,-]/g,'')); $('reportNet').textContent=money(pr-ex-w)}}
-  function wrapReports(){var old=window.renderReports; if(typeof old==='function'&&!window.__cswRep){window.__cswRep=1;window.renderReports=function(){var r=old.apply(this,arguments);setTimeout(renderReportsFix,0);return r}}}
-  function renderAllExt(){renderCustomers();renderSuppliers();renderWorkers();patchSupplierSelect();renderReportsFix()}
-  function bind(){D.addEventListener('click',function(e){var p=e.target.closest('[data-page]'); if(p&&['customersPage','suppliersPage','workersPage'].indexOf(p.dataset.page)>=0){e.preventDefault();D.querySelectorAll('.section').forEach(function(x){x.classList.remove('active')});$('page-'+p.dataset.page).classList.add('active');D.querySelectorAll('.nav-btn,.bottom-btn').forEach(function(b){b.classList.toggle('active',b.dataset.page===p.dataset.page)}); if($('sidebar'))$('sidebar').classList.remove('open');renderAllExt();return} if(e.target.closest('#cswAddCustomer'))customerForm(); var ec=e.target.closest('[data-csw-edit-cust]'); if(ec)customerForm(ec.dataset.cswEditCust); var oc=e.target.closest('[data-csw-open-cust]'); if(oc&&window.openCustomerAccount)window.openCustomerAccount(oc.dataset.cswOpenCust); if(e.target.closest('#cswAddSupplier'))supplierForm(); var es=e.target.closest('[data-csw-edit-sup]'); if(es)supplierForm(es.dataset.cswEditSup); var ds=e.target.closest('[data-csw-del-sup]'); if(ds&&confirm('حذف المورد؟')){var S=st();S.suppliers=S.suppliers.filter(function(x){return x.id!==ds.dataset.cswDelSup});del('suppliers',ds.dataset.cswDelSup).then(renderSuppliers)} if(e.target.closest('#cswAddWorker'))workerForm(); if(e.target.closest('#cswAddWage'))wageForm(); var ew=e.target.closest('[data-csw-edit-worker]'); if(ew)workerForm(ew.dataset.cswEditWorker); var ww=e.target.closest('[data-csw-wage-worker]'); if(ww)wageForm(ww.dataset.cswWageWorker); var dw=e.target.closest('[data-csw-del-worker]'); if(dw&&confirm('حذف العامل؟')){var S2=st();S2.workers=S2.workers.filter(function(x){return x.id!==dw.dataset.cswDelWorker});del('workers',dw.dataset.cswDelWorker).then(renderWorkers)} var dg=e.target.closest('[data-csw-del-wage]'); if(dg&&confirm('حذف الأجرة؟')){var S3=st();S3.workerWages=S3.workerWages.filter(function(x){return x.id!==dg.dataset.cswDelWage});del('workerWages',dg.dataset.cswDelWage).then(function(){renderWorkers();renderReportsFix()})}},true); D.addEventListener('input',function(e){if(['cswCustSearch','cswSupSearch','cswWorkSearch'].indexOf(e.target.id)>=0)renderAllExt()},true); D.addEventListener('change',function(e){if(e.target.id==='cswWorkPeriod')renderWorkers()},true)}
-  function wrapAll(){var old=window.renderAll;if(typeof old==='function'&&!window.__cswAll){window.__cswAll=1;window.renderAll=function(){var r=old.apply(this,arguments);setTimeout(renderAllExt,0);return r}}}
-  function init(){css();st();nav();sections();bind();wrapAll();wrapReports();renderAllExt();setInterval(renderAllExt,4000)}
-  if(D.readyState==='loading')D.addEventListener('DOMContentLoaded',init);else setTimeout(init,50)
+  const DEFAULT_ADMIN_PIN="0000";
+  const ADMIN_PERMISSION="__admin__";
+  const ADMIN_ID="admin";
+  const $=(id)=>document.getElementById(id);
+  const wait=(ms)=>new Promise(r=>setTimeout(r,ms));
+  function toast(msg,ms=2800){ if(typeof window.toast==="function") return window.toast(msg,ms); const el=$("toast"); if(el){el.textContent=msg;el.classList.add("show");clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove("show"),ms);} else alert(msg); }
+  function simpleHash(str){ const text=String(str||""); let h=2166136261; for(let i=0;i<text.length;i++){h^=text.charCodeAt(i); h+=(h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);} return String(h>>>0); }
+  function loading(btn,on,text){ if(!btn)return; if(on){ if(!btn.dataset.oldHtml)btn.dataset.oldHtml=btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> '+(text||'جاري التنفيذ...'); } else { btn.disabled=false; if(btn.dataset.oldHtml)btn.innerHTML=btn.dataset.oldHtml; delete btn.dataset.oldHtml; } }
+  function isAdmin(){ const u=window.state?.auth?.user; return !!u&&(u.role==='admin'||(u.permissions||[]).includes(ADMIN_PERMISSION)); }
+  function authKey(){ const keys=Object.keys(localStorage); const found=keys.find(k=>k.startsWith('cashier_auth_session_')&&k.endsWith('_v1')); if(found)return found; return 'cashier_auth_session_direct_final_v1'; }
+  function clearSession(){ try{ Object.keys(localStorage).forEach(k=>{if(k.startsWith('cashier_auth_session_'))localStorage.removeItem(k)}); Object.keys(sessionStorage).forEach(k=>{if(k.startsWith('cashier_auth_session_'))sessionStorage.removeItem(k)}); }catch{} }
+  function saveSession(u){ try{localStorage.setItem(authKey(),JSON.stringify({id:u.id,name:u.name,role:u.role,permissions:u.permissions||[],loginAt:Date.now()}));}catch{} }
+  function showLock(show){ const lock=$("authLock"); if(lock){ lock.classList.toggle('hide',!show); lock.style.display=show?'flex':'none'; } }
+  function setUser(u){ if(!window.state)return; window.state.auth=window.state.auth||{}; window.state.auth.user=u||null; window.state.auth.ready=true; if(u){saveSession(u);showLock(false);}else{clearSession();showLock(true);} applyUi(); }
+  function getHash(){ return window.state?.settings?.adminPasswordHash || simpleHash(DEFAULT_ADMIN_PIN); }
+  function firebaseRoot(){ return window.FIREBASE_ROOT || window.CASHIER_FIREBASE_CONFIG?.firebaseRoot || 'cashier_units_pro_default'; }
+  async function fetchSettings(){ try{ if(!navigator.onLine||!window.db||!window.ref||!window.get) return window.state?.settings; const snap=await window.get(window.ref(window.db, firebaseRoot()+"/settings/main")); if(snap&&snap.exists&&snap.exists()){ const remote=snap.val()||{}; window.state.settings={...(window.state.settings||{}),...remote,id:'main',localLogo:window.state?.settings?.localLogo||''}; if(typeof window.idbPut==='function') await window.idbPut('settings',window.state.settings); return window.state.settings; } }catch(e){console.warn('fetch settings failed',e)} return window.state?.settings; }
+  async function saveSettings(){ if(!window.state) return; window.state.settings={...(window.state.settings||{}),id:'main',updatedAt:Date.now()}; if(typeof window.idbPut==='function') await window.idbPut('settings',window.state.settings); const safe={...window.state.settings,localLogo:'',logoMode:window.state.settings.logo?'url':'default'}; if(navigator.onLine&&window.db&&window.ref&&window.set){ await window.set(window.ref(window.db, firebaseRoot()+"/settings/main"), safe); } else if(typeof window.enqueueSync==='function'){ await window.enqueueSync({type:'set',store:'settings',itemId:'main',data:safe}); } }
+  function applyUi(){ const u=window.state?.auth?.user||null; const pill=$("authUserPill"); if(pill) pill.innerHTML=u?`<i class="fa-solid ${isAdmin()?'fa-user-shield':'fa-user'}"></i> ${escape(String(u.name||'مستخدم'))}`:`<i class="fa-solid fa-lock"></i> غير مسجل`; document.querySelectorAll('.nav-btn[data-page],.bottom-btn[data-page]').forEach(b=>{ const page=b.dataset.page; const ok=!!u&&(isAdmin()||(u.permissions||[]).includes(page)); b.classList.toggle('auth-hidden',!ok); }); const a=$("adminSecurityBox"); if(a)a.style.display=isAdmin()?'block':'none'; const e=$("employeesSettingsBox"); if(e)e.style.display=isAdmin()?'block':'none'; }
+  function escape(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
+  function ensureRecoveryUi(){
+    if($("forgotAdminPasswordBtn")) return;
+    const form=$("adminLoginForm");
+    if(form){ form.insertAdjacentHTML('beforeend',`<button id="forgotAdminPasswordBtn" type="button" class="ghost-btn" style="width:100%;margin-top:10px"><i class="fa-solid fa-envelope-circle-check"></i> نسيت كلمة مرور المدير</button>`); }
+    const box=$("adminSecurityBox");
+    if(box && !$("settingRecoveryEmail")){
+      const grid=box.querySelector('.form-grid')||box;
+      grid.insertAdjacentHTML('beforeend',`<div class="full-row"><label class="field-label">بريد استرداد كلمة مرور المدير</label><input id="settingRecoveryEmail" type="email" class="input" placeholder="example@email.com"></div>`);
+      if(window.state?.settings?.recoveryEmail) $("settingRecoveryEmail").value=window.state.settings.recoveryEmail;
+    }
+  }
+  function openForceChange(){ if(!isAdmin()||getHash()!==simpleHash(DEFAULT_ADMIN_PIN))return; const title=$("modalTitle"),body=$("modalBody"),back=$("modalBackdrop"),box=$("modalBox"); if(!title||!body||!back)return; title.textContent='تغيير كلمة مرور المدير إجباري'; if(box)box.classList.remove('large'); body.innerHTML=`<div class="card" style="box-shadow:none"><div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:18px;padding:12px;margin-bottom:14px;font-weight:900;line-height:1.8">لا يمكن المتابعة بكلمة المرور الافتراضية 0000. غيّرها الآن وسيتم حفظها في Firebase.</div><form id="forceChangeForm"><div class="form-grid-compact"><div><label class="field-label">كلمة المرور الجديدة</label><input id="forcePass1" type="password" class="input" required></div><div><label class="field-label">تأكيد كلمة المرور</label><input id="forcePass2" type="password" class="input" required></div></div><button id="forceChangeBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-floppy-disk"></i> حفظ والمتابعة</button></form></div>`; back.classList.add('show'); const close=$("modalCloseBtn"); if(close) close.style.display='none'; $("forceChangeForm").onsubmit=async ev=>{ev.preventDefault(); const b=$("forceChangeBtn"),p1=$("forcePass1").value.trim(),p2=$("forcePass2").value.trim(); if(p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1===DEFAULT_ADMIN_PIN)return toast('لا يمكن استخدام 0000 مرة أخرى'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); loading(b,true,'جاري الحفظ في Firebase...'); try{window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),id:'main',updatedAt:Date.now()}; await saveSettings(); if(close)close.style.display=''; back.classList.remove('show'); toast('تم حفظ كلمة مرور المدير بنجاح');}catch(e){console.error(e);toast('فشل حفظ كلمة المرور في Firebase');}finally{loading(b,false);}}; }
+  async function changeAdminPassword(){ if(!isAdmin())return toast('تغيير كلمة مرور المدير للمدير فقط'); const b=$("saveAdminPasswordBtn")||$("changeAdminPasswordBtn"),p1=$("settingAdminPassword")?.value.trim()||'',p2=$("settingAdminPassword2")?.value.trim()||'',email=$("settingRecoveryEmail")?.value.trim()||''; if(p1&&p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1&&p1===DEFAULT_ADMIN_PIN)return toast('لا يمكن استخدام 0000'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); if(!p1 && email){ window.state.settings={...(window.state.settings||{}),recoveryEmail:email,id:'main',updatedAt:Date.now()}; loading(b,true,'جاري حفظ البريد...'); try{await saveSettings();toast('تم حفظ بريد الاسترداد في Firebase');}catch(e){toast('فشل حفظ بريد الاسترداد');}finally{loading(b,false);} return; } if(!p1)return toast('أدخل كلمة مرور المدير الجديدة'); loading(b,true,'جاري الحفظ في Firebase...'); try{window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),recoveryEmail:email||window.state.settings?.recoveryEmail||'',id:'main',updatedAt:Date.now()}; await saveSettings(); if($("settingAdminPassword"))$("settingAdminPassword").value=''; if($("settingAdminPassword2"))$("settingAdminPassword2").value=''; toast('تم تغيير كلمة مرور المدير وحفظها في Firebase');}catch(e){console.error(e);toast('فشل حفظ كلمة المرور في Firebase');}finally{loading(b,false);} }
+  function openForgot(){ const title=$("modalTitle"),body=$("modalBody"),back=$("modalBackdrop"),box=$("modalBox"); if(!title||!body||!back)return; title.textContent='استرداد كلمة مرور المدير'; if(box)box.classList.remove('large'); body.innerHTML=`<form id="forgotAdminForm"><div class="form-grid-compact"><div class="full-row"><label class="field-label">بريد الاسترداد المحفوظ</label><input id="forgotEmail" type="email" class="input" required placeholder="اكتب البريد المحفوظ في الإعدادات"></div><div><label class="field-label">كلمة مرور جديدة</label><input id="forgotPass1" type="password" class="input" required></div><div><label class="field-label">تأكيد كلمة المرور</label><input id="forgotPass2" type="password" class="input" required></div></div><button id="forgotSaveBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-key"></i> حفظ كلمة المرور الجديدة</button></form>`; back.classList.add('show'); $("forgotAdminForm").onsubmit=async ev=>{ev.preventDefault(); const b=$("forgotSaveBtn"),email=$("forgotEmail").value.trim().toLowerCase(),p1=$("forgotPass1").value.trim(),p2=$("forgotPass2").value.trim(); loading(b,true,'جاري التحقق...'); try{await fetchSettings(); const saved=String(window.state?.settings?.recoveryEmail||'').trim().toLowerCase(); if(!saved)return toast('لا يوجد بريد استرداد محفوظ في الإعدادات'); if(email!==saved)return toast('بريد الاسترداد غير صحيح'); if(p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1===DEFAULT_ADMIN_PIN)return toast('لا يمكن استخدام 0000'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); loading(b,true,'جاري الحفظ في Firebase...'); window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),id:'main',updatedAt:Date.now()}; await saveSettings(); back.classList.remove('show'); toast('تم استرداد كلمة المرور وحفظها في Firebase'); }catch(e){console.error(e);toast('فشل استرداد كلمة المرور');}finally{loading(b,false);}}; }
+  function bind(){ ensureRecoveryUi(); const adminForm=$("adminLoginForm"),empForm=$("employeeLoginForm"); if(adminForm){ adminForm.onsubmit=async ev=>{ev.preventDefault(); const btn=ev.submitter||adminForm.querySelector('button[type="submit"]'),pass=$("adminPasswordInput")?.value.trim()||''; loading(btn,true,'جاري فحص كلمة المرور...'); try{await fetchSettings(); if(simpleHash(pass)!==getHash()){toast('كلمة مرور المدير غير صحيحة');return;} if($("adminPasswordInput"))$("adminPasswordInput").value=''; setUser({id:ADMIN_ID,name:'المدير',role:'admin',permissions:[ADMIN_PERMISSION]}); toast('تم تسجيل دخول المدير بنجاح'); setTimeout(openForceChange,250);}catch(e){console.error(e);toast('حدث خطأ أثناء تسجيل الدخول');}finally{loading(btn,false);} }; }
+    if(empForm){ empForm.onsubmit=async ev=>{ev.preventDefault(); const btn=ev.submitter||empForm.querySelector('button[type="submit"]'),name=$("employeeNameInput")?.value.trim()||'',pass=$("employeePasswordInput")?.value.trim()||''; loading(btn,true,'جاري تسجيل الدخول...'); try{ const emp=(window.state?.employees||[]).find(x=>x.active!==false&&String(x.name||'').trim()===name&&x.passwordHash===simpleHash(pass)); if(!emp){toast('بيانات الموظف غير صحيحة أو الحساب موقوف');return;} if($("employeePasswordInput"))$("employeePasswordInput").value=''; setUser({id:emp.id,name:emp.name,role:(emp.permissions||[]).includes(ADMIN_PERMISSION)?'admin':'employee',permissions:emp.permissions||[]}); toast(`تم تسجيل دخول الموظف ${emp.name} بنجاح`);}catch(e){console.error(e);toast('حدث خطأ أثناء تسجيل دخول الموظف');}finally{loading(btn,false);} }; }
+    const forgot=$("forgotAdminPasswordBtn"); if(forgot) forgot.onclick=openForgot; const saveBtn=$("saveAdminPasswordBtn")||$("changeAdminPasswordBtn"); if(saveBtn) saveBtn.onclick=changeAdminPassword; const logoutBtn=$("logoutBtn"); if(logoutBtn)logoutBtn.onclick=()=>{setUser(null);toast('تم تسجيل الخروج')}; const topLogoutBtn=$("topLogoutBtn"); if(topLogoutBtn)topLogoutBtn.onclick=()=>{setUser(null);toast('تم تسجيل الخروج')}; document.addEventListener('click',e=>{ if(e.target.closest('#forgotAdminPasswordBtn')){e.preventDefault();e.stopImmediatePropagation();openForgot();} if(e.target.closest('#saveAdminPasswordBtn,#changeAdminPasswordBtn')){e.preventDefault();e.stopImmediatePropagation();changeAdminPassword();} },true);
+  }
+  function styleFix(){ if($("directAuthFinalStyle"))return; const s=document.createElement('style'); s.id='directAuthFinalStyle'; s.textContent='.sidebar{z-index:5000!important}.bottom-nav{z-index:60!important}.auth-lock{z-index:9999!important}.modal-backdrop{z-index:10000!important}'; document.head.appendChild(s); }
+  async function init(){ for(let i=0;i<60;i++){ if(window.state)break; await wait(100); } styleFix(); ensureRecoveryUi(); bind(); applyUi(); if(window.state?.settings?.recoveryEmail && $("settingRecoveryEmail")) $("settingRecoveryEmail").value=window.state.settings.recoveryEmail; setInterval(()=>{ensureRecoveryUi();applyUi();},3000); log('direct auth final fix ready'); }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
 })();
 </script>
 
-  <script src="./cashier-barcode-patch.js"></script>
+<script src="./cashier-barcode-patch.js"></script>
   
   
-<script>
-/* fix-auth-buttons-index-inline.js */
-(function () {
-  "use strict";
 
-  const DEFAULT_ADMIN_PIN = "0000";
-  const ADMIN_PERMISSION = "__admin__";
-
-  function $(id) {
-    return document.getElementById(id);
-  }
-
-  function toast(msg) {
-    if (typeof window.toast === "function") return window.toast(msg);
-    alert(msg);
-  }
-
-  function simpleHash(str) {
-    const text = String(str || "");
-    let h = 2166136261;
-
-    for (let i = 0; i < text.length; i++) {
-      h ^= text.charCodeAt(i);
-      h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
-    }
-
-    return String(h >>> 0);
-  }
-
-  function uid(prefix = "id") {
-    return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  }
-
-  function escapeHtml(str) {
-    return String(str ?? "").replace(/[&<>"']/g, function (m) {
-      return {
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#039;"
-      }[m];
-    });
-  }
-
-  function isAdmin() {
-    const u = window.state?.auth?.user;
-    if (!u) return false;
-    return u.role === "admin" || (u.permissions || []).includes(ADMIN_PERMISSION);
-  }
-
-  function getPages() {
-    return [
-      { id: "home", label: "الرئيسية", icon: "fa-house" },
-      { id: "cashier", label: "الكاشير", icon: "fa-cart-shopping" },
-      { id: "freeInvoice", label: "فاتورة بدون مخزون", icon: "fa-file-circle-plus" },
-      { id: "inventory", label: "المخزون", icon: "fa-boxes-stacked" },
-      { id: "invoices", label: "الفواتير", icon: "fa-file-invoice-dollar" },
-      { id: "debts", label: "الديون", icon: "fa-address-book" },
-      { id: "purchases", label: "المشتريات", icon: "fa-truck-ramp-box" },
-      { id: "supplierPayments", label: "دفعات التجار", icon: "fa-hand-holding-dollar" },
-      { id: "expenses", label: "المصروفات", icon: "fa-money-bill-wave" },
-      { id: "reports", label: "التقارير", icon: "fa-chart-line" },
-      { id: "settings", label: "الإعدادات", icon: "fa-gear" }
-    ];
-  }
-
-  function normalizeEmployee(emp) {
-    emp = emp || {};
-
-    return {
-      id: emp.id || uid("emp"),
-      name: emp.name || "موظف",
-      passwordHash: emp.passwordHash || simpleHash(emp.password || ""),
-      permissions: Array.isArray(emp.permissions) ? emp.permissions : [],
-      active: emp.active !== false,
-      createdAt: emp.createdAt || Date.now(),
-      updatedAt: Date.now()
-    };
-  }
-
-  function ensureState() {
-    window.state = window.state || {};
-    window.state.employees = Array.isArray(window.state.employees) ? window.state.employees : [];
-    window.state.settings = window.state.settings || {};
-
-    if (!window.state.settings.adminPasswordHash) {
-      window.state.settings.adminPasswordHash = simpleHash(DEFAULT_ADMIN_PIN);
-    }
-  }
-
-  async function saveSettingsSafe() {
-    ensureState();
-
-    if (typeof window.idbPut === "function") {
-      await window.idbPut("settings", {
-        id: "main",
-        ...window.state.settings,
-        updatedAt: Date.now()
-      });
-    }
-
-    if (typeof window.enqueueSync === "function") {
-      await window.enqueueSync({
-        type: "set",
-        store: "settings",
-        itemId: "main",
-        data: {
-          id: "main",
-          ...window.state.settings,
-          localLogo: "",
-          logoMode: window.state.settings.logo ? "url" : "default",
-          updatedAt: Date.now()
-        }
-      });
-    }
-  }
-
-  async function saveEmployeeSafe(employee) {
-    ensureState();
-
-    employee = normalizeEmployee(employee);
-
-    if (typeof window.saveLocal === "function") {
-      await window.saveLocal("employees", employee, true);
-    } else if (typeof window.idbPut === "function") {
-      await window.idbPut("employees", employee);
-    }
-
-    const i = window.state.employees.findIndex(function (e) {
-      return e.id === employee.id;
-    });
-
-    if (i >= 0) window.state.employees[i] = employee;
-    else window.state.employees.push(employee);
-
-    if (typeof window.renderAll === "function") window.renderAll();
-
-    return employee;
-  }
-
-  async function deleteEmployeeSafe(employeeId) {
-    ensureState();
-
-    const emp = window.state.employees.find(function (e) {
-      return e.id === employeeId;
-    });
-
-    if (!emp) return;
-
-    if (!confirm(`حذف الموظف ${emp.name}؟`)) return;
-
-    window.state.employees = window.state.employees.filter(function (e) {
-      return e.id !== employeeId;
-    });
-
-    if (typeof window.removeLocal === "function") {
-      await window.removeLocal("employees", employeeId, true);
-    } else if (typeof window.idbDelete === "function") {
-      await window.idbDelete("employees", employeeId);
-    }
-
-    if (typeof window.renderAll === "function") window.renderAll();
-    renderEmployeesSafe();
-    toast("تم حذف الموظف");
-  }
-
-  function openModalSafe(title, html, large) {
-    const modalTitle = $("modalTitle");
-    const modalBody = $("modalBody");
-    const modalBox = $("modalBox");
-    const modalBackdrop = $("modalBackdrop");
-
-    if (!modalTitle || !modalBody || !modalBackdrop) {
-      alert("نافذة النظام غير موجودة");
-      return;
-    }
-
-    modalTitle.textContent = title;
-    modalBody.innerHTML = html;
-
-    if (modalBox) modalBox.classList.toggle("large", !!large);
-    modalBackdrop.classList.add("show");
-  }
-
-  function closeModalSafe() {
-    $("modalBackdrop")?.classList.remove("show");
-    $("modalBox")?.classList.remove("large");
-  }
-
-  function renderEmployeesSafe() {
-    ensureState();
-
-    const box = $("employeesList");
-    if (!box) return;
-
-    if (!isAdmin()) {
-      box.innerHTML = `<div class="muted">إدارة الموظفين للمدير فقط</div>`;
-      return;
-    }
-
-    const pages = getPages();
-
-    box.innerHTML = window.state.employees.map(function (emp) {
-      const isFullAdmin = (emp.permissions || []).includes(ADMIN_PERMISSION);
-      const labels = isFullAdmin
-        ? "صلاحيات مدير كاملة"
-        : pages
-            .filter(function (p) {
-              return (emp.permissions || []).includes(p.id);
-            })
-            .map(function (p) {
-              return p.label;
-            })
-            .join("، ") || "بدون صلاحيات";
-
-      return `
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1px solid #e5e7eb;border-radius:18px;margin-bottom:8px;background:#fff">
-          <div>
-            <b>${escapeHtml(emp.name)}</b>
-            <div class="muted" style="font-size:12px;line-height:1.8">${escapeHtml(labels)}</div>
-            <span class="badge ${emp.active === false ? "red" : "green"}">
-              ${emp.active === false ? "موقوف" : "فعال"}
-            </span>
-          </div>
-
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="ghost-btn js-fix-edit-employee" data-id="${emp.id}" type="button">
-              <i class="fa-solid fa-pen"></i> تعديل
-            </button>
-
-            <button class="danger-btn js-fix-delete-employee" data-id="${emp.id}" type="button">
-              <i class="fa-solid fa-trash"></i> حذف
-            </button>
-          </div>
-        </div>
-      `;
-    }).join("") || `<div class="muted">لا يوجد موظفين بعد</div>`;
-
-    box.querySelectorAll(".js-fix-edit-employee").forEach(function (btn) {
-      btn.onclick = function () {
-        openEmployeeFormSafe(btn.dataset.id);
-      };
-    });
-
-    box.querySelectorAll(".js-fix-delete-employee").forEach(function (btn) {
-      btn.onclick = function () {
-        deleteEmployeeSafe(btn.dataset.id);
-      };
-    });
-  }
-
-  function openEmployeeFormSafe(employeeId) {
-    ensureState();
-
-    if (!isAdmin()) {
-      toast("إضافة وتعديل الموظفين للمدير فقط");
-      return;
-    }
-
-    const old = employeeId
-      ? window.state.employees.find(function (e) { return e.id === employeeId; })
-      : null;
-
-    const pages = getPages();
-
-    openModalSafe(old ? "تعديل موظف" : "إضافة موظف", `
-      <form id="fixEmployeeForm">
-        <input id="fixEmployeeId" type="hidden" value="${escapeHtml(old?.id || "")}">
-
-        <div class="form-grid-compact">
-          <div>
-            <label class="field-label">اسم الموظف</label>
-            <input id="fixEmployeeName" class="input" required value="${escapeHtml(old?.name || "")}" placeholder="مثال: أحمد">
-          </div>
-
-          <div>
-            <label class="field-label">كلمة المرور</label>
-            <input id="fixEmployeePassword" class="input" type="password" ${old ? "" : "required"} placeholder="${old ? "اتركها فارغة إذا لا تريد تغييرها" : "كلمة المرور"}">
-          </div>
-
-          <div>
-            <label class="field-label">الحالة</label>
-            <select id="fixEmployeeActive" class="select">
-              <option value="true" ${old?.active === false ? "" : "selected"}>فعال</option>
-              <option value="false" ${old?.active === false ? "selected" : ""}>موقوف</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="field-label">صلاحية مدير كاملة</label>
-            <select id="fixEmployeeAdmin" class="select">
-              <option value="no" ${(old?.permissions || []).includes(ADMIN_PERMISSION) ? "" : "selected"}>لا</option>
-              <option value="yes" ${(old?.permissions || []).includes(ADMIN_PERMISSION) ? "selected" : ""}>نعم</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="full-row" style="margin-top:12px">
-          <label class="field-label">صلاحيات التبويبات</label>
-          <div class="employee-grid">
-            ${pages.map(function (p) {
-              const checked = (old?.permissions || []).includes(p.id) ? "checked" : "";
-              return `
-                <label class="perm-card">
-                  <input type="checkbox" class="fix-perm-check" value="${p.id}" ${checked}>
-                  <span><i class="fa-solid ${p.icon}"></i> ${escapeHtml(p.label)}</span>
-                </label>
-              `;
-            }).join("")}
-          </div>
-        </div>
-
-        <button class="primary-btn" type="submit" style="width:100%;margin-top:14px">
-          <i class="fa-solid fa-floppy-disk"></i> حفظ الموظف
-        </button>
-      </form>
-    `, true);
-
-    $("fixEmployeeAdmin").onchange = function () {
-      const disabled = $("fixEmployeeAdmin").value === "yes";
-      document.querySelectorAll(".fix-perm-check").forEach(function (ch) {
-        ch.disabled = disabled;
-      });
-    };
-
-    $("fixEmployeeAdmin").dispatchEvent(new Event("change"));
-
-    $("fixEmployeeForm").onsubmit = async function (e) {
-      e.preventDefault();
-
-      const name = $("fixEmployeeName").value.trim();
-      const pass = $("fixEmployeePassword").value;
-      const fullAdmin = $("fixEmployeeAdmin").value === "yes";
-
-      if (!name) return toast("أدخل اسم الموظف");
-      if (!old && !pass) return toast("أدخل كلمة مرور الموظف");
-
-      let permissions = [];
-
-      if (fullAdmin) {
-        permissions = [ADMIN_PERMISSION];
-      } else {
-        permissions = Array.from(document.querySelectorAll(".fix-perm-check:checked")).map(function (x) {
-          return x.value;
-        });
-      }
-
-      const emp = normalizeEmployee({
-        ...(old || {}),
-        id: old?.id || uid("emp"),
-        name,
-        passwordHash: pass ? simpleHash(pass) : old?.passwordHash,
-        permissions,
-        active: $("fixEmployeeActive").value === "true",
-        createdAt: old?.createdAt || Date.now(),
-        updatedAt: Date.now()
-      });
-
-      await saveEmployeeSafe(emp);
-
-      closeModalSafe();
-      renderEmployeesSafe();
-      toast(old ? "تم تعديل الموظف" : "تم إضافة الموظف");
-    };
-  }
-
-  async function changeAdminPasswordSafe() {
-    ensureState();
-
-    if (!isAdmin()) {
-      toast("تغيير كلمة مرور المدير للمدير فقط");
-      return;
-    }
-
-    const p1 = $("settingAdminPassword")?.value || "";
-    const p2 = $("settingAdminPassword2")?.value || "";
-
-    if (p1.length < 4) {
-      toast("كلمة المرور يجب أن تكون 4 خانات على الأقل");
-      return;
-    }
-
-    if (p1 !== p2) {
-      toast("كلمتا المرور غير متطابقتين");
-      return;
-    }
-
-    window.state.settings.adminPasswordHash = simpleHash(p1);
-    window.state.settings.updatedAt = Date.now();
-
-    await saveSettingsSafe();
-
-    $("settingAdminPassword").value = "";
-    $("settingAdminPassword2").value = "";
-
-    toast("تم تغيير كلمة مرور المدير بنجاح");
-  }
-
-  function installFixEvents() {
-    const addBtn = $("addEmployeeBtn");
-    if (addBtn) {
-      addBtn.onclick = function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        openEmployeeFormSafe("");
-      };
-    }
-
-    const changeBtn = $("changeAdminPasswordBtn");
-    if (changeBtn) {
-      changeBtn.onclick = function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        changeAdminPasswordSafe();
-      };
-    }
-
-    document.addEventListener("click", function (e) {
-      const add = e.target.closest("#addEmployeeBtn");
-      if (add) {
-        e.preventDefault();
-        e.stopPropagation();
-        openEmployeeFormSafe("");
-        return;
-      }
-
-      const change = e.target.closest("#changeAdminPasswordBtn");
-      if (change) {
-        e.preventDefault();
-        e.stopPropagation();
-        changeAdminPasswordSafe();
-      }
-    }, true);
-
-    renderEmployeesSafe();
-  }
-
-  window.fixCashierAuthButtons = function () {
-    ensureState();
-    installFixEvents();
-    renderEmployeesSafe();
-    toast("تم تفعيل إصلاح أزرار المدير والموظفين");
-  };
-
-  setTimeout(window.fixCashierAuthButtons, 800);
-  setTimeout(window.fixCashierAuthButtons, 1800);
-})();
-</script>
   
   
 </body>
 </html>
+<!-- final-inline-fixes-2026-04-28-marker-added -->
+<script>
+/* final-inline-fixes-2026-04-28 */
+(function(){"use strict";const A="__admin__",$=id=>document.getElementById(id);function toast(m,s=2600){if(window.toast)return window.toast(m,s);alert(m)}function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}function uid(p="emp"){return p+"_"+Date.now()+"_"+Math.random().toString(16).slice(2)}function hash(str){let h=2166136261;str=String(str||"");for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h+=(h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24)}return String(h>>>0)}function root(){return window.FIREBASE_ROOT||window.CASHIER_FIREBASE_CONFIG?.firebaseRoot||"cashier_units_pro_default"}function admin(){const u=window.state?.auth?.user;return !!u&&(u.role==="admin"||(u.permissions||[]).includes(A))}function load(b,on,t){if(!b)return;if(on){b.dataset.oldHtml=b.dataset.oldHtml||b.innerHTML;b.disabled=true;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> '+(t||'جاري التنفيذ...')}else{b.disabled=false;if(b.dataset.oldHtml)b.innerHTML=b.dataset.oldHtml;delete b.dataset.oldHtml}}const pages=[["home","الرئيسية","fa-house"],["cashier","الكاشير","fa-cart-shopping"],["freeInvoice","فاتورة بدون مخزون","fa-file-circle-plus"],["inventory","المخزون","fa-boxes-stacked"],["invoices","الفواتير","fa-file-invoice-dollar"],["debts","الديون","fa-address-book"],["purchases","المشتريات","fa-truck-ramp-box"],["supplierPayments","دفعات التجار","fa-hand-holding-dollar"],["expenses","المصروفات","fa-money-bill-wave"],["reports","التقارير","fa-chart-line"],["settings","الإعدادات","fa-gear"]].map(([id,label,icon])=>({id,label,icon}));async function saveEmp(emp){window.state.employees=Array.isArray(window.state.employees)?window.state.employees:[];if(window.saveLocal)await window.saveLocal("employees",emp,true);else if(window.idbPut)await window.idbPut("employees",emp);if(navigator.onLine&&window.db&&window.ref&&window.set){try{await window.set(window.ref(window.db,root()+"/employees/"+emp.id),emp)}catch(e){console.warn(e)}}const i=window.state.employees.findIndex(e=>e.id===emp.id);if(i>=0)window.state.employees[i]=emp;else window.state.employees.push(emp);if(window.renderAll)window.renderAll()}async function delEmp(id){if(!admin())return toast("إدارة الموظفين للمدير فقط");const emp=(window.state?.employees||[]).find(e=>e.id===id);if(!emp)return;if(!confirm("حذف الموظف "+emp.name+"؟"))return;window.state.employees=(window.state.employees||[]).filter(e=>e.id!==id);if(window.removeLocal)await window.removeLocal("employees",id,true);else if(window.idbDelete)await window.idbDelete("employees",id);if(navigator.onLine&&window.db&&window.ref&&window.remove){try{await window.remove(window.ref(window.db,root()+"/employees/"+id))}catch(e){console.warn(e)}}if(window.renderAll)window.renderAll();toast("تم حذف الموظف")}function openEmp(id=""){if(!admin())return toast("إضافة وتعديل الموظفين للمدير فقط");const old=id?(window.state?.employees||[]).find(e=>e.id===id):null,t=$("modalTitle"),b=$("modalBody"),back=$("modalBackdrop"),box=$("modalBox");if(!t||!b||!back)return toast("نافذة النظام غير موجودة");t.textContent=old?"تعديل موظف":"إضافة موظف";if(box)box.classList.add("large");b.innerHTML=`<form id="finalEmployeeForm"><div class="form-grid-compact"><div><label class="field-label">اسم الموظف</label><input id="finalEmpName" class="input" required value="${esc(old?.name||"")}" placeholder="مثال: أحمد"></div><div><label class="field-label">كلمة المرور</label><input id="finalEmpPass" type="password" class="input" ${old?"":"required"} placeholder="${old?"اتركها فارغة إذا لا تريد تغييرها":"كلمة المرور"}"></div><div><label class="field-label">الحالة</label><select id="finalEmpActive" class="select"><option value="true" ${old?.active===false?"":"selected"}>فعال</option><option value="false" ${old?.active===false?"selected":""}>موقوف</option></select></div><div><label class="field-label">نوع الصلاحية</label><select id="finalEmpRole" class="select"><option value="employee" ${(old?.permissions||[]).includes(A)?"":"selected"}>موظف بصلاحيات محددة</option><option value="admin" ${(old?.permissions||[]).includes(A)?"selected":""}>صلاحيات مدير كاملة</option></select></div></div><div id="finalEmpPermBox" style="margin-top:14px"><label class="field-label">صلاحيات التبويبات</label><div class="employee-grid">${pages.map(p=>`<label class="perm-card"><input type="checkbox" class="final-emp-perm" value="${p.id}" ${(old?.permissions||[]).includes(p.id)?"checked":""}><span><i class="fa-solid ${p.icon}"></i> ${esc(p.label)}</span></label>`).join("")}</div></div><button id="finalEmpSaveBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-floppy-disk"></i> حفظ الموظف</button></form>`;back.classList.add("show");const ref=()=>{$("finalEmpPermBox").style.display=$("finalEmpRole").value==="admin"?"none":"block"};$("finalEmpRole").onchange=ref;ref();$("finalEmployeeForm").onsubmit=async e=>{e.preventDefault();const btn=$("finalEmpSaveBtn"),name=$("finalEmpName").value.trim(),pass=$("finalEmpPass").value.trim(),role=$("finalEmpRole").value,active=$("finalEmpActive").value==="true";if(!name)return toast("أدخل اسم الموظف");if(!old&&!pass)return toast("أدخل كلمة مرور الموظف");const dup=(window.state.employees||[]).find(x=>x.id!==old?.id&&String(x.name||"").trim()===name);if(dup)return toast("يوجد موظف بنفس الاسم");let perms=role==="admin"?[A]:[...document.querySelectorAll(".final-emp-perm:checked")].map(x=>x.value);if(!perms.length)return toast("اختر صلاحية واحدة على الأقل");load(btn,true,"جاري حفظ الموظف...");try{await saveEmp({...(old||{}),id:old?.id||uid("emp"),name,passwordHash:pass?hash(pass):old?.passwordHash,permissions:perms,active,createdAt:old?.createdAt||Date.now(),updatedAt:Date.now()});back.classList.remove("show");if(box)box.classList.remove("large");toast(old?"تم تعديل الموظف والصلاحيات":"تم إضافة الموظف")}catch(err){console.error(err);toast("فشل حفظ الموظف")}finally{load(btn,false)}}}function recovery(){const box=$("adminSecurityBox");if(!box||$("settingRecoveryEmail"))return;const btn=$("saveAdminPasswordBtn")||box.querySelector("button");const html=`<div class="full-row" style="margin-top:10px"><label class="field-label">بريد استرداد كلمة مرور المدير</label><input id="settingRecoveryEmail" type="email" class="input" placeholder="example@gmail.com" value="${esc(window.state?.settings?.recoveryEmail||"")}"><div class="muted" style="font-size:12px;margin-top:6px">يُستخدم لإرسال طلب/رابط تغيير كلمة مرور المدير.</div></div>`;if(btn)btn.insertAdjacentHTML("beforebegin",html);else box.insertAdjacentHTML("beforeend",html)}async function saveRec(){const email=$("settingRecoveryEmail")?.value?.trim();if(!email||!window.state)return;window.state.settings={...(window.state.settings||{}),id:"main",recoveryEmail:email,updatedAt:Date.now()};if(window.idbPut)await window.idbPut("settings",window.state.settings);if(navigator.onLine&&window.db&&window.ref&&window.set){try{await window.set(window.ref(window.db,root()+"/settings/main"),{...window.state.settings,localLogo:"",logoMode:window.state.settings.logo?"url":"default"})}catch(e){console.warn(e)}}}function forgot(){const email=String(window.state?.settings?.recoveryEmail||$("settingRecoveryEmail")?.value||"").trim();if(!email)return toast("لا يوجد بريد استرداد محفوظ في الإعدادات");const subject="رابط تغيير كلمة مرور المدير - نظام الكاشير",body="السلام عليكم،\n\nأحتاج رابط تغيير كلمة مرور المدير لنظام الكاشير.\n\nملاحظة: إرسال رابط فعلي تلقائي يحتاج Firebase Auth أو EmailJS، وهذا يفتح Gmail على البريد المسجل.";window.location.href="mailto:"+encodeURIComponent(email)+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);toast("تم فتح Gmail/البريد لإرسال رابط تغيير كلمة المرور")}function forgotBtn(){const f=$("adminLoginForm");if(!f||$("forgotAdminPasswordBtn"))return;f.insertAdjacentHTML("beforeend",`<button id="forgotAdminPasswordBtn" type="button" class="ghost-btn" style="width:100%;margin-top:10px"><i class="fa-solid fa-envelope"></i> نسيت كلمة مرور المدير</button>`)}function noEmpInvoice(){const old=window.buildInvoiceHtml;if(typeof old==="function"&&!window.__finalNoEmployeeInvoice){window.__finalNoEmployeeInvoice=true;window.buildInvoiceHtml=function(inv){return old(inv).replace(/<div[^>]*>\s*الموظف:[\s\S]*?<\/div>/g,"").replace(/الموظف:\s*[^<\n]+/g,"")}}}function styles(){if($("finalFixesStyle"))return;const s=document.createElement("style");s.id="finalFixesStyle";s.textContent=`.sidebar{z-index:5000!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;touch-action:pan-y!important;padding-bottom:120px!important}.sidebar *{overscroll-behavior:contain!important}.bottom-nav{z-index:60!important}.modal-backdrop{z-index:10000!important}@media(max-width:900px){.sidebar{bottom:86px!important;height:auto!important}.sidebar.open{transform:translateX(0)!important}}.invoice-paper,.invoice-paper *{font-family:'Cairo',Arial,sans-serif!important}.invoice-logo{object-fit:cover!important}@media print{.invoice-paper,.invoice-paper *{font-family:'Cairo',Arial,sans-serif!important}.invoice-paper{font-size:10px!important}.invoice-shop-title{font-size:14px!important}.invoice-date-small,.invoice-paper div{font-size:10px!important}.invoice-logo{width:48px!important;height:48px!important;object-fit:cover!important}}`;document.head.appendChild(s)}function bind(){document.addEventListener("click",async e=>{const add=e.target.closest("#addEmployeeBtn");if(add){e.preventDefault();e.stopImmediatePropagation();openEmp();return}const edit=e.target.closest("[data-edit-employee]");if(edit){e.preventDefault();e.stopImmediatePropagation();openEmp(edit.dataset.editEmployee);return}const del=e.target.closest("[data-delete-employee]");if(del){e.preventDefault();e.stopImmediatePropagation();await delEmp(del.dataset.deleteEmployee);return}const fp=e.target.closest("#forgotAdminPasswordBtn");if(fp){e.preventDefault();e.stopImmediatePropagation();forgot();return}},true);document.addEventListener("change",e=>{if(e.target&&e.target.id==="settingRecoveryEmail")saveRec()},true);window.openEmployeeForm=openEmp;window.deleteEmployee=delEmp}function init(){styles();forgotBtn();recovery();bind();noEmpInvoice();setInterval(()=>{forgotBtn();recovery();noEmpInvoice()},1800)}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();})();
+</script>
+
+<!-- customers suppliers workers addon placeholder -->
+<script>
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  function toast(m){ if(window.toast) window.toast(m); else alert(m); }
+  function uid(p){ return p+'_'+Date.now()+'_'+Math.random().toString(16).slice(2); }
+  function money(v){ if(window.money) return window.money(v); return '₪ '+(Number(v||0)).toFixed(2); }
+  function load(k){ try{return JSON.parse(localStorage.getItem(k)||'[]')}catch{return[]} }
+  function save(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
+  const SK={suppliers:'cashier_suppliers_addon_v1',workers:'cashier_workers_addon_v1',wages:'cashier_wages_addon_v1'};
+  const css=document.createElement('style');css.textContent='.addon-table{width:100%;border-collapse:collapse}.addon-table th,.addon-table td{padding:10px;border-bottom:1px solid #e5e7eb}.addon-actions{display:flex;gap:6px;flex-wrap:wrap}';document.head.appendChild(css);
+  function ensureNav(){
+    const side=document.querySelector('.sidebar'); if(!side||document.querySelector('[data-page="customersAddon"]')) return;
+    const mk=(p,ic,t)=>{const b=document.createElement('button');b.className='nav-btn';b.dataset.page=p;b.innerHTML='<span class="nav-icon"><i class="fa-solid '+ic+'"></i></span> '+t;return b};
+    side.append(mk('customersAddon','fa-users','العملاء'),mk('suppliersAddon','fa-truck-field','الموردين'),mk('workersAddon','fa-user-gear','العمال والأجور'));
+  }
+  function ensurePages(){const main=document.querySelector('.main'); if(!main||$('page-customersAddon'))return; main.insertAdjacentHTML('beforeend',`
+<section id="page-customersAddon" class="section"><div class="card"><h1 style="font-size:24px;font-weight:900;margin:0 0 14px"><i class="fa-solid fa-users"></i> العملاء</h1><div id="customersAddonBox"></div></div></section>
+<section id="page-suppliersAddon" class="section"><div class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px"><h1 style="font-size:24px;font-weight:900;margin:0"><i class="fa-solid fa-truck-field"></i> الموردين</h1><button id="addSupplierAddonBtn" class="primary-btn"><i class="fa-solid fa-plus"></i> إضافة مورد</button></div><div id="suppliersAddonBox"></div></div></section>
+<section id="page-workersAddon" class="section"><div class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px"><h1 style="font-size:24px;font-weight:900;margin:0"><i class="fa-solid fa-user-gear"></i> العمال والأجور</h1><button id="addWorkerAddonBtn" class="primary-btn"><i class="fa-solid fa-plus"></i> إضافة عامل</button></div><div id="workersAddonBox"></div></div></section>`)}
+  function switchAddon(p){document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));$('page-'+p)?.classList.add('active');document.querySelectorAll('.nav-btn,.bottom-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===p));renderAllAddon();}
+  function renderCustomers(){const box=$('customersAddonBox');if(!box)return;const cs=window.state?.customers||[];box.innerHTML='<table class="addon-table"><thead><tr><th>الاسم</th><th>الهاتف</th><th>الرصيد</th><th>المبيعات</th><th>الدفعات</th><th>الفواتير</th><th>إجراءات</th></tr></thead><tbody>'+cs.map(c=>`<tr><td><b>${c.name||''}</b></td><td>${c.phone||'-'}</td><td>${money(c.balance||0)}</td><td>${money(c.totalSales||0)}</td><td>${money(c.totalPaid||0)}</td><td>${c.invoicesCount||0}</td><td><div class="addon-actions"><button class="ghost-btn" data-open-customer="${c.id}">عرض</button><button class="ghost-btn" data-edit-debt-customer="${c.id}">تعديل</button><button class="danger-btn" data-delete-customer="${c.id}">حذف</button></div></td></tr>`).join('')+'</tbody></table>';}
+  function renderSuppliers(){const box=$('suppliersAddonBox');if(!box)return;const arr=load(SK.suppliers);box.innerHTML='<table class="addon-table"><thead><tr><th>المورد</th><th>الهاتف</th><th>ملاحظات</th><th>إجراءات</th></tr></thead><tbody>'+arr.map(s=>`<tr><td><b>${s.name}</b></td><td>${s.phone||'-'}</td><td>${s.notes||'-'}</td><td><button class="ghost-btn" data-edit-supplier-addon="${s.id}">تعديل</button> <button class="danger-btn" data-del-supplier-addon="${s.id}">حذف</button></td></tr>`).join('')+'</tbody></table>';patchPurchaseSupplierSelect();}
+  function supplierForm(id){const arr=load(SK.suppliers),old=arr.find(x=>x.id===id)||{};modal(id?'تعديل مورد':'إضافة مورد',`<form id="supplierAddonForm"><label class="field-label">اسم المورد</label><input id="supName" class="input" required value="${old.name||''}"><label class="field-label">الهاتف</label><input id="supPhone" class="input" value="${old.phone||''}"><label class="field-label">ملاحظات</label><textarea id="supNotes" class="textarea">${old.notes||''}</textarea><button class="primary-btn" style="width:100%;margin-top:12px">حفظ</button></form>`);$('supplierAddonForm').onsubmit=e=>{e.preventDefault();const o={id:id||uid('sup'),name:$('supName').value.trim(),phone:$('supPhone').value.trim(),notes:$('supNotes').value.trim(),updatedAt:Date.now(),createdAt:old.createdAt||Date.now()};const a=load(SK.suppliers);const i=a.findIndex(x=>x.id===o.id);if(i>=0)a[i]=o;else a.push(o);save(SK.suppliers,a);closeModal2();renderSuppliers();toast(id?'تم تعديل المورد':'تم إضافة المورد');};}
+  function renderWorkers(){const box=$('workersAddonBox');if(!box)return;const ws=load(SK.workers),wg=load(SK.wages);box.innerHTML='<table class="addon-table"><thead><tr><th>العامل</th><th>النظام</th><th>القيمة</th><th>مدفوع</th><th>إجراءات</th></tr></thead><tbody>'+ws.map(w=>{const paid=wg.filter(x=>x.workerId===w.id).reduce((s,x)=>s+Number(x.amount||0),0);return`<tr><td><b>${w.name}</b></td><td>${w.type==='daily'?'يومي':w.type==='percent'?'نسبة أرباح':'راتب شهري'}</td><td>${w.type==='percent'?w.value+'%':money(w.value)}</td><td>${money(paid)}</td><td><button class="success-btn" data-pay-worker-addon="${w.id}">تسجيل أجرة</button> <button class="ghost-btn" data-edit-worker-addon="${w.id}">تعديل</button> <button class="danger-btn" data-del-worker-addon="${w.id}">حذف</button></td></tr>`}).join('')+'</tbody></table>';}
+  function workerForm(id){const arr=load(SK.workers),old=arr.find(x=>x.id===id)||{};modal(id?'تعديل عامل':'إضافة عامل',`<form id="workerAddonForm"><label class="field-label">اسم العامل</label><input id="wName" class="input" required value="${old.name||''}"><label class="field-label">نوع الأجرة</label><select id="wType" class="select"><option value="daily">أجرة يومية</option><option value="percent">نسبة من الأرباح %</option><option value="monthly">راتب شهري</option></select><label class="field-label">القيمة</label><input id="wValue" type="number" class="input" required value="${old.value||0}"><button class="primary-btn" style="width:100%;margin-top:12px">حفظ</button></form>`);$('wType').value=old.type||'daily';$('workerAddonForm').onsubmit=e=>{e.preventDefault();const o={id:id||uid('wrk'),name:$('wName').value.trim(),type:$('wType').value,value:Number($('wValue').value||0),updatedAt:Date.now(),createdAt:old.createdAt||Date.now()};const a=load(SK.workers);const i=a.findIndex(x=>x.id===o.id);if(i>=0)a[i]=o;else a.push(o);save(SK.workers,a);closeModal2();renderWorkers();toast(id?'تم تعديل العامل':'تم إضافة العامل');};}
+  function payWorker(id){const w=load(SK.workers).find(x=>x.id===id);if(!w)return;let amount=w.value;if(w.type==='percent'){const profit=[...(window.state?.invoices||[])].reduce((s,i)=>s+Number(i.profit||0),0);amount=profit*Number(w.value||0)/100;}modal('تسجيل أجرة عامل',`<form id="payWorkerAddonForm"><b>${w.name}</b><label class="field-label">المبلغ</label><input id="payWAmount" type="number" class="input" value="${amount}"><label class="field-label">ملاحظة</label><input id="payWNote" class="input"><button class="primary-btn" style="width:100%;margin-top:12px">حفظ الأجرة</button></form>`);$('payWorkerAddonForm').onsubmit=e=>{e.preventDefault();const a=load(SK.wages);a.push({id:uid('wage'),workerId:id,workerName:w.name,amount:Number($('payWAmount').value||0),note:$('payWNote').value,createdAt:Date.now()});save(SK.wages,a);closeModal2();renderWorkers();toast('تم تسجيل أجرة العامل وخصمها من الأرباح');};}
+  function modal(t,h){$('modalTitle').textContent=t;$('modalBody').innerHTML=h;$('modalBackdrop').classList.add('show');}
+  function closeModal2(){$('modalBackdrop')?.classList.remove('show');}
+  function patchPurchaseSupplierSelect(){const inp=$('purchaseSupplier');if(!inp||$('purchaseSupplierAddonSelect'))return;const sel=document.createElement('select');sel.id='purchaseSupplierAddonSelect';sel.className='select';sel.innerHTML='<option value="">اختر مورد محفوظ</option>'+load(SK.suppliers).map(s=>`<option value="${s.name}">${s.name}</option>`).join('');inp.parentNode.appendChild(sel);sel.onchange=()=>{if(sel.value)inp.value=sel.value};}
+  function patchReports(){const wages=load(SK.wages).reduce((s,x)=>s+Number(x.amount||0),0);const net=$('reportNet');if(net&&!net.dataset.wagePatched){net.dataset.wagePatched='1';const old=net.textContent;net.title='تم خصم أجور العمال من صافي الربح';} if(net){let profit=0,exp=0;try{profit=(window.state?.invoices||[]).reduce((s,x)=>s+Number(x.profit||0),0);exp=(window.state?.expenses||[]).reduce((s,x)=>s+Number(x.amount||0),0);net.textContent=money(profit-exp-wages)}catch{}}
+  }
+  function renderAllAddon(){renderCustomers();renderSuppliers();renderWorkers();patchReports();}
+  document.addEventListener('click',e=>{const n=e.target.closest('[data-page]');if(n&&['customersAddon','suppliersAddon','workersAddon'].includes(n.dataset.page)){e.preventDefault();e.stopImmediatePropagation();switchAddon(n.dataset.page)} const as=e.target.closest('#addSupplierAddonBtn');if(as)supplierForm(); const es=e.target.closest('[data-edit-supplier-addon]');if(es)supplierForm(es.dataset.editSupplierAddon); const ds=e.target.closest('[data-del-supplier-addon]');if(ds){let a=load(SK.suppliers).filter(x=>x.id!==ds.dataset.delSupplierAddon);save(SK.suppliers,a);renderSuppliers();toast('تم حذف المورد')} const aw=e.target.closest('#addWorkerAddonBtn');if(aw)workerForm(); const ew=e.target.closest('[data-edit-worker-addon]');if(ew)workerForm(ew.dataset.editWorkerAddon); const dw=e.target.closest('[data-del-worker-addon]');if(dw){save(SK.workers,load(SK.workers).filter(x=>x.id!==dw.dataset.delWorkerAddon));renderWorkers();toast('تم حذف العامل')} const pw=e.target.closest('[data-pay-worker-addon]');if(pw)payWorker(pw.dataset.payWorkerAddon);},true);
+  const old=window.renderAll; if(typeof old==='function'){window.renderAll=function(){const r=old.apply(this,arguments);setTimeout(renderAllAddon,0);return r}}
+  function init(){ensureNav();ensurePages();renderAllAddon();setInterval(renderAllAddon,3000)} if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
