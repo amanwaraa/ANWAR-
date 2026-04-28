@@ -10332,3 +10332,24 @@
   function init(){ensureNav();ensurePages();renderAllAddon();setInterval(renderAllAddon,3000)} if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
 </script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+function toast(m,ms=2600){if(window.toast)window.toast(m,ms);else alert(m)}
+function uid(p='id'){return `${p}_${Date.now()}_${Math.random().toString(16).slice(2)}`}
+function root(){return window.FIREBASE_ROOT||window.CASHIER_FIREBASE_CONFIG?.firebaseRoot||'cashier_units_pro_default'}
+function fpath(store,id){return window.firebasePath?window.firebasePath(store,id):`${root()}/${store}/${id}`}
+async function saveNew(store,item){item.id=item.id||uid(store);item.createdAt=item.createdAt||Date.now();item.updatedAt=Date.now();if(window.saveLocal)await window.saveLocal(store,item,true);else if(window.idbPut)await window.idbPut(store,item);if(navigator.onLine&&window.db&&window.ref&&window.set)await window.set(window.ref(window.db,fpath(store,item.id)),item);window.state=window.state||{};window.state[store]=Array.isArray(window.state[store])?window.state[store]:[];const i=window.state[store].findIndex(x=>x.id===item.id);if(i>=0)window.state[store][i]=item;else window.state[store].push(item);return item}
+async function delNew(store,id){if(window.removeLocal)await window.removeLocal(store,id,true);else if(window.idbDelete)await window.idbDelete(store,id);if(navigator.onLine&&window.db&&window.ref&&window.remove)await window.remove(window.ref(window.db,fpath(store,id)));if(window.state&&Array.isArray(window.state[store]))window.state[store]=window.state[store].filter(x=>x.id!==id)}
+async function pull(store){if(!navigator.onLine||!window.db||!window.ref||!window.get)return;try{const s=await window.get(window.ref(window.db,`${root()}/${store}`));if(!s.exists())return;const o=s.val()||{};const arr=Array.isArray(o)?o.filter(Boolean):Object.values(o).filter(Boolean);window.state=window.state||{};window.state[store]=arr;if(window.idbPut)for(const it of arr)await window.idbPut(store,it)}catch(e){console.warn('sync '+store,e)}}
+async function syncAll(){await pull('suppliers');await pull('workers');await pull('workerWages')}
+function css(){if($('syncMobileSidebarCss'))return;const s=document.createElement('style');s.id='syncMobileSidebarCss';s.textContent=`.table-wrap{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-x pan-y!important;max-width:100%!important}.table-wrap table{min-width:850px!important}#customersTable,#suppliersTable,#workersTable,#workerWagesTable{min-width:760px!important}@media(max-width:900px){.sidebar{z-index:5000!important;overflow-y:auto!important;overscroll-behavior:contain!important}.sidebar.open{transform:translateX(0)!important}.main{overflow-x:hidden!important}.card{max-width:100%!important}}`;document.head.appendChild(s)}
+function closeNav(){document.addEventListener('click',e=>{const x=e.target.closest('.nav-btn[data-page],.bottom-btn[data-page],[data-page-jump]');if(x)setTimeout(()=>{$('sidebar')?.classList.remove('open')},60)},true)}
+function supplierSelect(){document.addEventListener('focusin',()=>{const inp=$('purchaseSupplier');if(!inp||inp.dataset.suppliersEnhanced)return;inp.dataset.suppliersEnhanced='1';const sel=document.createElement('select');sel.className='select';sel.style.marginTop='6px';const arr=window.state?.suppliers||[];sel.innerHTML='<option value="">اختر مورد محفوظ أو اكتب يدويًا</option>'+arr.map(s=>`<option value="${String(s.name||'').replace(/"/g,'&quot;')}">${s.name||''}</option>`).join('');inp.insertAdjacentElement('afterend',sel);sel.onchange=()=>{if(sel.value)inp.value=sel.value}},true)}
+function reportPatch(){const old=window.renderReports;if(typeof old==='function'&&!window.__wageReportPatch){window.__wageReportPatch=1;window.renderReports=function(...a){const r=old.apply(this,a);try{const wages=(window.state?.workerWages||[]).reduce((s,w)=>s+Number(w.amount||0),0);const el=$('reportNet');if(el&&window.money){const n=Number(String(el.textContent||'0').replace(/[^0-9.\-]/g,''))||0;el.textContent=window.money(n-wages)}}catch(e){}return r}}}
+window.__saveNewStoreToFirebase=saveNew;window.__removeNewStoreFromFirebase=delNew;window.__syncNewStores=syncAll;
+async function init(){css();closeNav();supplierSelect();await syncAll();reportPatch();if(window.renderAll)window.renderAll();setInterval(syncAll,15000);window.addEventListener('online',syncAll);toast('تم تفعيل مزامنة الإضافات الجديدة وتحسين عرض الجوال')}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
