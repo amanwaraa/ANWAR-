@@ -2923,6 +2923,23 @@
   }catch(e){}
 })();
 </script>
+  <script id="oskar-trial-local-only-early-guard">
+  (function(){
+    "use strict";
+    var MODE_KEY="oskar_storage_mode_v1", START_KEY="oskar_trial_started_at_v1", DUR=30*60*1000;
+    var st=Number(localStorage.getItem(START_KEY)||0);
+    var active=localStorage.getItem(MODE_KEY)==="trial" && st && (Date.now()-st)<DUR;
+    window.OSKAR_TRIAL_EARLY_ACTIVE=!!active;
+    if(!active) return;
+    window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true;
+    var firebasePattern=/(firebaseio\.com|firebasedatabase\.app|googleapis\.com\/.*database|firebaseinstallations|identitytoolkit|securetoken)/i;
+    var oldFetch=window.fetch;
+    if(oldFetch){ window.fetch=function(input, init){ try{ var url=String((input&&input.url)||input||""); if(firebasePattern.test(url)) return Promise.resolve(new Response("{}",{status:200,headers:{"Content-Type":"application/json"}})); }catch(e){} return oldFetch.apply(this, arguments); }; }
+    var OldWS=window.WebSocket;
+    if(OldWS){ window.WebSocket=function(url, protocols){ if(firebasePattern.test(String(url||""))){ throw new Error("trial-local-only"); } return new OldWS(url, protocols); }; window.WebSocket.prototype=OldWS.prototype; }
+  })();
+  </script>
+
   <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import {
@@ -9888,7 +9905,7 @@
         const cartQty = e.target.closest("[data-change-cart-qty]");
         if (cartQty) {
           const line = state.cart.find(x => x.id === cartQty.dataset.changeCartQty);
-          if (line) updateCartLine(line.id, { qty: cartQty.value }, true);
+          if (line) updateCartLine(line.id, { qty: cartQty.value }, false);
           return;
         }
 
@@ -11447,7 +11464,7 @@
   function ensureTrialButton(){ const card=document.querySelector("#authLock .auth-card"); if(!card) return; let btn=$("trialLoginBtn"); if(!btn){btn=document.createElement("button"); btn.id="trialLoginBtn"; btn.type="button"; btn.className="auth-main-btn"; card.appendChild(btn);} btn.style.cssText="background:linear-gradient(135deg,#f59e0b,#d97706);margin-top:10px"; btn.disabled=false; btn.style.opacity="1"; btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 30 دقيقة'; let note=$("trialLoginNote"); if(!note){note=document.createElement("div"); note.id="trialLoginNote"; note.className="auth-note"; btn.insertAdjacentElement("afterend",note);} btn.onclick=function(e){ e.preventDefault(); e.stopPropagation(); if(expireTrialIfNeeded()) return toast("انتهت الفترة التجريبية على هذا الجهاز"); const active=trialActive(); const used=localStorage.getItem(TRIAL_USED_KEY)==="1"; if(used&&!active) return toast("الفترة التجريبية استُخدمت على هذا الجهاز وانتهت"); if(!active){ getDeviceId(); localStorage.setItem(TRIAL_USED_KEY,"1"); localStorage.setItem(TRIAL_STARTED_KEY,String(now())); localStorage.setItem(TRIAL_MODE_KEY,"trial"); localStorage.removeItem(TRIAL_LOGGED_OUT_KEY); toast("تم إنشاء تجربة مستقلة لهذا الجهاز. سيتم فتح مسار بيانات خاص."); setTimeout(()=>location.reload(),450); return; } setTrialUser(); toast("تم الدخول للتجربة بنفس بيانات هذا الجهاز"); }; }
   function ensurePurchaseCards(){ const card=document.querySelector("#authLock .auth-card"); if(!card) return; if(!$("oskarPurchaseBox")){ const box=document.createElement("div"); box.id="oskarPurchaseBox"; box.innerHTML=`<div class="oskar-buy-title"><i class="fa-brands fa-whatsapp"></i> شراء نسخة دائمة</div><div class="oskar-plans-row"><button class="oskar-plan-card" data-plan="30 يوم ب 49 شيكل"><b>30 يوم</b><span>49 شيكل</span></button><button class="oskar-plan-card" data-plan="90 يوم ب 99 شيكل"><b>90 يوم</b><span>99 شيكل</span></button><button class="oskar-plan-card best" data-plan="دائم مدى الحياة ب 149 شيكل"><b>مدى الحياة</b><span>149 شيكل</span></button></div><a class="oskar-wa-btn" target="_blank" rel="noopener" href="https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent('مرحبا، أريد شراء نسخة oskar دائمة')}"><i class="fa-brands fa-whatsapp"></i> تواصل واتساب للشراء</a>`; const note=$("trialLoginNote"); (note||$("employeeLoginForm")||card.lastElementChild).insertAdjacentElement("afterend",box); } document.querySelectorAll(".oskar-plan-card").forEach(btn=>{ if(btn.__bound) return; btn.__bound=true; btn.addEventListener("click",()=>{ const plan=btn.dataset.plan||"نسخة دائمة"; window.open(`https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent('مرحبا، أريد شراء خطة oskar: '+plan)}`,'_blank'); }); }); }
   function installStyles(){ if($("oskarTrialPurchaseStyles")) return; const style=document.createElement("style"); style.id="oskarTrialPurchaseStyles"; style.textContent=`#oskarPurchaseBox{margin-top:12px;background:linear-gradient(180deg,#f8fafc,#fff);border:1px solid #e2e8f0;border-radius:22px;padding:12px;box-shadow:0 16px 34px rgba(15,23,42,.07)}.oskar-buy-title{font-weight:900;color:#0f172a;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:7px}.oskar-buy-title i{color:#16a34a;font-size:20px}.oskar-plans-row{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;direction:rtl!important}.oskar-plan-card{border:1px solid #dbeafe;background:#fff;border-radius:18px;padding:10px 5px;min-height:74px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-family:Cairo,Arial,sans-serif;box-shadow:0 10px 22px rgba(37,99,235,.08);transition:.16s;white-space:nowrap}.oskar-plan-card b{font-size:13px;color:#0f172a}.oskar-plan-card span{font-size:12px;font-weight:900;color:#1d4ed8}.oskar-plan-card.best{background:linear-gradient(135deg,#fef3c7,#fff);border-color:#f59e0b}.oskar-plan-card:hover{transform:translateY(-2px)}.oskar-wa-btn{margin-top:10px;text-decoration:none;width:100%;border:0;border-radius:18px;padding:12px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 14px 28px rgba(22,163,74,.22)}.oskar-trial-pill{position:fixed;right:14px;bottom:92px;z-index:35000;background:#0f172a;color:#fff;border-radius:999px;padding:10px 13px;font-weight:900;font-size:12px;box-shadow:0 16px 38px rgba(15,23,42,.22)}@media(max-width:420px){.oskar-plan-card{padding:8px 2px;min-height:68px}.oskar-plan-card b{font-size:11px}.oskar-plan-card span{font-size:11px}.oskar-plans-row{gap:5px!important}}`; document.head.appendChild(style); }
-  function updateTrialUi(){ installStyles(); ensureTrialButton(); ensurePurchaseCards(); if(expireTrialIfNeeded()) return; const active=trialActive(), used=localStorage.getItem(TRIAL_USED_KEY)==="1", out=localStorage.getItem(TRIAL_LOGGED_OUT_KEY)==="1"; const note=$("trialLoginNote"), btn=$("trialLoginBtn"); if(active){ if(note) note.textContent=out?`التجربة فعالة لهذا الجهاز. اضغط زر التجربة للدخول مرة أخرى. المتبقي ${mmss(leftMs())}.`:`التجربة فعالة الآن. المتبقي ${mmss(leftMs())}. بياناتها محلية وFirebase بمسار مستقل لهذا الجهاز.`; if(btn){btn.disabled=false; btn.style.opacity="1"; btn.innerHTML='<i class="fa-solid fa-flask"></i> دخول التجربة المتبقية';} let pill=$("oskarTrialPill"); if(!pill){pill=document.createElement("div"); pill.id="oskarTrialPill"; pill.className="oskar-trial-pill"; document.body.appendChild(pill);} pill.textContent=`تجربة oskar: ${mmss(leftMs())}`; if(out) forceTrialLoggedOutUi(); } else { const pill=$("oskarTrialPill"); if(pill) pill.remove(); if(used){ if(note) note.textContent="تم استخدام الفترة التجريبية على هذا الجهاز وانتهت. اختر إحدى البطاقات بالأسفل للشراء."; if(btn){btn.disabled=true; btn.style.opacity=".55"; btn.innerHTML='<i class="fa-solid fa-lock"></i> انتهت الفترة التجريبية';} } else { if(note) note.textContent="التجربة تستخدم مرة واحدة لكل جهاز. عند تشغيلها يتم إنشاء تخزين محلي ومسار Firebase مستقلين لهذا الجهاز فقط."; } } }
+  function updateTrialUi(){ installStyles(); ensureTrialButton(); ensurePurchaseCards(); if(expireTrialIfNeeded()) return; const active=trialActive(), used=localStorage.getItem(TRIAL_USED_KEY)==="1", out=localStorage.getItem(TRIAL_LOGGED_OUT_KEY)==="1"; const note=$("trialLoginNote"), btn=$("trialLoginBtn"); if(active){ if(note) note.textContent=out?`التجربة فعالة لهذا الجهاز. اضغط زر التجربة للدخول مرة أخرى. المتبقي ${mmss(leftMs())}.`:`التجربة فعالة الآن. المتبقي ${mmss(leftMs())}. بياناتها محلية فقط على هذا الجهاز بدون مزامنة.`; if(btn){btn.disabled=false; btn.style.opacity="1"; btn.innerHTML='<i class="fa-solid fa-flask"></i> دخول التجربة المتبقية';} let pill=$("oskarTrialPill"); if(!pill){pill=document.createElement("div"); pill.id="oskarTrialPill"; pill.className="oskar-trial-pill"; document.body.appendChild(pill);} pill.textContent=`تجربة oskar: ${mmss(leftMs())}`; if(out) forceTrialLoggedOutUi(); } else { const pill=$("oskarTrialPill"); if(pill) pill.remove(); if(used){ if(note) note.textContent="تم استخدام الفترة التجريبية على هذا الجهاز وانتهت. اختر إحدى البطاقات بالأسفل للشراء."; if(btn){btn.disabled=true; btn.style.opacity=".55"; btn.innerHTML='<i class="fa-solid fa-lock"></i> انتهت الفترة التجريبية';} } else { if(note) note.textContent="التجربة تستخدم مرة واحدة لكل جهاز. عند تشغيلها يتم إنشاء تخزين محلي ومساحة بيانات محلية مستقلة لهذا الجهاز فقط."; } } }
   function bindLogout(){ document.addEventListener("click", e=>{ const out=e.target.closest("#logoutBtn,#topLogoutBtn"); if(!out) return; if(trialActive()){ localStorage.setItem(TRIAL_LOGGED_OUT_KEY,"1"); setTimeout(()=>{clearAuthOnly(); authLock(true); updateTrialUi();},0); } }, true); }
   function init(){ getDeviceId(); installStyles(); bindLogout(); updateTrialUi(); setInterval(updateTrialUi,60000); window.OSKAR_FORCE_TRIAL_LOGIN=setTrialUser; window.OSKAR_TRIAL_INFO=()=>({active:trialActive(),deviceId:getDeviceId(),startedAt:startedAt(),leftMs:leftMs(),storageProfile:window.OSKAR_STORAGE_PROFILE,firebaseRoot:window.FIREBASE_ROOT}); }
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
@@ -11527,7 +11544,7 @@
       if(note) note.textContent="تم استخدام الفترة التجريبية على هذا الجهاز وانتهت. اختر إحدى الباقات أو تواصل واتساب للشراء.";
     } else {
       btn.disabled=false; btn.style.opacity="1"; btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 30 دقيقة';
-      if(note) note.textContent="التجربة مرة واحدة لكل جهاز، وبمسار تخزين محلي وFirebase مستقل عن النسخة الأساسية.";
+      if(note) note.textContent="التجربة مرة واحدة لكل جهاز، وبتخزين محلي مستقل عن النسخة الأساسية.";
     }
   }
   function enterTrial(){
@@ -11964,7 +11981,7 @@
       .cart-line{grid-template-columns:minmax(150px,1fr) 82px 120px 88px 42px!important;gap:7px!important;position:relative!important;align-items:center!important}.cart-line .select{padding:8px 7px!important;border-radius:13px!important;font-size:12px!important}.cart-line .cart-qty-input{padding:7px 5px!important;height:36px!important}.cart-line .qty-btn{width:28px!important;height:34px!important;border-radius:10px!important;font-size:16px!important}.cart-line .line-total{justify-self:end!important;text-align:left!important;font-size:14px!important;background:#eff6ff!important;border-radius:12px!important;padding:7px 8px!important;min-width:82px!important}
       @media(max-width:900px){.cart-line{grid-template-columns:1fr 78px 112px!important;padding:10px!important}.cart-line .line-total{position:absolute!important;top:10px!important;left:10px!important}.cart-line>button.danger-btn{position:absolute!important;bottom:10px!important;left:10px!important}.cart-line>div:first-child{padding-left:92px!important}.cart-line .select{grid-column:auto!important}}
       .oskar-keep-camera-setting{margin-top:12px;border:1px solid #dbeafe;background:linear-gradient(135deg,#eff6ff,#fff);border-radius:20px;padding:13px;display:flex;align-items:center;justify-content:space-between;gap:12px}.oskar-keep-camera-setting b{font-weight:900;color:#0f172a}.oskar-keep-camera-setting small{display:block;color:#64748b;font-weight:800;line-height:1.7}.oskar-switch{position:relative;width:54px;height:30px;flex:0 0 auto}.oskar-switch input{display:none}.oskar-slider{position:absolute;inset:0;background:#cbd5e1;border-radius:999px;transition:.2s}.oskar-slider:before{content:"";position:absolute;width:24px;height:24px;right:3px;top:3px;background:white;border-radius:999px;box-shadow:0 5px 12px rgba(15,23,42,.22);transition:.2s}.oskar-switch input:checked+.oskar-slider{background:#2563eb}.oskar-switch input:checked+.oskar-slider:before{right:27px}
-      .oskar-fast-scanner{position:fixed;inset:0;background:#000;z-index:10000;display:none}.oskar-fast-scanner.show{display:block}.oskar-fast-reader,.oskar-fast-reader video{width:100vw!important;height:100vh!important;object-fit:cover!important}.oskar-fast-reader__dashboard,#oskarFastReader__dashboard,#oskarFastReader__scan_region{display:none!important}.oskar-fast-frame{pointer-events:none;position:fixed;top:50%;left:50%;width:min(84vw,430px);height:230px;transform:translate(-50%,-50%);border:3px solid rgba(255,255,255,.55);border-radius:28px;z-index:10002;box-shadow:0 0 0 9999px rgba(0,0,0,.18),0 0 35px rgba(255,255,255,.15)}.oskar-fast-scanner.detected .oskar-fast-frame{border-color:#22c55e;box-shadow:0 0 0 9999px rgba(0,0,0,.12),0 0 45px rgba(34,197,94,.95),inset 0 0 35px rgba(34,197,94,.24)}.oskar-fast-laser{position:fixed;top:50%;left:50%;width:min(72vw,360px);height:3px;transform:translate(-50%,-50%);background:linear-gradient(90deg,transparent,#22c55e,transparent);box-shadow:0 0 22px #22c55e;border-radius:999px;z-index:10003;animation:oskarLaser 1.05s ease-in-out infinite}@keyframes oskarLaser{0%,100%{transform:translate(-50%,calc(-50% - 90px));opacity:.55}50%{transform:translate(-50%,calc(-50% + 90px));opacity:1}}.oskar-fast-close{position:fixed;top:15px;left:15px;z-index:10005;width:48px;height:48px;border:0;border-radius:16px;background:rgba(15,23,42,.86);color:white;font-size:22px;font-weight:900}.oskar-fast-title{position:fixed;top:16px;right:15px;z-index:10005;max-width:calc(100vw - 88px);background:rgba(15,23,42,.86);color:#fff;border-radius:16px;padding:10px 14px;font-weight:900}.oskar-fast-added{position:fixed;top:72px;right:12px;left:12px;z-index:10006;display:flex;gap:8px;overflow-x:auto;padding:4px}.oskar-fast-chip{background:rgba(255,255,255,.95);color:#0f172a;border-radius:999px;padding:8px 10px;font-weight:900;font-size:12px;display:inline-flex;align-items:center;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.22);white-space:nowrap}.oskar-fast-chip button{border:0;background:#fee2e2;color:#b91c1c;border-radius:999px;width:22px;height:22px;font-weight:900}
+      .oskar-fast-scanner{position:fixed;inset:0;background:#000;z-index:10000;display:none}.oskar-fast-scanner.show{display:block}.oskar-fast-reader,.oskar-fast-reader video{width:100vw!important;height:100vh!important;object-fit:cover!important}.oskar-fast-reader__dashboard,#oskarFastReader__dashboard,#oskarFastReader__scan_region{display:none!important}.oskar-fast-frame{pointer-events:none;position:fixed;top:50%;left:50%;width:min(94vw,560px);height:min(42vh,300px);transform:translate(-50%,-50%);border:3px solid rgba(255,255,255,.55);border-radius:28px;z-index:10002;box-shadow:0 0 0 9999px rgba(0,0,0,.18),0 0 35px rgba(255,255,255,.15)}.oskar-fast-scanner.detected .oskar-fast-frame{border-color:#22c55e;box-shadow:0 0 0 9999px rgba(0,0,0,.12),0 0 45px rgba(34,197,94,.95),inset 0 0 35px rgba(34,197,94,.24)}.oskar-fast-laser{position:fixed;top:50%;left:50%;width:min(72vw,360px);height:3px;transform:translate(-50%,-50%);background:linear-gradient(90deg,transparent,#22c55e,transparent);box-shadow:0 0 22px #22c55e;border-radius:999px;z-index:10003;animation:oskarLaser 1.05s ease-in-out infinite}@keyframes oskarLaser{0%,100%{transform:translate(-50%,calc(-50% - 90px));opacity:.55}50%{transform:translate(-50%,calc(-50% + 90px));opacity:1}}.oskar-fast-close{position:fixed;top:15px;left:15px;z-index:10005;width:48px;height:48px;border:0;border-radius:16px;background:rgba(15,23,42,.86);color:white;font-size:22px;font-weight:900}.oskar-fast-title{position:fixed;top:16px;right:15px;z-index:10005;max-width:calc(100vw - 88px);background:rgba(15,23,42,.86);color:#fff;border-radius:16px;padding:10px 14px;font-weight:900}.oskar-fast-added{position:fixed;top:72px;right:12px;left:12px;z-index:10006;display:flex;gap:8px;overflow-x:auto;padding:4px}.oskar-fast-chip{background:rgba(255,255,255,.95);color:#0f172a;border-radius:999px;padding:8px 10px;font-weight:900;font-size:12px;display:inline-flex;align-items:center;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.22);white-space:nowrap}.oskar-fast-chip button{border:0;background:#fee2e2;color:#b91c1c;border-radius:999px;width:22px;height:22px;font-weight:900}
     `; document.head.appendChild(s);
   }
 
@@ -12062,7 +12079,7 @@
     try{
       const formats = window.Html5QrcodeSupportedFormats ? [Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.CODE_93,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.DATA_MATRIX,Html5QrcodeSupportedFormats.AZTEC,Html5QrcodeSupportedFormats.PDF_417] : undefined;
       scanner=new Html5Qrcode("oskarFastReader", formats?{formatsToSupport:formats,verbose:false}:undefined);
-      const config={fps:45,qrbox:(w,h)=>({width:Math.floor(w*.86),height:Math.floor(h*.34)}),aspectRatio:1.7777778,disableFlip:false,experimentalFeatures:{useBarCodeDetectorIfSupported:true},videoConstraints:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:"continuous"},{exposureMode:"continuous"}]}};
+      const config={fps:45,qrbox:(w,h)=>({width:Math.floor(w*.94),height:Math.floor(h*.44)}),aspectRatio:1.7777778,disableFlip:false,experimentalFeatures:{useBarCodeDetectorIfSupported:true},videoConstraints:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:"continuous"},{exposureMode:"continuous"}]}};
       await scanner.start({facingMode:"environment"},config,(txt)=>{ const c=String(txt||"").trim(); const t=Date.now(); if(!c) return; if(c===lastCode && t-lastAt<1700) return; lastCode=c; lastAt=t; handleCode(c); },()=>{}); running=true;
     }catch(e){ console.error(e); await stopScanner(); toast("اسمح باستخدام الكاميرا وتأكد أن الرابط HTTPS"); }
   }
@@ -12131,6 +12148,105 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
 </script>
+<script id="oskar-final-user-fixes-2026-04-29-v2">
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const TRIAL_DURATION_MS = 30*60*1000;
+  const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
+  const TRIAL_MODE_KEY = "oskar_storage_mode_v1";
+  const money = v => (typeof window.money === "function" ? window.money(v) : "₪ " + (Number(v||0).toFixed(2)));
+  const clean = (v,f=0) => { const n=Number(String(v??"").replace(",",".")); return Number.isFinite(n)?n:f; };
+  function toast(msg, ms=2600){ if(typeof window.toast==="function") return window.toast(msg,ms); const el=$("toast"); if(el){el.textContent=msg; el.classList.add("show"); clearTimeout(el.__t); el.__t=setTimeout(()=>el.classList.remove("show"),ms);} else alert(msg); }
+  function trialActive(){ const st=Number(localStorage.getItem(TRIAL_STARTED_KEY)||0); return localStorage.getItem(TRIAL_MODE_KEY)==="trial" && st && Date.now()-st<TRIAL_DURATION_MS; }
+  function leftMinutes(){ const st=Number(localStorage.getItem(TRIAL_STARTED_KEY)||0); const left=Math.max(0,TRIAL_DURATION_MS-(Date.now()-st)); const m=Math.ceil(left/60000); return m<=0?"انتهت":(m===1?"دقيقة":(m===2?"دقيقتان":m+" دقيقة")); }
+  function installFinalStyles(){
+    if($("oskarFinalUserFixesStylesV2")) return;
+    const st=document.createElement("style"); st.id="oskarFinalUserFixesStylesV2";
+    st.textContent=`
+      #trialLoginNote{display:none!important}
+      #oskarTrialPill{display:none!important}
+      .auth-user-pill{display:inline-flex!important;flex-direction:row!important;align-items:center!important;gap:8px!important;white-space:nowrap!important;min-height:38px!important;overflow:visible!important}
+      .auth-user-pill .oskar-side-minutes{display:inline-flex!important;align-items:center!important;gap:5px!important;margin-inline-start:8px!important;padding:4px 9px!important;border-radius:999px!important;background:linear-gradient(135deg,#f59e0b,#d97706)!important;color:#fff!important;font-size:11px!important;font-weight:900!important;box-shadow:0 8px 18px rgba(217,119,6,.22)!important;min-width:74px!important;justify-content:center!important;opacity:1!important;visibility:visible!important}
+      .auth-user-pill .oskar-side-title{display:inline-flex!important;align-items:center!important;gap:7px!important}
+      .oskar-fast-frame{width:min(94vw,560px)!important;height:min(42vh,300px)!important;border-width:4px!important;border-color:rgba(255,255,255,.72)!important}
+      .oskar-fast-frame:after{content:"ضع الباركود كامل داخل الإطار";position:absolute;right:50%;bottom:-42px;transform:translateX(50%);background:rgba(15,23,42,.88);color:#fff;border-radius:999px;padding:8px 12px;font-family:Cairo,Arial,sans-serif;font-size:12px;font-weight:900;white-space:nowrap}
+      .oskar-fast-laser{width:min(84vw,500px)!important}
+      @media(max-width:900px){
+        .cart-line{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;align-items:start!important;background:#fff!important;border:1px solid #e5e7eb!important;border-radius:24px!important;padding:14px!important;position:relative!important;min-height:138px!important;box-shadow:0 12px 28px rgba(15,23,42,.05)!important;overflow:hidden!important}
+        .oskar-cart-product-info{padding-left:168px!important;min-width:0!important;padding-top:2px!important}
+        .oskar-cart-product-info b{font-size:17px!important;color:#0f172a!important;display:block!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;line-height:1.5!important}
+        .oskar-cart-product-info .muted{display:none!important}
+        .line-total{position:absolute!important;top:14px!important;left:64px!important;background:#eff6ff!important;color:#1d4ed8!important;border-radius:16px!important;padding:9px 12px!important;font-size:15px!important;font-weight:900!important;min-width:94px!important;text-align:center!important;z-index:3!important}
+        .oskar-cart-remove{position:absolute!important;top:14px!important;left:14px!important;width:42px!important;height:42px!important;padding:0!important;border-radius:15px!important;display:flex!important;align-items:center!important;justify-content:center!important;z-index:4!important;background:#fee2e2!important;color:#b91c1c!important}
+        .oskar-cart-controls{display:flex!important;align-items:center!important;gap:8px!important;grid-column:1 / -1!important;margin-top:12px!important;width:100%!important;max-width:100%!important;justify-content:flex-start!important}
+        .oskar-cart-unit{width:92px!important;height:42px!important;padding:6px 8px!important;border-radius:14px!important;font-size:13px!important;flex:0 0 auto!important}
+        .oskar-cart-qty-wrap{display:grid!important;grid-template-columns:38px minmax(64px,82px) 38px!important;gap:6px!important;align-items:center!important;flex:0 0 auto!important}
+        .oskar-cart-qty-wrap .cart-qty-input{text-align:center!important;height:42px!important;padding:6px!important;border-radius:14px!important;font-size:15px!important;direction:ltr!important}
+        .oskar-cart-qty-wrap .qty-btn{width:38px!important;height:42px!important;border-radius:14px!important;font-size:18px!important}
+      }
+      @media(max-width:360px){.oskar-cart-product-info{padding-left:150px!important}.line-total{left:58px!important;min-width:84px!important;padding-inline:8px!important}.oskar-cart-unit{width:82px!important}.oskar-cart-qty-wrap{grid-template-columns:34px 62px 34px!important}}
+    `;
+    document.head.appendChild(st);
+  }
+  function forceStableTrialSidebar(){
+    const pill=$("authUserPill"); if(!pill) return;
+    const user=window.state?.auth?.user;
+    const isTrial=trialActive() && user && (user.trial || String(user.name||"").includes("تجربة oskar"));
+    if(!isTrial) return;
+    const min=leftMinutes();
+    const current=$("oskarTrialSidebarMinutes")?.textContent?.trim() || "";
+    if(!pill.querySelector(".oskar-side-title") || !current.includes(min)){
+      pill.classList.add("oskar-trial-active-pill");
+      pill.innerHTML='<span class="oskar-side-title"><i class="fa-solid fa-flask"></i> تجربة oskar</span><span id="oskarTrialSidebarMinutes" class="oskar-side-minutes"><i class="fa-solid fa-clock"></i> '+min+'</span>';
+    }
+  }
+  function blockTrialSyncAndCloud(){
+    document.addEventListener("click",function(e){
+      const btn=e.target.closest("#syncNowBtn");
+      if(!btn || !trialActive()) return;
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      toast("النسخة التجريبية محلية فقط ولا يوجد فيها مزامنة");
+      try{ if(window.updateSyncUi) window.updateSyncUi({visible:true,spin:false,title:"نسخة تجريبية",status:"لا يوجد مزامنة في النسخة التجريبية، البيانات تحفظ محليًا فقط",progress:100}); }catch{}
+    },true);
+  }
+  function patchQuantityInputNoBlur(){
+    document.addEventListener("input",function(e){
+      const inp=e.target.closest("[data-change-cart-qty]"); if(!inp || !window.state?.cart) return;
+      e.stopPropagation(); e.stopImmediatePropagation();
+      const line=window.state.cart.find(x=>x.id===inp.dataset.changeCartQty); if(!line) return;
+      line.qty=inp.value;
+      try{
+        if(typeof window.updateCartLine==="function") window.updateCartLine(line.id,{qty:inp.value},false);
+        else { const q=clean(inp.value,0); const price=clean(line.price || line.unitPrice || (clean(line.total,0)/(clean(line.qty,1)||1)),0); line.total=price*q; }
+      }catch{}
+      const row=document.querySelector(`[data-cart-line="${CSS.escape(line.id)}"]`);
+      const total=row?.querySelector(".line-total"); if(total) total.textContent=money(line.total);
+      try{ const subtotal=(window.state.cart||[]).reduce((s,x)=>s+clean(x.total,0),0); const discType=$("discountType")?.value||"fixed", discVal=clean($("discountValue")?.value,0); let disc=discType==="percent"?subtotal*discVal/100:discVal; disc=Math.min(Math.max(disc,0),subtotal); if($("cartSubtotal")) $("cartSubtotal").textContent=money(subtotal); if($("cartDiscount")) $("cartDiscount").textContent=money(disc); if($("cartTotal")) $("cartTotal").textContent=money(subtotal-disc); }catch{}
+    },true);
+  }
+  function ensureScannerKeepsBehavior(){
+    const oldAdd=window.addToCart;
+    if(typeof oldAdd==="function" && !oldAdd.__oskarFinalWrapped){
+      const wrapped=function(product, selectedUnit){ const res=oldAdd.apply(this,arguments); setTimeout(()=>{ try{ if(typeof window.renderCart==="function") window.renderCart(); }catch{} },0); setTimeout(()=>{ try{ if(typeof window.renderCart==="function") window.renderCart(); }catch{} },120); return res; };
+      wrapped.__oskarFinalWrapped=true; window.addToCart=wrapped;
+    }
+  }
+  function makeTrialLocalOnlyRuntime(){
+    if(!trialActive()) return;
+    window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true;
+    if(typeof window.enqueueSync==="function" && !window.enqueueSync.__trialBlocked){ const f=function(){ toast("النسخة التجريبية محلية فقط ولا يوجد فيها مزامنة"); return Promise.resolve(); }; f.__trialBlocked=true; window.enqueueSync=f; }
+  }
+  function init(){
+    installFinalStyles(); blockTrialSyncAndCloud(); patchQuantityInputNoBlur(); makeTrialLocalOnlyRuntime(); ensureScannerKeepsBehavior(); forceStableTrialSidebar();
+    setInterval(()=>{ makeTrialLocalOnlyRuntime(); ensureScannerKeepsBehavior(); forceStableTrialSidebar(); },60000);
+    const pill=$("authUserPill"); if(pill) new MutationObserver(()=>forceStableTrialSidebar()).observe(pill,{childList:true,subtree:true,characterData:true});
+    window.addEventListener("barcode:scanned",()=>setTimeout(()=>{ try{ if(typeof window.renderCart==="function") window.renderCart(); }catch{} },50));
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+})();
+</script>
+
 </body>
 </html>
 <!-- legacy-disabled-patches-2026-04-29-base64: old duplicate scripts after </html> were disabled to prevent app startup errors. Do not execute. 
