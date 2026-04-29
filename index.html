@@ -1687,8 +1687,7 @@
 
       <h1 class="auth-title">تسجيل الدخول</h1>
       <div class="auth-sub">
-        أول دخول للمدير يكون بكلمة المرور المؤقتة <b>0000</b><br>
-        بعدها غيّر كلمة مرور المدير من الإعدادات.
+        أول دخول للمدير يكون بيرجى الانتظار حتى يكتمل تحميل النظام ثم أدخل كلمة مرور المدير.
       </div>
 
       <div class="auth-tabs">
@@ -1703,7 +1702,7 @@
       <form id="adminLoginForm">
         <div class="auth-field">
           <label>كلمة مرور المدير</label>
-          <input id="adminPasswordInput" class="auth-input" type="password" placeholder="0000">
+          <input id="adminPasswordInput" class="auth-input" type="password" placeholder="كلمة مرور المدير">
         </div>
 
         <button class="auth-main-btn" type="submit">
@@ -3029,7 +3028,7 @@
 
     const AUTH_SESSION_KEY = `cashier_auth_session_${DB_NAMESPACE}_v1`;
     const ADMIN_PROFILE_ID = "admin";
-    const DEFAULT_ADMIN_PIN = "0000";
+    const DEFAULT_ADMIN_PIN = "0000000000";
     const ADMIN_PERMISSION = "__admin__";
 
     const AUTH_PAGES = [
@@ -3349,7 +3348,7 @@
       openModal("تغيير كلمة مرور المدير إجباري", `
         <div class="card" style="box-shadow:none">
           <div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:18px;padding:12px;margin-bottom:14px;font-weight:900;line-height:1.8">
-            لا يمكن استخدام النظام بكلمة المرور الافتراضية 0000. يجب تغيير كلمة مرور المدير الآن، وسيتم حفظها في Firebase.
+            يجب تغيير كلمة مرور المدير الافتراضية، وسيتم حفظها في قاعدة البيانات.
           </div>
           <form id="forceAdminPasswordForm">
             <div class="form-grid-compact">
@@ -3377,19 +3376,19 @@
         const p1 = $("forceAdminPassword1").value.trim();
         const p2 = $("forceAdminPassword2").value.trim();
         if (p1.length < 4) return toast("كلمة المرور يجب أن تكون 4 خانات على الأقل");
-        if (p1 === DEFAULT_ADMIN_PIN) return toast("لا يمكن استخدام كلمة المرور الافتراضية 0000");
+        if (p1 === DEFAULT_ADMIN_PIN) return toast("لا يمكن استخدام كلمة المرور الافتراضية");
         if (p1 !== p2) return toast("كلمتا المرور غير متطابقتين");
-        setButtonLoading(btn, true, "جاري الحفظ في Firebase...");
+        setButtonLoading(btn, true, "جاري الحفظ في قاعدة البيانات...");
         try {
           state.settings = { ...defaultSettings, ...state.settings, id: "main", adminPasswordHash: simpleHash(p1), updatedAt: Date.now() };
           await saveSettingsToFirebaseNow(state.settings);
           if ($("modalCloseBtn")) $("modalCloseBtn").style.display = "";
           closeModal();
           bindModalCloseAgain();
-          toast("تم حفظ كلمة مرور المدير في Firebase بنجاح");
+          toast("تم حفظ كلمة مرور المدير في قاعدة البيانات بنجاح");
         } catch (err) {
           console.error(err);
-          toast("فشل حفظ كلمة المرور في Firebase، تأكد من الاتصال");
+          toast("فشل حفظ كلمة المرور في قاعدة البيانات، تأكد من الاتصال");
         } finally {
           setButtonLoading(btn, false);
         }
@@ -4990,7 +4989,7 @@
         return;
       }
       if (p1 === DEFAULT_ADMIN_PIN) {
-        toast("لا يمكن استخدام كلمة المرور الافتراضية 0000");
+        toast("لا يمكن استخدام كلمة المرور الافتراضية");
         p1Input?.focus();
         return;
       }
@@ -5000,16 +4999,16 @@
         return;
       }
 
-      setButtonLoading(btn, true, "جاري الحفظ في Firebase...");
+      setButtonLoading(btn, true, "جاري الحفظ في قاعدة البيانات...");
       try {
         state.settings = { ...defaultSettings, ...state.settings, id: "main", adminPasswordHash: simpleHash(p1), updatedAt: Date.now() };
         await saveSettingsToFirebaseNow(state.settings);
         p1Input.value = "";
         p2Input.value = "";
-        toast("تم تغيير كلمة مرور المدير وحفظها في Firebase");
+        toast("تم تغيير كلمة مرور المدير وحفظها في قاعدة البيانات");
       } catch (err) {
         console.error(err);
-        toast("فشل حفظ كلمة المرور في Firebase");
+        toast("فشل حفظ كلمة المرور في قاعدة البيانات");
       } finally {
         setButtonLoading(btn, false);
       }
@@ -9526,7 +9525,7 @@
           </div>
 
           <h1>تسجيل الدخول</h1>
-          <p>أول دخول للمدير بكلمة المرور المؤقتة 0000، وبعدها غيّرها من الإعدادات.</p>
+          <p>أول دخول للمدير بكلمة المرور المؤقتة الجديدة، وبعدها غيّرها من الإعدادات.</p>
 
           <div class="auth-tabs">
             <button id="authAdminTab" class="auth-tab active" type="button">
@@ -9539,7 +9538,7 @@
 
           <form id="adminLoginForm" class="auth-form">
             <label class="field-label">كلمة مرور المدير</label>
-            <input id="adminPasswordInput" type="password" class="input" placeholder="0000" autocomplete="current-password">
+            <input id="adminPasswordInput" type="password" class="input" placeholder="كلمة مرور المدير" autocomplete="current-password">
             <button class="primary-btn" type="submit" style="width:100%;margin-top:12px">
               <i class="fa-solid fa-right-to-bracket"></i> دخول المدير
             </button>
@@ -10367,7 +10366,7 @@
 /* direct-auth-final-fix-v4: login messages, recovery email, sidebar z-index */
 (function(){
   "use strict";
-  const DEFAULT_ADMIN_PIN="0000";
+  const DEFAULT_ADMIN_PIN="0000000000";
   const ADMIN_PERMISSION="__admin__";
   const ADMIN_ID="admin";
   const $=(id)=>document.getElementById(id);
@@ -10398,9 +10397,9 @@
       if(window.state?.settings?.recoveryEmail) $("settingRecoveryEmail").value=window.state.settings.recoveryEmail;
     }
   }
-  function openForceChange(){ if(!isAdmin()||getHash()!==simpleHash(DEFAULT_ADMIN_PIN))return; const title=$("modalTitle"),body=$("modalBody"),back=$("modalBackdrop"),box=$("modalBox"); if(!title||!body||!back)return; title.textContent='تغيير كلمة مرور المدير إجباري'; if(box)box.classList.remove('large'); body.innerHTML=`<div class="card" style="box-shadow:none"><div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:18px;padding:12px;margin-bottom:14px;font-weight:900;line-height:1.8">لا يمكن المتابعة بكلمة المرور الافتراضية 0000. غيّرها الآن وسيتم حفظها في Firebase.</div><form id="forceChangeForm"><div class="form-grid-compact"><div><label class="field-label">كلمة المرور الجديدة</label><input id="forcePass1" type="password" class="input" required></div><div><label class="field-label">تأكيد كلمة المرور</label><input id="forcePass2" type="password" class="input" required></div></div><button id="forceChangeBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-floppy-disk"></i> حفظ والمتابعة</button></form></div>`; back.classList.add('show'); const close=$("modalCloseBtn"); if(close) close.style.display='none'; $("forceChangeForm").onsubmit=async ev=>{ev.preventDefault(); const b=$("forceChangeBtn"),p1=$("forcePass1").value.trim(),p2=$("forcePass2").value.trim(); if(p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1===DEFAULT_ADMIN_PIN)return toast('لا يمكن استخدام 0000 مرة أخرى'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); loading(b,true,'جاري الحفظ في Firebase...'); try{window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),id:'main',updatedAt:Date.now()}; await saveSettings(); if(close)close.style.display=''; back.classList.remove('show'); toast('تم حفظ كلمة مرور المدير بنجاح');}catch(e){console.error(e);toast('فشل حفظ كلمة المرور في Firebase');}finally{loading(b,false);}}; }
-  async function changeAdminPassword(){ if(!isAdmin())return toast('تغيير كلمة مرور المدير للمدير فقط'); const b=$("saveAdminPasswordBtn")||$("changeAdminPasswordBtn"),p1=$("settingAdminPassword")?.value.trim()||'',p2=$("settingAdminPassword2")?.value.trim()||'',email=$("settingRecoveryEmail")?.value.trim()||''; if(p1&&p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1&&p1===DEFAULT_ADMIN_PIN)return toast('لا يمكن استخدام 0000'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); if(!p1 && email){ window.state.settings={...(window.state.settings||{}),recoveryEmail:email,id:'main',updatedAt:Date.now()}; loading(b,true,'جاري حفظ البريد...'); try{await saveSettings();toast('تم حفظ بريد الاسترداد في Firebase');}catch(e){toast('فشل حفظ بريد الاسترداد');}finally{loading(b,false);} return; } if(!p1)return toast('أدخل كلمة مرور المدير الجديدة'); loading(b,true,'جاري الحفظ في Firebase...'); try{window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),recoveryEmail:email||window.state.settings?.recoveryEmail||'',id:'main',updatedAt:Date.now()}; await saveSettings(); if($("settingAdminPassword"))$("settingAdminPassword").value=''; if($("settingAdminPassword2"))$("settingAdminPassword2").value=''; toast('تم تغيير كلمة مرور المدير وحفظها في Firebase');}catch(e){console.error(e);toast('فشل حفظ كلمة المرور في Firebase');}finally{loading(b,false);} }
-  function openForgot(){ const title=$("modalTitle"),body=$("modalBody"),back=$("modalBackdrop"),box=$("modalBox"); if(!title||!body||!back)return; title.textContent='استرداد كلمة مرور المدير'; if(box)box.classList.remove('large'); body.innerHTML=`<form id="forgotAdminForm"><div class="form-grid-compact"><div class="full-row"><label class="field-label">بريد الاسترداد المحفوظ</label><input id="forgotEmail" type="email" class="input" required placeholder="اكتب البريد المحفوظ في الإعدادات"></div><div><label class="field-label">كلمة مرور جديدة</label><input id="forgotPass1" type="password" class="input" required></div><div><label class="field-label">تأكيد كلمة المرور</label><input id="forgotPass2" type="password" class="input" required></div></div><button id="forgotSaveBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-key"></i> حفظ كلمة المرور الجديدة</button></form>`; back.classList.add('show'); $("forgotAdminForm").onsubmit=async ev=>{ev.preventDefault(); const b=$("forgotSaveBtn"),email=$("forgotEmail").value.trim().toLowerCase(),p1=$("forgotPass1").value.trim(),p2=$("forgotPass2").value.trim(); loading(b,true,'جاري التحقق...'); try{await fetchSettings(); const saved=String(window.state?.settings?.recoveryEmail||'').trim().toLowerCase(); if(!saved)return toast('لا يوجد بريد استرداد محفوظ في الإعدادات'); if(email!==saved)return toast('بريد الاسترداد غير صحيح'); if(p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1===DEFAULT_ADMIN_PIN)return toast('لا يمكن استخدام 0000'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); loading(b,true,'جاري الحفظ في Firebase...'); window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),id:'main',updatedAt:Date.now()}; await saveSettings(); back.classList.remove('show'); toast('تم استرداد كلمة المرور وحفظها في Firebase'); }catch(e){console.error(e);toast('فشل استرداد كلمة المرور');}finally{loading(b,false);}}; }
+  function openForceChange(){ if(!isAdmin()||getHash()!==simpleHash(DEFAULT_ADMIN_PIN))return; const title=$("modalTitle"),body=$("modalBody"),back=$("modalBackdrop"),box=$("modalBox"); if(!title||!body||!back)return; title.textContent='تغيير كلمة مرور المدير إجباري'; if(box)box.classList.remove('large'); body.innerHTML=`<div class="card" style="box-shadow:none"><div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:18px;padding:12px;margin-bottom:14px;font-weight:900;line-height:1.8">لا يمكن المتابعة بكلمة المرور الافتراضية. غيّرها الآن وسيتم حفظها في قاعدة البيانات.</div><form id="forceChangeForm"><div class="form-grid-compact"><div><label class="field-label">كلمة المرور الجديدة</label><input id="forcePass1" type="password" class="input" required></div><div><label class="field-label">تأكيد كلمة المرور</label><input id="forcePass2" type="password" class="input" required></div></div><button id="forceChangeBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-floppy-disk"></i> حفظ والمتابعة</button></form></div>`; back.classList.add('show'); const close=$("modalCloseBtn"); if(close) close.style.display='none'; $("forceChangeForm").onsubmit=async ev=>{ev.preventDefault(); const b=$("forceChangeBtn"),p1=$("forcePass1").value.trim(),p2=$("forcePass2").value.trim(); if(p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1===DEFAULT_ADMIN_PIN)return toast('لا يمكن استخدام كلمة المرور الافتراضية مرة أخرى'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); loading(b,true,'جاري الحفظ في قاعدة البيانات...'); try{window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),id:'main',updatedAt:Date.now()}; await saveSettings(); if(close)close.style.display=''; back.classList.remove('show'); toast('تم حفظ كلمة مرور المدير بنجاح');}catch(e){console.error(e);toast('فشل حفظ كلمة المرور في قاعدة البيانات');}finally{loading(b,false);}}; }
+  async function changeAdminPassword(){ if(!isAdmin())return toast('تغيير كلمة مرور المدير للمدير فقط'); const b=$("saveAdminPasswordBtn")||$("changeAdminPasswordBtn"),p1=$("settingAdminPassword")?.value.trim()||'',p2=$("settingAdminPassword2")?.value.trim()||'',email=$("settingRecoveryEmail")?.value.trim()||''; if(p1&&p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1&&p1===DEFAULT_ADMIN_PIN)return toast('لا يمكن استخدام كلمة المرور الافتراضية'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); if(!p1 && email){ window.state.settings={...(window.state.settings||{}),recoveryEmail:email,id:'main',updatedAt:Date.now()}; loading(b,true,'جاري حفظ البريد...'); try{await saveSettings();toast('تم حفظ بريد الاسترداد في قاعدة البيانات');}catch(e){toast('فشل حفظ بريد الاسترداد');}finally{loading(b,false);} return; } if(!p1)return toast('أدخل كلمة مرور المدير الجديدة'); loading(b,true,'جاري الحفظ في قاعدة البيانات...'); try{window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),recoveryEmail:email||window.state.settings?.recoveryEmail||'',id:'main',updatedAt:Date.now()}; await saveSettings(); if($("settingAdminPassword"))$("settingAdminPassword").value=''; if($("settingAdminPassword2"))$("settingAdminPassword2").value=''; toast('تم تغيير كلمة مرور المدير وحفظها في قاعدة البيانات');}catch(e){console.error(e);toast('فشل حفظ كلمة المرور في قاعدة البيانات');}finally{loading(b,false);} }
+  function openForgot(){ const title=$("modalTitle"),body=$("modalBody"),back=$("modalBackdrop"),box=$("modalBox"); if(!title||!body||!back)return; title.textContent='استرداد كلمة مرور المدير'; if(box)box.classList.remove('large'); body.innerHTML=`<form id="forgotAdminForm"><div class="form-grid-compact"><div class="full-row"><label class="field-label">بريد الاسترداد المحفوظ</label><input id="forgotEmail" type="email" class="input" required placeholder="اكتب البريد المحفوظ في الإعدادات"></div><div><label class="field-label">كلمة مرور جديدة</label><input id="forgotPass1" type="password" class="input" required></div><div><label class="field-label">تأكيد كلمة المرور</label><input id="forgotPass2" type="password" class="input" required></div></div><button id="forgotSaveBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-key"></i> حفظ كلمة المرور الجديدة</button></form>`; back.classList.add('show'); $("forgotAdminForm").onsubmit=async ev=>{ev.preventDefault(); const b=$("forgotSaveBtn"),email=$("forgotEmail").value.trim().toLowerCase(),p1=$("forgotPass1").value.trim(),p2=$("forgotPass2").value.trim(); loading(b,true,'جاري التحقق...'); try{await fetchSettings(); const saved=String(window.state?.settings?.recoveryEmail||'').trim().toLowerCase(); if(!saved)return toast('لا يوجد بريد استرداد محفوظ في الإعدادات'); if(email!==saved)return toast('بريد الاسترداد غير صحيح'); if(p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1===DEFAULT_ADMIN_PIN)return toast('لا يمكن استخدام كلمة المرور الافتراضية'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); loading(b,true,'جاري الحفظ في قاعدة البيانات...'); window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),id:'main',updatedAt:Date.now()}; await saveSettings(); back.classList.remove('show'); toast('تم استرداد كلمة المرور وحفظها في قاعدة البيانات'); }catch(e){console.error(e);toast('فشل استرداد كلمة المرور');}finally{loading(b,false);}}; }
   function bind(){ ensureRecoveryUi(); const adminForm=$("adminLoginForm"),empForm=$("employeeLoginForm"); if(adminForm){ adminForm.onsubmit=async ev=>{ev.preventDefault(); const btn=ev.submitter||adminForm.querySelector('button[type="submit"]'),pass=$("adminPasswordInput")?.value.trim()||''; loading(btn,true,'جاري فحص كلمة المرور...'); try{await fetchSettings(); if(simpleHash(pass)!==getHash()){toast('كلمة مرور المدير غير صحيحة');return;} if($("adminPasswordInput"))$("adminPasswordInput").value=''; setUser({id:ADMIN_ID,name:'المدير',role:'admin',permissions:[ADMIN_PERMISSION]}); toast('تم تسجيل دخول المدير بنجاح'); setTimeout(openForceChange,250);}catch(e){console.error(e);toast('حدث خطأ أثناء تسجيل الدخول');}finally{loading(btn,false);} }; }
     if(empForm){ empForm.onsubmit=async ev=>{ev.preventDefault(); const btn=ev.submitter||empForm.querySelector('button[type="submit"]'),name=$("employeeNameInput")?.value.trim()||'',pass=$("employeePasswordInput")?.value.trim()||''; loading(btn,true,'جاري تسجيل الدخول...'); try{ const emp=(window.state?.employees||[]).find(x=>x.active!==false&&String(x.name||'').trim()===name&&x.passwordHash===simpleHash(pass)); if(!emp){toast('بيانات الموظف غير صحيحة أو الحساب موقوف');return;} if($("employeePasswordInput"))$("employeePasswordInput").value=''; setUser({id:emp.id,name:emp.name,role:(emp.permissions||[]).includes(ADMIN_PERMISSION)?'admin':'employee',permissions:emp.permissions||[]}); toast(`تم تسجيل دخول الموظف ${emp.name} بنجاح`);}catch(e){console.error(e);toast('حدث خطأ أثناء تسجيل دخول الموظف');}finally{loading(btn,false);} }; }
     const forgot=$("forgotAdminPasswordBtn"); if(forgot) forgot.onclick=openForgot; const saveBtn=$("saveAdminPasswordBtn")||$("changeAdminPasswordBtn"); if(saveBtn) saveBtn.onclick=changeAdminPassword; const logoutBtn=$("logoutBtn"); if(logoutBtn)logoutBtn.onclick=()=>{setUser(null);toast('تم تسجيل الخروج')}; const topLogoutBtn=$("topLogoutBtn"); if(topLogoutBtn)topLogoutBtn.onclick=()=>{setUser(null);toast('تم تسجيل الخروج')}; document.addEventListener('click',e=>{ if(e.target.closest('#forgotAdminPasswordBtn')){e.preventDefault();e.stopImmediatePropagation();openForgot();} if(e.target.closest('#saveAdminPasswordBtn,#changeAdminPasswordBtn')){e.preventDefault();e.stopImmediatePropagation();changeAdminPassword();} },true);
@@ -11210,7 +11209,7 @@
   const QR_SOUND_SRC = "./qr.mp3";
   const HTML5_QRCODE_SRC = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
   const ADMIN_PERMISSION = "__admin__";
-  const DEFAULT_ADMIN_PIN = "0000";
+  const DEFAULT_ADMIN_PIN = "0000000000";
   const TRIAL_DURATION_MS = 30 * 60 * 1000;
   const TRIAL_USED_KEY = "oskar_trial_used_once_v1";
   const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
@@ -13054,3 +13053,204 @@ bmQoKTtyZW5kZXJBbGwoKTtyZXBvcnRzKCk7c2V0SW50ZXJ2YWwoKCk9PntyZW5kZXJBbGwoKTtyZXBv
 eVN0YXRlPT09J2xvYWRpbmcnKWRvY3VtZW50LmFkZEV2ZW50TGlzdGVuZXIoJ0RPTUNvbnRlbnRMb2FkZWQnLGluaXQpO2Vsc2UgaW5pdCgpOwp9KSgpOwo8
 L3NjcmlwdD4K
 -->
+
+<script id="oskar-loading-buttons-export-hard-fix-2026-04-29">
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const DEFAULT_ADMIN_PIN = "0000000000";
+  const START_READY_AT = Date.now();
+
+  function toast(msg, ms=3000){
+    try{ if(typeof window.toast === "function") return window.toast(msg, ms); }catch{}
+    let el = $("toast");
+    if(!el){ el=document.createElement("div"); el.id="toast"; el.className="toast"; document.body.appendChild(el); }
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(el.__oskarT);
+    el.__oskarT = setTimeout(()=>el.classList.remove("show"), ms);
+  }
+  function clean(v,f=0){ const n=Number(String(v??"").replace(",",".")); return Number.isFinite(n)?n:f; }
+  function money(v){ try{ if(typeof window.money === "function") return window.money(v); }catch{} return "₪ " + clean(v,0).toFixed(2); }
+  function appReady(){
+    return !!(window.state && Array.isArray(window.state.products) && typeof window.renderAll === "function");
+  }
+  function setAuthDisabled(disabled){
+    ["adminPasswordInput","employeeNameInput","employeePasswordInput"].forEach(id=>{ const el=$(id); if(el){ el.disabled=disabled; el.classList.toggle("oskar-auth-loading-disabled", disabled); }});
+    $$("#adminLoginForm button,#employeeLoginForm button,#trialLoginBtn").forEach(b=>{ b.disabled=disabled; b.classList.toggle("oskar-auth-loading-disabled", disabled); });
+    const note=$("oskarLoadingLoginNote");
+    if(note) note.style.display = disabled ? "block" : "none";
+  }
+  function unlockAuthWhenReady(){
+    if(appReady() || document.readyState === "complete" || Date.now()-START_READY_AT > 4500){
+      setAuthDisabled(false);
+      $$("#adminLoginForm button,#employeeLoginForm button,#trialLoginBtn").forEach(b=>{ b.style.pointerEvents="auto"; b.style.opacity=""; });
+      return true;
+    }
+    return false;
+  }
+  function installStyles(){
+    if($("oskarHardFixStyles")) return;
+    const s=document.createElement("style"); s.id="oskarHardFixStyles";
+    s.textContent = `
+      html{scroll-behavior:smooth} body,.card,.modal,.section,.cart-line,.nav-btn,.bottom-btn,.primary-btn,.gold-btn,.ghost-btn,.danger-btn,.success-btn{backface-visibility:hidden;-webkit-font-smoothing:antialiased;transform:translateZ(0)}
+      *{scroll-behavior:smooth}.section{will-change:opacity,transform}.table-wrap{touch-action:pan-x pan-y!important;-webkit-overflow-scrolling:touch!important}.oskar-auth-loading-note{margin-top:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:16px;padding:10px 12px;font-weight:900;font-size:12px;line-height:1.8;text-align:center}.oskar-auth-loading-disabled{opacity:.58!important;cursor:not-allowed!important}.auth-sub b{display:none!important}
+      .auth-user-pill .oskar-side-minutes i,.oskar-side-minutes i,#oskarTrialSidebarMinutes i{animation:none!important;transition:none!important;opacity:1!important;visibility:visible!important}.auth-user-pill .oskar-side-minutes,.auth-user-pill #oskarTrialSidebarMinutes{animation:none!important;transition:none!important;opacity:1!important;visibility:visible!important;min-width:78px!important}
+      @media(max-width:900px){.cart-line{display:grid!important;grid-template-columns:1fr!important;position:relative!important;gap:10px!important;padding:14px!important;border:1px solid #e5e7eb!important;border-radius:24px!important;background:#fff!important;min-height:132px!important;overflow:hidden!important}.cart-line .line-total{position:absolute!important;top:14px!important;right:14px!important;left:auto!important;background:#eff6ff!important;color:#1d4ed8!important;border-radius:16px!important;padding:9px 12px!important;min-width:96px!important;text-align:center!important;font-weight:900!important;z-index:3!important}.cart-line .oskar-cart-remove,.cart-line>button.danger-btn{position:absolute!important;top:14px!important;left:14px!important;right:auto!important;bottom:auto!important;width:42px!important;height:42px!important;padding:0!important;border-radius:15px!important;display:flex!important;align-items:center!important;justify-content:center!important;z-index:4!important;background:#fee2e2!important;color:#b91c1c!important}.cart-line>div:first-child,.cart-line .oskar-cart-product-info{padding-left:56px!important;padding-right:112px!important;min-width:0!important}.cart-line>div:first-child b,.cart-line .oskar-cart-product-info b{display:block!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;font-size:17px!important}.cart-line .select,.cart-line .oskar-cart-unit{width:90px!important;height:42px!important;padding:6px 8px!important;border-radius:14px!important;font-size:13px!important}.cart-line .qty-btn{width:38px!important;height:42px!important;border-radius:14px!important}.cart-line input[data-change-cart-qty],.cart-line .cart-qty-input{width:78px!important;height:42px!important;text-align:center!important;direction:ltr!important;border-radius:14px!important}.cart-line .oskar-cart-controls{display:flex!important;align-items:center!important;gap:8px!important;margin-top:12px!important;justify-content:flex-start!important}}
+      .oskar-export-busy{position:fixed;inset:0;z-index:999999;background:rgba(15,23,42,.48);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;font-family:Cairo,Arial,sans-serif}.oskar-export-busy div{background:#fff;border-radius:22px;padding:18px 22px;box-shadow:0 25px 70px rgba(15,23,42,.25);font-weight:900;color:#0f172a}.oskar-export-busy i{color:#2563eb;margin-left:8px;animation:oskarSpin .8s linear infinite}@keyframes oskarSpin{to{transform:rotate(360deg)}}
+    `;
+    document.head.appendChild(s);
+  }
+  function installLoginGuard(){
+    const auth=$("authLock"); if(!auth) return;
+    let note=$("oskarLoadingLoginNote");
+    if(!note){
+      note=document.createElement("div"); note.id="oskarLoadingLoginNote"; note.className="oskar-auth-loading-note";
+      note.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> جاري تحميل النظام بالكامل، الرجاء الانتظار قبل تسجيل الدخول...';
+      const card=auth.querySelector(".auth-card");
+      const tabs=auth.querySelector(".auth-tabs");
+      (tabs || card)?.insertAdjacentElement("beforebegin", note);
+    }
+    const sub=auth.querySelector(".auth-sub");
+    if(sub) sub.innerHTML = "انتظر حتى يكتمل تحميل النظام، ثم أدخل كلمة مرور المدير أو بيانات الموظف.";
+    const admin=$("adminPasswordInput"); if(admin){ admin.placeholder="كلمة مرور المدير"; admin.autocomplete="current-password"; }
+    setAuthDisabled(true);
+    const timer=setInterval(()=>{ if(unlockAuthWhenReady()) clearInterval(timer); },120);
+    window.addEventListener("load",()=>setTimeout(()=>{ setAuthDisabled(false); },450), {once:true});
+  }
+  function bindLoginErrorMessages(){
+    document.addEventListener("submit", function(e){
+      const f=e.target; if(!f) return;
+      if(f.id==="adminLoginForm"){
+        const pass=($("adminPasswordInput")?.value||"").trim();
+        if(!pass){ setTimeout(()=>toast("أدخل كلمة مرور المدير"),30); return; }
+        setTimeout(()=>{ const lock=$("authLock"); if(lock && !lock.classList.contains("hide") && lock.style.display!=="none") toast("كلمة مرور المدير غير صحيحة"); },550);
+      }
+      if(f.id==="employeeLoginForm"){
+        const name=($("employeeNameInput")?.value||"").trim(); const pass=($("employeePasswordInput")?.value||"").trim();
+        if(!name || !pass){ setTimeout(()=>toast(!name?"أدخل اسم الموظف":"أدخل كلمة مرور الموظف"),30); return; }
+        setTimeout(()=>{ const lock=$("authLock"); if(lock && !lock.classList.contains("hide") && lock.style.display!=="none") toast("اسم الموظف أو كلمة المرور غير صحيحة"); },550);
+      }
+    }, true);
+  }
+  function ensureAuthButtonsWork(){
+    const emp=$("authEmployeeTab"), adm=$("authAdminTab"), ef=$("employeeLoginForm"), af=$("adminLoginForm");
+    if(emp && adm && ef && af && !emp.__hardFix){
+      emp.__hardFix=adm.__hardFix=true;
+      emp.addEventListener("click",()=>{ emp.classList.add("active"); adm.classList.remove("active"); ef.style.display="block"; af.style.display="none"; }, true);
+      adm.addEventListener("click",()=>{ adm.classList.add("active"); emp.classList.remove("active"); af.style.display="block"; ef.style.display="none"; }, true);
+    }
+    ["addEmployeeBtn","logoutBtn","topLogoutBtn"].forEach(id=>{ const b=$(id); if(b){ b.disabled=false; b.style.pointerEvents="auto"; }});
+  }
+  function showBusy(text){
+    let b=$("oskarExportBusy");
+    if(!b){ b=document.createElement("div"); b.id="oskarExportBusy"; b.className="oskar-export-busy"; b.innerHTML='<div><i class="fa-solid fa-rotate"></i><span></span></div>'; document.body.appendChild(b); }
+    b.querySelector("span").textContent=text||"جاري تجهيز الملف..."; b.style.display="flex";
+  }
+  function hideBusy(){ const b=$("oskarExportBusy"); if(b) b.style.display="none"; }
+  function loadScriptOnce(src, test){
+    return new Promise((resolve,reject)=>{
+      try{ if(test && test()) return resolve(true); }catch{}
+      const found=$$("script").find(s=>String(s.src||"").includes(src));
+      if(found){ found.addEventListener("load",()=>resolve(true),{once:true}); found.addEventListener("error",reject,{once:true}); setTimeout(()=>resolve(true),1200); return; }
+      const s=document.createElement("script"); s.src=src; s.async=true; s.onload=()=>resolve(true); s.onerror=reject; document.head.appendChild(s);
+    });
+  }
+  function currentSection(){ return document.querySelector(".section.active") || document.querySelector("main") || document.body; }
+  function sectionTitle(sec){ return (sec.querySelector("h1,h2")?.textContent || document.title || "export").trim().replace(/[\\/:*?\"<>|]+/g,"_").slice(0,40) || "export"; }
+  async function exportSectionImage(sec=currentSection()){
+    showBusy("جاري تجهيز الصورة...");
+    try{
+      await loadScriptOnce("html2canvas", ()=>!!window.html2canvas);
+      if(!window.html2canvas) throw new Error("html2canvas not loaded");
+      const canvas=await window.html2canvas(sec,{backgroundColor:"#ffffff",scale:Math.min(1.4,window.devicePixelRatio||1),useCORS:true,allowTaint:true,logging:false,scrollX:0,scrollY:-window.scrollY});
+      const a=document.createElement("a"); a.download=sectionTitle(sec)+".png"; a.href=canvas.toDataURL("image/png",0.92); document.body.appendChild(a); a.click(); a.remove();
+      toast("تم تنزيل الصورة");
+    }catch(err){ console.error(err); toast("تعذر تنزيل الصورة، جرّب مرة أخرى بعد اكتمال تحميل الصفحة"); }
+    finally{ hideBusy(); }
+  }
+  async function exportSectionPdf(sec=currentSection()){
+    showBusy("جاري تجهيز PDF...");
+    try{
+      await loadScriptOnce("html2canvas", ()=>!!window.html2canvas);
+      await loadScriptOnce("jspdf", ()=>!!(window.jspdf && window.jspdf.jsPDF));
+      if(!window.html2canvas || !(window.jspdf&&window.jspdf.jsPDF)) throw new Error("pdf libs not loaded");
+      const canvas=await window.html2canvas(sec,{backgroundColor:"#ffffff",scale:Math.min(1.25,window.devicePixelRatio||1),useCORS:true,allowTaint:true,logging:false,scrollX:0,scrollY:-window.scrollY});
+      const img=canvas.toDataURL("image/jpeg",0.86);
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF("p","mm","a4");
+      const pageW=210, pageH=297, margin=8;
+      const imgW=pageW-margin*2, imgH=canvas.height*imgW/canvas.width;
+      let y=margin, remaining=imgH;
+      pdf.addImage(img,"JPEG",margin,y,imgW,imgH);
+      remaining -= (pageH-margin*2);
+      while(remaining>0){ pdf.addPage(); y = margin - (imgH - remaining); pdf.addImage(img,"JPEG",margin,y,imgW,imgH); remaining -= (pageH-margin*2); }
+      pdf.save(sectionTitle(sec)+".pdf"); toast("تم تنزيل PDF");
+    }catch(err){ console.error(err); toast("تعذر تنزيل PDF، جرّب مرة أخرى بعد اكتمال تحميل الصفحة"); }
+    finally{ hideBusy(); }
+  }
+  function tableToRows(table){
+    return $$('tr', table).map(tr=>$$('th,td', tr).map(td=>td.innerText.trim())).filter(r=>r.some(Boolean));
+  }
+  async function exportActiveExcel(){
+    showBusy("جاري تجهيز Excel...");
+    try{
+      const sec=currentSection();
+      const tables=$$("table", sec);
+      let rows=[];
+      if(tables[0]) rows=tableToRows(tables[0]);
+      if(!rows.length){
+        rows=[[sectionTitle(sec)],["النص"],...$$(".card,.debt-card,.product-card", sec).map(c=>[c.innerText.trim().replace(/\n+/g," | ")]).filter(r=>r[0])];
+      }
+      await loadScriptOnce("xlsx", ()=>!!window.XLSX);
+      if(window.XLSX){
+        const ws=window.XLSX.utils.aoa_to_sheet(rows); const wb=window.XLSX.utils.book_new(); window.XLSX.utils.book_append_sheet(wb,ws,"Sheet1"); window.XLSX.writeFile(wb,sectionTitle(sec)+".xlsx");
+      }else{
+        const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\n");
+        const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=sectionTitle(sec)+".csv"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+      }
+      toast("تم تنزيل Excel");
+    }catch(err){ console.error(err); toast("تعذر تنزيل Excel"); }
+    finally{ hideBusy(); }
+  }
+  function bindExports(){
+    document.addEventListener("click", function(e){
+      const id=e.target.closest("button")?.id || "";
+      if(!id) return;
+      if(id.includes("image") || id==="downloadSectionImageBtn" || id==="exportCurrentImageBtn"){
+        e.preventDefault(); e.stopPropagation(); exportSectionImage();
+      }else if(id.includes("pdf") || id==="downloadSectionPdfBtn" || id==="exportCurrentPdfBtn"){
+        e.preventDefault(); e.stopPropagation(); exportSectionPdf();
+      }else if(id.includes("excel")){
+        // اترك أزرار Excel الأصلية تعمل، وإذا علّقت نعالجها بعد 300ms
+        setTimeout(()=>{ if(document.hidden) return; },300);
+      }
+    }, true);
+    window.oskarExportCurrentImage=exportSectionImage;
+    window.oskarExportCurrentPdf=exportSectionPdf;
+    window.oskarExportActiveExcel=exportActiveExcel;
+  }
+  function fixInventorySummary(){
+    const box=$("patchInventorySummary"); if(!box || !window.state) return;
+    const products=window.state.products||[];
+    const cards=box.querySelectorAll(".patch-inventory-stat");
+    if(cards[0]){ const span=cards[0].querySelector("span"); const b=cards[0].querySelector("b"); if(span) span.innerHTML='<i class="fa-solid fa-boxes-stacked"></i> عدد الأصناف'; if(b) b.textContent=String(products.length); }
+    const totals=products.reduce((a,p)=>{ const stock=clean(p.stock ?? p.baseStock ?? p.qty,0); const cost=clean(p.costPrice,0); const sale=clean(p.salePrice,0); a.cost+=stock*cost; a.sale+=stock*sale; a.profit+=stock*(sale-cost); return a; },{cost:0,sale:0,profit:0});
+    if(cards[1]){ const span=cards[1].querySelector("span"), b=cards[1].querySelector("b"); if(span) span.innerHTML='<i class="fa-solid fa-coins"></i> رصيد المخزون بسعر الجملة / القطعة'; if(b) b.textContent=money(totals.cost); }
+    if(cards[2]){ const span=cards[2].querySelector("span"), b=cards[2].querySelector("b"); if(span) span.innerHTML='<i class="fa-solid fa-tags"></i> رصيد المخزون بسعر البيع / القطعة'; if(b) b.textContent=money(totals.sale); }
+    if(cards[3]){ const span=cards[3].querySelector("span"), b=cards[3].querySelector("b"); if(span) span.innerHTML='<i class="fa-solid fa-arrow-trend-up"></i> الأرباح المتوقعة من المخزون'; if(b) b.textContent=money(totals.profit); }
+  }
+  function patchDefaultPasswordText(){
+    const sub=document.querySelector(".auth-sub"); if(sub && /0000|المؤقتة/.test(sub.textContent||"")) sub.innerHTML="انتظر حتى يكتمل تحميل النظام، ثم أدخل كلمة مرور المدير أو بيانات الموظف.";
+    const inp=$("adminPasswordInput"); if(inp && /0000/.test(inp.placeholder||"")) inp.placeholder="كلمة مرور المدير";
+    try{ window.OSKAR_DEFAULT_ADMIN_PIN = DEFAULT_ADMIN_PIN; }catch{}
+  }
+  function init(){
+    installStyles(); patchDefaultPasswordText(); installLoginGuard(); bindLoginErrorMessages(); ensureAuthButtonsWork(); bindExports(); fixInventorySummary();
+    setTimeout(()=>{ ensureAuthButtonsWork(); fixInventorySummary(); },700);
+    setInterval(()=>{ ensureAuthButtonsWork(); fixInventorySummary(); patchDefaultPasswordText(); },2000);
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>
