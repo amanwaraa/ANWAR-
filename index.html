@@ -12247,6 +12247,151 @@
 })();
 </script>
 
+<script id="oskar-correct-final-fixes-2026-04-29-v3">
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+  const TRIAL_MODE_KEY="oskar_storage_mode_v1";
+  const TRIAL_STARTED_KEY="oskar_trial_started_at_v1";
+  const TRIAL_DURATION_MS=30*60*1000;
+  const LOGO_URL="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhc2-SIvoXM037iekfqFFgG9ScPFkd2OYmDCTxAsulO8-UYIByWI5H7pAhaNRr3OkT-WR5h-RrPQfjsWpv4RCPLDIauhevT3RdNQIAICh-ZgdTMWn8ZL8oabWZL-sttvTQ2EAk6LckmOIa2lEdSyjHW9_jrjbMpnItLw9TzulLth5MoEQxj3un_cLoqHL9C/s759/1000002395.jpg";
+  const money = v => (typeof window.money==="function" ? window.money(v) : "₪ " + (Number(v||0).toFixed(2)));
+  const clean = (v,f=0)=>{ const n=Number(String(v??"").replace(",",".")); return Number.isFinite(n)?n:f; };
+  function toast(msg,ms=2800){ if(typeof window.toast==="function") return window.toast(msg,ms); const el=$("toast"); if(el){el.textContent=msg; el.classList.add("show"); clearTimeout(el.__t); el.__t=setTimeout(()=>el.classList.remove("show"),ms);} else alert(msg); }
+  function trialActive(){ const st=Number(localStorage.getItem(TRIAL_STARTED_KEY)||0); return localStorage.getItem(TRIAL_MODE_KEY)==="trial" && st && Date.now()-st<TRIAL_DURATION_MS; }
+  function trialUser(){ const u=window.state?.auth?.user; return !!(trialActive() && u && (u.trial || String(u.name||"").includes("تجربة oskar"))); }
+  function leftMinutes(){ const st=Number(localStorage.getItem(TRIAL_STARTED_KEY)||0); const left=Math.max(0,TRIAL_DURATION_MS-(Date.now()-st)); const m=Math.ceil(left/60000); return m<=0?"انتهت":(m+" دقيقة"); }
+  function installStyles(){
+    if($("oskarCorrectFinalStylesV3")) return;
+    const st=document.createElement("style"); st.id="oskarCorrectFinalStylesV3";
+    st.textContent=`
+      @media(max-width:900px){
+        .cart-line{position:relative!important;min-height:138px!important;padding:14px!important;overflow:hidden!important}
+        .cart-line .line-total{position:absolute!important;top:14px!important;right:14px!important;left:auto!important;background:#eff6ff!important;color:#1d4ed8!important;border-radius:16px!important;padding:9px 12px!important;font-weight:900!important;min-width:96px!important;text-align:center!important;z-index:3!important}
+        .cart-line .oskar-cart-remove{position:absolute!important;top:14px!important;left:14px!important;right:auto!important;width:42px!important;height:42px!important;padding:0!important;border-radius:15px!important;z-index:4!important;background:#fee2e2!important;color:#b91c1c!important;display:flex!important;align-items:center!important;justify-content:center!important}
+        .cart-line .oskar-cart-product-info{padding-left:62px!important;padding-right:124px!important;padding-top:2px!important;min-width:0!important}
+        .cart-line .oskar-cart-product-info b{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;font-size:17px!important;line-height:1.5!important}
+        .cart-line .oskar-cart-product-info .muted{display:none!important}
+        .cart-line .oskar-cart-controls{margin-top:14px!important;width:100%!important;display:flex!important;align-items:center!important;gap:8px!important;justify-content:center!important;grid-column:1 / -1!important}
+        .cart-line .oskar-cart-unit{width:94px!important;min-width:94px!important;height:42px!important;padding:6px 8px!important;border-radius:14px!important;font-size:13px!important;flex:0 0 auto!important}
+        .cart-line .oskar-cart-qty-wrap{display:grid!important;grid-template-columns:38px minmax(64px,84px) 38px!important;gap:6px!important;align-items:center!important;flex:0 0 auto!important}
+        .cart-line .cart-qty-input{height:42px!important;text-align:center!important;direction:ltr!important;font-size:15px!important;padding:6px!important;border-radius:14px!important}
+        .cart-line .qty-btn{width:38px!important;height:42px!important;border-radius:14px!important;font-size:18px!important}
+      }
+      .auth-user-pill{display:inline-flex!important;flex-direction:row!important;align-items:center!important;gap:8px!important;white-space:nowrap!important;overflow:visible!important;min-height:38px!important}
+      .auth-user-pill .oskar-side-title{display:inline-flex!important;align-items:center!important;gap:7px!important;line-height:1!important}
+      .auth-user-pill .oskar-side-minutes{display:inline-flex!important;align-items:center!important;justify-content:center!important;margin-inline-start:8px!important;padding:4px 10px!important;border-radius:999px!important;background:#fef3c7!important;color:#92400e!important;border:1px solid #f59e0b!important;font-size:11px!important;font-weight:900!important;min-width:72px!important;box-shadow:none!important;animation:none!important;opacity:1!important;visibility:visible!important;transform:none!important;line-height:1.4!important}
+      .auth-user-pill .oskar-side-minutes i{display:none!important}
+      .oskar-trial-locked{opacity:.52!important;filter:grayscale(.25)!important;pointer-events:none!important}
+      .oskar-trial-locked-note{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:16px;padding:10px 12px;margin:10px 0;font-weight:900;font-size:12px;line-height:1.8}
+      #settingLogoUrl.oskar-trial-disabled-input,#settingShopPhone.oskar-trial-disabled-input,#settingLowStock.oskar-trial-disabled-input{background:#f1f5f9!important;color:#94a3b8!important;pointer-events:none!important}
+      .patch-inventory-summary .patch-inventory-stat:first-child span::after{content:""}
+    `;
+    document.head.appendChild(st);
+  }
+  function setDefaultLogo(){
+    try{
+      window.state=window.state||{}; window.state.settings=window.state.settings||{};
+      if(!window.state.settings.logo && !window.state.settings.localLogo){ window.state.settings.logo=LOGO_URL; }
+      ["topShopLogo","sideShopLogo"].forEach(id=>{ const img=$(id); if(img && (!img.src || img.src.startsWith("data:") || /undefined|null/.test(img.src))) img.src=LOGO_URL; });
+    }catch{}
+  }
+  function stableTrialPill(){
+    const pill=$("authUserPill"); if(!pill || !trialUser()) return;
+    const min=leftMinutes();
+    const title='<span class="oskar-side-title"><i class="fa-solid fa-flask"></i> تجربة oskar</span>';
+    const chip='<span id="oskarTrialSidebarMinutes" class="oskar-side-minutes">'+min+'</span>';
+    if(!pill.querySelector(".oskar-side-title") || !pill.querySelector("#oskarTrialSidebarMinutes")) pill.innerHTML=title+chip;
+    const b=$("oskarTrialSidebarMinutes"); if(b && b.textContent.trim()!==min) b.textContent=min;
+  }
+  function lockTrialSettings(){
+    if(!trialActive()) return;
+    const settings=$("page-settings"); if(!settings) return;
+    const logoUrl=$("settingLogoUrl"), phone=$("settingShopPhone"), low=$("settingLowStock");
+    if(logoUrl){ logoUrl.value=""; logoUrl.placeholder="غير متاح في النسخة التجريبية — استخدم رفع صورة من الجهاز"; logoUrl.disabled=true; logoUrl.classList.add("oskar-trial-disabled-input"); }
+    if(phone){ phone.disabled=true; phone.classList.add("oskar-trial-disabled-input"); }
+    if(low){ low.disabled=true; low.classList.add("oskar-trial-disabled-input"); }
+    const empBox=$("employeesSettingsBox"), secBox=$("adminSecurityBox");
+    const backupCard=$$("#page-settings .card").find(c=>/النسخ الاحتياطي/.test(c.textContent||""));
+    [empBox,secBox,backupCard].filter(Boolean).forEach(box=>{
+      if(!box.querySelector(".oskar-trial-locked-note")) box.insertAdjacentHTML("afterbegin",'<div class="oskar-trial-locked-note"><i class="fa-solid fa-lock"></i> هذا القسم غير متاح في النسخة التجريبية.</div>');
+      Array.from(box.querySelectorAll("input,select,textarea,button,label")).forEach(el=>{ el.classList.add("oskar-trial-locked"); if(el.tagName==="BUTTON"||el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA") el.disabled=true; });
+    });
+    const note=$$("#page-settings .muted").find(x=>/Firebase|الشعار يتزامن/.test(x.textContent||""));
+    if(note) note.textContent="في النسخة التجريبية يمكنك تعديل اسم المحل، العملة، شعار محلي من الجهاز، وحسابات الدفع والتحويل فقط.";
+  }
+  function blockTrialEmployee(){
+    document.addEventListener("click",function(e){
+      if(!trialActive()) return;
+      const btn=e.target.closest("#addEmployeeBtn,[data-open-employee],#finalAddWorker,#finalAddEmployee");
+      if(btn){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast("إضافة الموظفين غير متاحة في النسخة التجريبية"); }
+    },true);
+    document.addEventListener("submit",function(e){
+      if(!trialActive()) return;
+      const f=e.target;
+      if(f && /employee/i.test(f.id||"")){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast("إضافة أو تعديل الموظفين غير متاح في النسخة التجريبية"); }
+    },true);
+  }
+  function patchLoginWrongMessages(){
+    document.addEventListener("submit",function(e){
+      const f=e.target; if(!f) return;
+      if(f.id==="adminLoginForm"){
+        const pass=($("adminPasswordInput")?.value||"").trim(); if(!pass) return;
+        setTimeout(()=>{ const lock=$("authLock"); if(lock && !lock.classList.contains("hide") && lock.style.display!=="none") toast("كلمة مرور المدير غير صحيحة"); },650);
+      }
+      if(f.id==="employeeLoginForm"){
+        const name=($("employeeNameInput")?.value||"").trim(); const pass=($("employeePasswordInput")?.value||"").trim(); if(!name || !pass) return;
+        setTimeout(()=>{ const lock=$("authLock"); if(lock && !lock.classList.contains("hide") && lock.style.display!=="none") toast("اسم المستخدم أو كلمة مرور الموظف غير صحيحة"); },650);
+      }
+    },true);
+  }
+  function patchInventoryProductCount(){
+    const box=$("patchInventorySummary"); if(!box) return;
+    const first=box.querySelector(".patch-inventory-stat:first-child"); if(!first) return;
+    const span=first.querySelector("span"), b=first.querySelector("b");
+    if(span) span.innerHTML='<i class="fa-solid fa-boxes-stacked"></i> عدد الأصناف';
+    if(b) b.textContent=String((window.state?.products||[]).length);
+  }
+  function patchQuantityNoKeyboardClose(){
+    document.addEventListener("input",function(e){
+      const inp=e.target.closest("[data-change-cart-qty]"); if(!inp || !window.state?.cart) return;
+      const active=document.activeElement;
+      const line=window.state.cart.find(x=>x.id===inp.dataset.changeCartQty); if(!line) return;
+      try{
+        if(typeof window.updateCartLine==="function") window.updateCartLine(line.id,{qty:inp.value},false);
+        const row=document.querySelector(`[data-cart-line="${CSS.escape(line.id)}"]`);
+        const total=row?.querySelector(".line-total"); if(total) total.textContent=money(line.total);
+        const subtotal=(window.state.cart||[]).reduce((s,x)=>s+clean(x.total,0),0); const type=$("discountType")?.value||"fixed"; const val=clean($("discountValue")?.value,0); let disc=type==="percent"?subtotal*val/100:val; disc=Math.min(Math.max(disc,0),subtotal);
+        if($("cartSubtotal")) $("cartSubtotal").textContent=money(subtotal); if($("cartDiscount")) $("cartDiscount").textContent=money(disc); if($("cartTotal")) $("cartTotal").textContent=money(subtotal-disc);
+      }catch{}
+      if(active===inp) setTimeout(()=>{ try{ inp.focus({preventScroll:true}); }catch{} },0);
+    },true);
+  }
+  function forceTrialLocalOnly(){
+    if(!trialActive()) return;
+    window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true;
+    window.FIREBASE_ROOT="TRIAL_LOCAL_ONLY_NO_SYNC";
+    ["syncNow","syncFromFirebase","pushSyncQueue","startRealtimeListeners"].forEach(name=>{ if(typeof window[name]==="function" && !window[name].__trialNoop){ const fn=function(){ toast("النسخة التجريبية محلية فقط ولا يوجد فيها مزامنة"); return Promise.resolve(false); }; fn.__trialNoop=true; window[name]=fn; } });
+  }
+  function patchSyncButton(){
+    document.addEventListener("click",function(e){
+      const b=e.target.closest("#syncNowBtn"); if(!b || !trialActive()) return;
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      toast("النسخة التجريبية محلية فقط ولا يوجد فيها مزامنة");
+    },true);
+  }
+  function init(){
+    installStyles(); setDefaultLogo(); blockTrialEmployee(); patchLoginWrongMessages(); patchQuantityNoKeyboardClose(); patchSyncButton();
+    function tick(){ setDefaultLogo(); stableTrialPill(); lockTrialSettings(); patchInventoryProductCount(); forceTrialLocalOnly(); }
+    tick(); setTimeout(tick,500); setTimeout(tick,1800); setInterval(tick,60000);
+    const pill=$("authUserPill"); if(pill){ try{ new MutationObserver(()=>setTimeout(stableTrialPill,0)).observe(pill,{childList:true,subtree:true,characterData:true}); }catch{} }
+    window.addEventListener("barcode:scanned",()=>setTimeout(()=>{ try{ if(typeof window.renderCart==="function") window.renderCart(); }catch{} },60));
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+})();
+</script>
+
 </body>
 </html>
 <!-- legacy-disabled-patches-2026-04-29-base64: old duplicate scripts after </html> were disabled to prevent app startup errors. Do not execute. 
