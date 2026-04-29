@@ -2916,10 +2916,8 @@
 (function(){
   try{
     var MODE='oskar_storage_mode_v1', OUT='oskar_trial_logged_out_v1';
-    /* إبقاء التجربة على مسارها المحلي حتى بعد تسجيل الخروج أو تحديث الصفحة؛
-       ممنوع تحويل MODE إلى main لأن ذلك يحمّل بيانات النسخة الرسمية. */
     if(localStorage.getItem(OUT)==='1' && localStorage.getItem(MODE)==='trial'){
-      window.OSKAR_TRIAL_LOGGED_OUT_LOCAL_ONLY = true;
+      localStorage.setItem(MODE,'main');
     }
   }catch(e){}
 })();
@@ -2933,7 +2931,7 @@
     window.OSKAR_TRIAL_EARLY_ACTIVE=!!active;
     if(!active) return;
     window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true;
-    var firebasePattern=/(firebaseio\.com|firebasedatabase\.app|firestore\.googleapis\.com|googleapis\.com\/.*database|firebaseinstallations|identitytoolkit|securetoken|www\.google-analytics\.com|app-measurement)/i;
+    var firebasePattern=/(firebaseio\.com|firebasedatabase\.app|googleapis\.com\/.*database|firebaseinstallations|identitytoolkit|securetoken)/i;
     var oldFetch=window.fetch;
     if(oldFetch){ window.fetch=function(input, init){ try{ var url=String((input&&input.url)||input||""); if(firebasePattern.test(url)) return Promise.resolve(new Response("{}",{status:200,headers:{"Content-Type":"application/json"}})); }catch(e){} return oldFetch.apply(this, arguments); }; }
     var OldWS=window.WebSocket;
@@ -3004,7 +3002,7 @@
       .slice(0, 42) || "default";
 
     const BASE_FIREBASE_ROOT = externalFirebase.firebaseRoot || `cashier_units_pro_${DB_NAMESPACE}`;
-    const FIREBASE_ROOT = OSKAR_TRIAL_ACTIVE ? `TRIAL_LOCAL_ONLY_${OSKAR_DEVICE_ID}` : BASE_FIREBASE_ROOT;
+    const FIREBASE_ROOT = OSKAR_TRIAL_ACTIVE ? `${BASE_FIREBASE_ROOT}__trial__${OSKAR_DEVICE_ID}` : BASE_FIREBASE_ROOT;
     window.FIREBASE_ROOT = FIREBASE_ROOT;
     window.OSKAR_STORAGE_PROFILE = STORAGE_PROFILE;
     window.OSKAR_TRIAL_ACTIVE = OSKAR_TRIAL_ACTIVE;
@@ -3312,7 +3310,6 @@
     }
 
     async function fetchFreshSettingsFromFirebase() {
-      if (OSKAR_TRIAL_LOCAL_ONLY) return state.settings || defaultSettings;
       if (!navigator.onLine) return state.settings || defaultSettings;
       try {
         const snap = await get(ref(db, `${FIREBASE_ROOT}/settings/main`));
@@ -3340,10 +3337,6 @@
     async function saveSettingsToFirebaseNow(settings) {
       const cleanSettings = stripLocalOnlySettings(settings);
       await idbPut("settings", settings);
-      if (OSKAR_TRIAL_LOCAL_ONLY) {
-        await refreshPendingCount();
-        return;
-      }
       if (navigator.onLine) {
         await set(ref(db, `${FIREBASE_ROOT}/settings/main`), cleanSettings);
       } else {
@@ -3412,55 +3405,6 @@
       }
     }
 
-    let authCloudBootStarted = false;
-
-    async function runCloudBootAfterLogin(reason = "login") {
-      if (OSKAR_TRIAL_LOCAL_ONLY) return;
-      if (!navigator.onLine) return;
-      if (!currentUser()) return;
-      if (authCloudBootStarted) return;
-      authCloudBootStarted = true;
-
-      try {
-        updateSyncUi({
-          spin: true,
-          visible: false,
-          title: "تحميل البيانات",
-          status: "تحميل بيانات Firebase بعد تسجيل الدخول",
-          progress: 20,
-          operations: []
-        });
-
-        await syncNow(false);
-        await loadFirebaseOnce();
-        await loadLocalData(true);
-        await validateCurrentEmployeeSession();
-        await syncLocalSnapshotToFirebase();
-        startRealtimeListeners();
-        renderAll();
-
-        updateSyncUi({
-          spin: false,
-          visible: false,
-          title: "جاهز",
-          status: "تم تحميل البيانات بعد تسجيل الدخول",
-          progress: 100
-        });
-      } catch (err) {
-        console.warn("post login cloud boot failed", err);
-        authCloudBootStarted = false;
-        updateSyncUi({
-          spin: false,
-          visible: false,
-          title: "تنبيه",
-          status: "تعذر تحميل البيانات الآن، سيتم العمل من التخزين المحلي",
-          progress: 0
-        });
-      }
-
-      await refreshPendingCount();
-    }
-
     function setAuthUser(user) {
       state.auth.user = user;
       state.auth.ready = true;
@@ -3476,11 +3420,6 @@
       }
 
       applyPermissionsUI();
-
-      if (user && !OSKAR_TRIAL_LOCAL_ONLY) {
-        setTimeout(() => runCloudBootAfterLogin("auth"), 0);
-        try { window.dispatchEvent(new CustomEvent("oskar:official-login")); } catch {}
-      }
     }
 
     function logout() {
@@ -8322,184 +8261,52 @@
       setTimeout(doPrint, 1800);
     }
 
-    const EXPORT_FAST_STATE = { busy: false };
-
-    function safeFilename(name, fallback = "export") {
-      return String(name || fallback)
-        .replace(/[\\/:*?"<>|]+/g, "-")
-        .replace(/\s+/g, " ")
-        .trim() || fallback;
-    }
-
-    function downloadBlobFast(blob, filename) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = safeFilename(filename);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1200);
-    }
-
-    function canvasToBlobFast(canvas, type = "image/jpeg", quality = 0.88) {
-      return new Promise((resolve, reject) => {
-        if (!canvas || !canvas.toBlob) {
-          reject(new Error("تعذر تجهيز الصورة"));
-          return;
-        }
-
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error("تعذر إنشاء الملف"));
-        }, type, quality);
-      });
-    }
-
-    function getExportScale(element) {
-      const rect = element.getBoundingClientRect();
-      const width = Math.max(1, element.scrollWidth || rect.width || 1);
-      const height = Math.max(1, element.scrollHeight || rect.height || 1);
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
-      const maxPixels = isMobile ? 3600000 : 7600000;
-      let scale = Math.min(window.devicePixelRatio || 1, isMobile ? 1.15 : 1.35);
-      scale = Math.max(scale, 0.75);
-
-      const estimatedPixels = width * height * scale * scale;
-      if (estimatedPixels > maxPixels) {
-        scale = Math.sqrt(maxPixels / Math.max(1, width * height));
-      }
-
-      return Math.max(0.55, Math.min(1.35, Number(scale.toFixed(2))));
-    }
-
-    async function waitForExportAssets(element, maxWait = 1100) {
-      try {
-        if (document.fonts && document.fonts.ready) {
-          await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 550))]);
-        }
-      } catch (_) {}
-
-      const imgs = Array.from(element.querySelectorAll("img"));
-      if (!imgs.length) return;
-
-      await Promise.race([
-        Promise.all(imgs.map(img => new Promise(resolve => {
-          try {
-            if (!img.getAttribute("crossorigin")) img.setAttribute("crossorigin", "anonymous");
-          } catch (_) {}
-          if (img.complete) return resolve();
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-        }))),
-        new Promise(resolve => setTimeout(resolve, maxWait))
-      ]);
-    }
-
-    async function makeExportCanvas(element) {
-      if (!element) throw new Error("لم يتم العثور على العنصر المطلوب تصديره");
-      await waitForExportAssets(element);
-
-      const width = Math.max(document.documentElement.clientWidth, element.scrollWidth || 0, 900);
-      const height = Math.max(document.documentElement.clientHeight, element.scrollHeight || 0);
-
-      return html2canvas(element, {
-        scale: getExportScale(element),
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: "#ffffff",
-        logging: false,
-        removeContainer: true,
-        imageTimeout: 900,
-        windowWidth: width,
-        windowHeight: height,
-        ignoreElements: (node) => {
-          if (!node || !node.classList) return false;
-          return node.classList.contains("no-export") || node.classList.contains("no-print");
-        },
-        onclone: (doc) => {
-          doc.documentElement.style.direction = "rtl";
-          doc.body.style.background = "#ffffff";
-          doc.querySelectorAll("button,.no-print,.sync-popover,.toast,.floating-scanner").forEach(el => {
-            el.style.display = "none";
-          });
-          doc.querySelectorAll(".table-wrap").forEach(el => {
-            el.style.overflow = "visible";
-            el.style.maxHeight = "none";
-          });
-          doc.querySelectorAll("table").forEach(table => {
-            table.style.minWidth = "0";
-            table.style.width = "100%";
-          });
-          doc.querySelectorAll("img").forEach(img => {
-            try {
-              if (!img.complete || img.naturalWidth === 0) img.style.visibility = "hidden";
-            } catch (_) {}
-          });
-        }
-      });
-    }
-
-    async function withFastExportLock(task) {
-      if (EXPORT_FAST_STATE.busy) {
-        toast("جاري تجهيز ملف سابق، انتظر لحظة");
-        return;
-      }
-
-      EXPORT_FAST_STATE.busy = true;
-      toast("جاري تجهيز الملف...", 1600);
-
-      try {
-        await new Promise(resolve => requestAnimationFrame(() => resolve()));
-        await task();
-        toast("تم تجهيز الملف بنجاح");
-      } catch (err) {
-        console.error("export failed", err);
-        toast("تعذر تجهيز الملف، جرّب تقليل عدد السجلات أو استخدم Excel");
-      } finally {
-        EXPORT_FAST_STATE.busy = false;
-      }
-    }
-
     async function downloadElementImage(element, filename) {
-      return withFastExportLock(async () => {
-        const canvas = await makeExportCanvas(element);
-        const outName = safeFilename(filename || ("image-" + todayKey() + ".jpg")).replace(/\.png$/i, ".jpg");
-        const blob = await canvasToBlobFast(canvas, "image/jpeg", 0.9);
-        downloadBlobFast(blob, outName);
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff"
       });
+
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = filename;
+      a.click();
     }
 
     async function downloadElementPdf(element, filename) {
-      return withFastExportLock(async () => {
-        const canvas = await makeExportCanvas(element);
-        const img = canvas.toDataURL("image/jpeg", 0.82);
-        const { jsPDF } = window.jspdf || {};
-        if (!jsPDF) throw new Error("PDF library not loaded");
-
-        const pdf = new jsPDF("p", "mm", "a4", true);
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const margin = 6;
-        const imgWidth = pageWidth - (margin * 2);
-        const imgHeight = canvas.height * imgWidth / Math.max(1, canvas.width);
-
-        if (imgHeight <= pageHeight - (margin * 2)) {
-          pdf.addImage(img, "JPEG", margin, margin, imgWidth, imgHeight, undefined, "FAST");
-        } else {
-          let remaining = imgHeight;
-          let position = 0;
-
-          while (remaining > 0) {
-            pdf.addImage(img, "JPEG", margin, margin - position, imgWidth, imgHeight, undefined, "FAST");
-            remaining -= pageHeight;
-            position += pageHeight;
-            if (remaining > 0) pdf.addPage();
-          }
-        }
-
-        pdf.save(safeFilename(filename || ("export-" + todayKey() + ".pdf")));
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff"
       });
+
+      const img = canvas.toDataURL("image/png");
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth - 12;
+      const imgHeight = canvas.height * imgWidth / canvas.width;
+
+      if (imgHeight <= pageHeight - 12) {
+        pdf.addImage(img, "PNG", 6, 6, imgWidth, imgHeight);
+      } else {
+        let remaining = imgHeight;
+        let position = 0;
+
+        while (remaining > 0) {
+          pdf.addImage(img, "PNG", 6, 6 - position, imgWidth, imgHeight);
+          remaining -= pageHeight;
+          position += pageHeight;
+          if (remaining > 0) pdf.addPage();
+        }
+      }
+
+      pdf.save(filename);
     }
 
     function reportShell(title, bodyHtml) {
@@ -10246,11 +10053,8 @@
 
       window.addEventListener("online", async () => {
         await refreshPendingCount();
-        if (!OSKAR_TRIAL_LOCAL_ONLY && currentUser()) {
-          await runCloudBootAfterLogin("online");
-          await syncNow(false);
-          startRealtimeListeners();
-        }
+        await syncNow(false);
+        startRealtimeListeners();
       });
 
       window.addEventListener("offline", () => {
@@ -10381,7 +10185,7 @@
 
       await loadLocalData(true);
 
-      if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY && currentUser()) {
+      if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY) {
         await fetchFreshSettingsFromFirebase();
       }
 
@@ -10393,8 +10197,49 @@
 
       renderAll();
 
-      if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY && currentUser()) {
-        await runCloudBootAfterLogin("boot-session");
+      if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY) {
+        updateSyncUi({
+          spin: true,
+          visible: false,
+          title: "المزامنة",
+          status: "رفع العمليات المحلية أولاً",
+          progress: 20
+        });
+
+        await syncNow(false);
+
+        updateSyncUi({
+          spin: true,
+          visible: false,
+          title: "المزامنة",
+          status: "تنزيل تحديثات Firebase الجديدة",
+          progress: 45
+        });
+
+        await loadFirebaseOnce();
+
+        await loadLocalData(true);
+        await validateCurrentEmployeeSession();
+
+        updateSyncUi({
+          spin: true,
+          visible: false,
+          title: "المزامنة",
+          status: "تثبيت نسخة الجهاز على المشروع الحالي عند الحاجة",
+          progress: 72
+        });
+
+        await syncLocalSnapshotToFirebase();
+
+        startRealtimeListeners();
+
+        updateSyncUi({
+          spin: false,
+          visible: false,
+          title: "جاهز",
+          status: "تم تشغيل المزامنة المباشرة",
+          progress: 100
+        });
       } else {
         updateSyncUi({
           spin: false,
@@ -10410,7 +10255,7 @@
       setInterval(async () => {
         await refreshPendingCount();
 
-        if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY && currentUser()) {
+        if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY) {
           await syncNow(false);
           await validateCurrentEmployeeSession();
         }
@@ -10464,7 +10309,6 @@
       enqueueSync,
       syncNow,
       startRealtimeListeners,
-      runCloudBootAfterLogin,
       rebuildCustomerBalances,
       logout
     });
@@ -10496,17 +10340,15 @@
   function simpleHash(str){ const text=String(str||""); let h=2166136261; for(let i=0;i<text.length;i++){h^=text.charCodeAt(i); h+=(h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);} return String(h>>>0); }
   function loading(btn,on,text){ if(!btn)return; if(on){ if(!btn.dataset.oldHtml)btn.dataset.oldHtml=btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> '+(text||'جاري التنفيذ...'); } else { btn.disabled=false; if(btn.dataset.oldHtml)btn.innerHTML=btn.dataset.oldHtml; delete btn.dataset.oldHtml; } }
   function isAdmin(){ const u=window.state?.auth?.user; return !!u&&(u.role==='admin'||(u.permissions||[]).includes(ADMIN_PERMISSION)); }
-  function trialLocalOnly(){ const st=Number(localStorage.getItem('oskar_trial_started_at_v1')||0); return window.OSKAR_TRIAL_LOCAL_ONLY===true || (localStorage.getItem('oskar_storage_mode_v1')==='trial' && st && Date.now()-st<30*60*1000); }
-  function officialUser(){ const u=window.state?.auth?.user; return !!u && !u.trial && !String(u.name||'').includes('تجربة oskar'); }
   function authKey(){ const keys=Object.keys(localStorage); const found=keys.find(k=>k.startsWith('cashier_auth_session_')&&k.endsWith('_v1')); if(found)return found; return 'cashier_auth_session_direct_final_v1'; }
   function clearSession(){ try{ Object.keys(localStorage).forEach(k=>{if(k.startsWith('cashier_auth_session_'))localStorage.removeItem(k)}); Object.keys(sessionStorage).forEach(k=>{if(k.startsWith('cashier_auth_session_'))sessionStorage.removeItem(k)}); }catch{} }
   function saveSession(u){ try{localStorage.setItem(authKey(),JSON.stringify({id:u.id,name:u.name,role:u.role,permissions:u.permissions||[],loginAt:Date.now()}));}catch{} }
   function showLock(show){ const lock=$("authLock"); if(lock){ lock.classList.toggle('hide',!show); lock.style.display=show?'flex':'none'; } }
-  function setUser(u){ if(!window.state)return; window.state.auth=window.state.auth||{}; window.state.auth.user=u||null; window.state.auth.ready=true; if(u){saveSession(u);showLock(false); if(!trialLocalOnly() && typeof window.runCloudBootAfterLogin==='function') setTimeout(()=>window.runCloudBootAfterLogin('direct-auth'),0); try{ window.dispatchEvent(new CustomEvent('oskar:official-login')); }catch{} }else{ if(trialLocalOnly()){ localStorage.setItem('oskar_trial_logged_out_v1','1'); localStorage.setItem('oskar_storage_mode_v1','trial'); } clearSession();showLock(true);} applyUi(); }
+  function setUser(u){ if(!window.state)return; window.state.auth=window.state.auth||{}; window.state.auth.user=u||null; window.state.auth.ready=true; if(u){saveSession(u);showLock(false);}else{clearSession();showLock(true);} applyUi(); }
   function getHash(){ const h=window.state?.settings?.adminPasswordHash || simpleHash(DEFAULT_ADMIN_PIN); return h==="3052262101" ? simpleHash(DEFAULT_ADMIN_PIN) : h; }
   function firebaseRoot(){ return window.FIREBASE_ROOT || window.CASHIER_FIREBASE_CONFIG?.firebaseRoot || 'cashier_units_pro_default'; }
-  async function fetchSettings(){ try{ if(trialLocalOnly()) return window.state?.settings; if(!navigator.onLine||!window.db||!window.ref||!window.get) return window.state?.settings; const snap=await window.get(window.ref(window.db, firebaseRoot()+"/settings/main")); if(snap&&snap.exists&&snap.exists()){ const remote=snap.val()||{}; window.state.settings={...(window.state.settings||{}),...remote,id:'main',localLogo:window.state?.settings?.localLogo||''}; if(typeof window.idbPut==='function') await window.idbPut('settings',window.state.settings); return window.state.settings; } }catch(e){console.warn('fetch settings failed',e)} return window.state?.settings; }
-  async function saveSettings(){ if(!window.state) return; window.state.settings={...(window.state.settings||{}),id:'main',updatedAt:Date.now()}; if(typeof window.idbPut==='function') await window.idbPut('settings',window.state.settings); const safe={...window.state.settings,localLogo:'',logoMode:window.state.settings.logo?'url':'default'}; if(trialLocalOnly()) return; if(navigator.onLine&&window.db&&window.ref&&window.set){ await window.set(window.ref(window.db, firebaseRoot()+"/settings/main"), safe); } else if(typeof window.enqueueSync==='function'){ await window.enqueueSync({type:'set',store:'settings',itemId:'main',data:safe}); } }
+  async function fetchSettings(){ try{ if(!navigator.onLine||!window.db||!window.ref||!window.get) return window.state?.settings; const snap=await window.get(window.ref(window.db, firebaseRoot()+"/settings/main")); if(snap&&snap.exists&&snap.exists()){ const remote=snap.val()||{}; window.state.settings={...(window.state.settings||{}),...remote,id:'main',localLogo:window.state?.settings?.localLogo||''}; if(typeof window.idbPut==='function') await window.idbPut('settings',window.state.settings); return window.state.settings; } }catch(e){console.warn('fetch settings failed',e)} return window.state?.settings; }
+  async function saveSettings(){ if(!window.state) return; window.state.settings={...(window.state.settings||{}),id:'main',updatedAt:Date.now()}; if(typeof window.idbPut==='function') await window.idbPut('settings',window.state.settings); const safe={...window.state.settings,localLogo:'',logoMode:window.state.settings.logo?'url':'default'}; if(navigator.onLine&&window.db&&window.ref&&window.set){ await window.set(window.ref(window.db, firebaseRoot()+"/settings/main"), safe); } else if(typeof window.enqueueSync==='function'){ await window.enqueueSync({type:'set',store:'settings',itemId:'main',data:safe}); } }
   function applyUi(){ const u=window.state?.auth?.user||null; const pill=$("authUserPill"); if(pill) pill.innerHTML=u?`<i class="fa-solid ${isAdmin()?'fa-user-shield':'fa-user'}"></i> ${escape(String(u.name||'مستخدم'))}`:`<i class="fa-solid fa-lock"></i> غير مسجل`; document.querySelectorAll('.nav-btn[data-page],.bottom-btn[data-page]').forEach(b=>{ const page=b.dataset.page; const ok=!!u&&(isAdmin()||(u.permissions||[]).includes(page)); b.classList.toggle('auth-hidden',!ok); }); const a=$("adminSecurityBox"); if(a)a.style.display=isAdmin()?'block':'none'; const e=$("employeesSettingsBox"); if(e)e.style.display=isAdmin()?'block':'none'; }
   function escape(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
   function ensureRecoveryUi(){
@@ -10561,7 +10403,6 @@
   };
   const root = () => window.FIREBASE_ROOT || window.CASHIER_FIREBASE_CONFIG?.firebaseRoot || "cashier_units_pro_default";
   const storageKey = () => "cashier_extra_final_2026_04_29_" + root();
-  function cloudAllowed(){ const u=window.state?.auth?.user; const trial=window.OSKAR_TRIAL_LOCAL_ONLY===true || (u && (u.trial || String(u.name||"").includes("تجربة oskar"))); return !!(navigator.onLine && window.db && window.ref && u && !trial); }
 
   function loadExtra(){
     try{
@@ -10591,7 +10432,7 @@
 
   async function firebaseSet(path, data){
     try{
-      if (cloudAllowed() && window.set) {
+      if (navigator.onLine && window.db && window.ref && window.set) {
         await window.set(window.ref(window.db, root() + "/" + path), data);
       }
     }catch(e){ console.warn("firebaseSet", path, e); }
@@ -10599,7 +10440,7 @@
 
   async function firebaseRemove(path){
     try{
-      if (cloudAllowed() && window.remove) {
+      if (navigator.onLine && window.db && window.ref && window.remove) {
         await window.remove(window.ref(window.db, root() + "/" + path));
       }
     }catch(e){ console.warn("firebaseRemove", path, e); }
@@ -10607,7 +10448,7 @@
 
   async function pullExtra(){
     try{
-      if (!(cloudAllowed() && window.get)) return;
+      if (!(navigator.onLine && window.db && window.ref && window.get)) return;
       for (const key of ["suppliers","workers","workerWages"]) {
         const snap = await window.get(window.ref(window.db, root() + "/" + key));
         if (snap && snap.exists && snap.exists()) {
@@ -11279,11 +11120,6 @@
       patchReportNet();
       patchPurchaseSupplierPicker();
     }));
-    window.addEventListener("oskar:official-login", () => pullExtra().then(() => {
-      renderExtraPages();
-      patchReportNet();
-      patchPurchaseSupplierPicker();
-    }));
   }
 
   async function init(){
@@ -11504,7 +11340,7 @@
     const st=state(); if(!st) return; st.employees=Array.isArray(st.employees)?st.employees:[];
     const idx=st.employees.findIndex(e=>e.id===emp.id); if(idx>=0) st.employees[idx]=emp; else st.employees.push(emp);
     try{ if(typeof window.idbPut==="function") await window.idbPut("employees", emp); }catch{}
-    try{ if(!window.OSKAR_TRIAL_LOCAL_ONLY && navigator.onLine && window.db && window.ref && window.set){ await window.set(window.ref(window.db, (window.FIREBASE_ROOT||window.CASHIER_FIREBASE_CONFIG?.firebaseRoot||"cashier_units_pro_default") + "/employees/" + emp.id), emp); } }catch(e){ console.warn("employee firebase save",e); }
+    try{ if(navigator.onLine && window.db && window.ref && window.set){ await window.set(window.ref(window.db, (window.FIREBASE_ROOT||window.CASHIER_FIREBASE_CONFIG?.firebaseRoot||"cashier_units_pro_default") + "/employees/" + emp.id), emp); } }catch(e){ console.warn("employee firebase save",e); }
     if(typeof window.renderAll==="function") { try{window.renderAll();}catch{} }
     renderEmployeesFallback();
   }
@@ -11528,7 +11364,7 @@
   async function deleteEmployeeFallback(id){
     const st=state(); if(!st) return; st.employees=(st.employees||[]).filter(e=>e.id!==id);
     try{ if(typeof window.idbDelete==="function") await window.idbDelete("employees", id); }catch{}
-    try{ if(!window.OSKAR_TRIAL_LOCAL_ONLY && navigator.onLine && window.db && window.ref && window.remove){ await window.remove(window.ref(window.db, (window.FIREBASE_ROOT||window.CASHIER_FIREBASE_CONFIG?.firebaseRoot||"cashier_units_pro_default") + "/employees/" + id)); } }catch{}
+    try{ if(navigator.onLine && window.db && window.ref && window.remove){ await window.remove(window.ref(window.db, (window.FIREBASE_ROOT||window.CASHIER_FIREBASE_CONFIG?.firebaseRoot||"cashier_units_pro_default") + "/employees/" + id)); } }catch{}
     renderEmployeesFallback(); toast("تم حذف الموظف");
   }
   function bindEmployees(){
@@ -11839,7 +11675,7 @@
     clearAuthSessions();
     if(wasTrial || trialTimeValid()){
       localStorage.setItem(TRIAL_LOGGED_OUT_KEY, "1");
-      localStorage.setItem(TRIAL_MODE_KEY, "trial");
+      localStorage.setItem(TRIAL_MODE_KEY, MAIN_MODE_VALUE);
     }
     showLogin();
     toast("تم تسجيل الخروج");
@@ -12057,7 +11893,7 @@
     ensureStyles();
     getDeviceId();
     if(localStorage.getItem(TRIAL_LOGGED_OUT_KEY) === "1" && localStorage.getItem(TRIAL_MODE_KEY) === "trial"){
-      window.OSKAR_TRIAL_LOGGED_OUT_LOCAL_ONLY = true;
+      localStorage.setItem(TRIAL_MODE_KEY, MAIN_MODE_VALUE);
     }
     replaceLogoutButtons();
     ensureGuidePage();
@@ -12399,10 +12235,7 @@
   function makeTrialLocalOnlyRuntime(){
     if(!trialActive()) return;
     window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true;
-    window.FIREBASE_ROOT="TRIAL_LOCAL_ONLY_NO_FIREBASE";
-    ["loadFirebaseOnce","loadFirebaseRoot","syncLocalSnapshotToFirebase","startRealtimeListeners","runCloudBootAfterLogin"].forEach(name=>{ if(typeof window[name]==="function" && !window[name].__trialBlocked){ const f=function(){ return Promise.resolve(false); }; f.__trialBlocked=true; window[name]=f; } });
-    if(typeof window.enqueueSync==="function" && !window.enqueueSync.__trialBlocked){ const f=function(){ return Promise.resolve(); }; f.__trialBlocked=true; window.enqueueSync=f; }
-    try{ if(typeof window.idbClear==="function") window.idbClear("syncQueue"); }catch{}
+    if(typeof window.enqueueSync==="function" && !window.enqueueSync.__trialBlocked){ const f=function(){ toast("النسخة التجريبية محلية فقط ولا يوجد فيها مزامنة"); return Promise.resolve(); }; f.__trialBlocked=true; window.enqueueSync=f; }
   }
   function init(){
     installFinalStyles(); blockTrialSyncAndCloud(); patchQuantityInputNoBlur(); makeTrialLocalOnlyRuntime(); ensureScannerKeepsBehavior(); forceStableTrialSidebar();
@@ -12559,6 +12392,273 @@
 })();
 </script>
 
+
+
+<!-- oskar-scroll-fix-2026-04-29: desktop/sidebar/modal/table scrolling -->
+<style id="oskarScrollFixStyle">
+  /* تمرير عام بدون تغيير التصميم */
+  .sidebar,
+  #sidebar,
+  .modal,
+  #modalBox,
+  .oskar-emp-card,
+  .sync-popover,
+  .sync-operation-list,
+  .guide-modal-wrap,
+  .floating-scanner-card,
+  .customer-suggest-list,
+  .smart-suggest-list,
+  .new-page-table-holder,
+  .table-wrap,
+  .folder-tabs,
+  #finalSimpleModal .card,
+  #finalModal .card{
+    overscroll-behavior:contain!important;
+    -webkit-overflow-scrolling:touch!important;
+    touch-action:pan-x pan-y!important;
+    scrollbar-width:thin;
+    scrollbar-color:rgba(37,99,235,.45) rgba(226,232,240,.75);
+  }
+
+  .sidebar::-webkit-scrollbar,
+  .modal::-webkit-scrollbar,
+  .oskar-emp-card::-webkit-scrollbar,
+  .table-wrap::-webkit-scrollbar,
+  .new-page-table-holder::-webkit-scrollbar,
+  .folder-tabs::-webkit-scrollbar,
+  .guide-modal-wrap::-webkit-scrollbar{
+    width:9px;
+    height:9px;
+  }
+
+  .sidebar::-webkit-scrollbar-thumb,
+  .modal::-webkit-scrollbar-thumb,
+  .oskar-emp-card::-webkit-scrollbar-thumb,
+  .table-wrap::-webkit-scrollbar-thumb,
+  .new-page-table-holder::-webkit-scrollbar-thumb,
+  .folder-tabs::-webkit-scrollbar-thumb,
+  .guide-modal-wrap::-webkit-scrollbar-thumb{
+    background:rgba(37,99,235,.38);
+    border-radius:999px;
+    border:2px solid rgba(255,255,255,.9);
+  }
+
+  .sidebar::-webkit-scrollbar-track,
+  .modal::-webkit-scrollbar-track,
+  .oskar-emp-card::-webkit-scrollbar-track,
+  .table-wrap::-webkit-scrollbar-track,
+  .new-page-table-holder::-webkit-scrollbar-track,
+  .folder-tabs::-webkit-scrollbar-track,
+  .guide-modal-wrap::-webkit-scrollbar-track{
+    background:rgba(226,232,240,.55);
+    border-radius:999px;
+  }
+
+  #sidebar,
+  .sidebar{
+    height:100vh!important;
+    max-height:100vh!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    padding-bottom:135px!important;
+    scroll-behavior:smooth;
+  }
+
+  @media(min-width:901px){
+    #sidebar,
+    .sidebar{
+      top:0!important;
+      bottom:0!important;
+      transform:none;
+    }
+  }
+
+  .modal,
+  #modalBox,
+  .oskar-emp-card,
+  .floating-scanner-card,
+  #finalSimpleModal .card,
+  #finalModal .card{
+    max-height:92vh!important;
+    overflow:auto!important;
+    scroll-behavior:smooth;
+  }
+
+  .guide-modal-wrap{
+    max-height:72vh!important;
+    overflow:auto!important;
+  }
+
+  .table-wrap,
+  .new-page-table-holder{
+    overflow:auto!important;
+    cursor:grab;
+    user-select:auto;
+  }
+
+  .folder-tabs{
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    cursor:grab;
+  }
+
+  .sync-operation-list,
+  .customer-suggest-list,
+  .smart-suggest-list{
+    overflow:auto!important;
+  }
+
+  .oskar-scroll-dragging{
+    cursor:grabbing!important;
+    scroll-behavior:auto!important;
+  }
+
+  body.oskar-scroll-noselect,
+  body.oskar-scroll-noselect *{
+    user-select:none!important;
+  }
+</style>
+<script id="oskarScrollFixScript">
+(function(){
+  "use strict";
+  const PATCH_VERSION = "2026-04-29-scroll-fix-v1";
+  const SELECTOR = [
+    "#sidebar",
+    ".sidebar",
+    ".modal",
+    "#modalBox",
+    ".oskar-emp-card",
+    ".sync-popover",
+    ".sync-operation-list",
+    ".guide-modal-wrap",
+    ".floating-scanner-card",
+    ".customer-suggest-list",
+    ".smart-suggest-list",
+    ".new-page-table-holder",
+    ".table-wrap",
+    ".folder-tabs",
+    "#finalSimpleModal .card",
+    "#finalModal .card",
+    "[style*='overflow:auto']",
+    "[style*='overflow: auto']"
+  ].join(",");
+
+  const isTextControl = (el) => !!(el && el.closest && el.closest("input,textarea,select,button,a,[contenteditable='true'],[contenteditable='']"));
+
+  function canScroll(el){
+    if(!el) return false;
+    return (el.scrollHeight - el.clientHeight > 2) || (el.scrollWidth - el.clientWidth > 2);
+  }
+
+  function ensureFocusable(el){
+    if(!el || el.dataset.oskarScrollReady === "1") return;
+    el.dataset.oskarScrollReady = "1";
+    if(!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "0");
+    el.addEventListener("mouseenter", () => {
+      try{ el.focus({preventScroll:true}); }catch{ try{ el.focus(); }catch{} }
+    }, {passive:true});
+    el.addEventListener("keydown", (e) => {
+      if(isTextControl(document.activeElement)) return;
+      if(!canScroll(el)) return;
+      const page = Math.max(90, Math.floor(el.clientHeight * 0.85));
+      let used = true;
+      switch(e.key){
+        case "ArrowDown": el.scrollTop += 48; break;
+        case "ArrowUp": el.scrollTop -= 48; break;
+        case "PageDown": el.scrollTop += page; break;
+        case "PageUp": el.scrollTop -= page; break;
+        case "End": el.scrollTop = el.scrollHeight; break;
+        case "Home": el.scrollTop = 0; break;
+        case "ArrowRight": el.scrollLeft += 58; break;
+        case "ArrowLeft": el.scrollLeft -= 58; break;
+        default: used = false;
+      }
+      if(used){
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    let startX = 0, startY = 0, startLeft = 0, startTop = 0, dragging = false, moved = false, downTarget = null;
+    el.addEventListener("mousedown", (e) => {
+      if(e.button !== 0) return;
+      if(isTextControl(e.target)) return;
+      if(!canScroll(el)) return;
+      downTarget = e.target;
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = el.scrollLeft;
+      startTop = el.scrollTop;
+      dragging = true;
+      moved = false;
+      el.classList.add("oskar-scroll-dragging");
+      document.body.classList.add("oskar-scroll-noselect");
+      try{ el.focus({preventScroll:true}); }catch{}
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if(!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if(Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+      if(moved){
+        el.scrollLeft = startLeft - dx;
+        el.scrollTop = startTop - dy;
+        e.preventDefault();
+      }
+    }, {passive:false});
+
+    document.addEventListener("mouseup", (e) => {
+      if(!dragging) return;
+      dragging = false;
+      el.classList.remove("oskar-scroll-dragging");
+      document.body.classList.remove("oskar-scroll-noselect");
+      if(moved && downTarget){
+        const blockClick = (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          document.removeEventListener("click", blockClick, true);
+        };
+        document.addEventListener("click", blockClick, true);
+        setTimeout(() => document.removeEventListener("click", blockClick, true), 120);
+      }
+      downTarget = null;
+    });
+  }
+
+  function enhanceAll(){
+    document.querySelectorAll(SELECTOR).forEach(ensureFocusable);
+  }
+
+  function keepSidebarScrollable(){
+    const sidebar = document.getElementById("sidebar") || document.querySelector(".sidebar");
+    if(sidebar){
+      sidebar.style.overflowY = "auto";
+      sidebar.style.overflowX = "hidden";
+      sidebar.style.maxHeight = "100vh";
+      sidebar.style.height = "100vh";
+      sidebar.style.paddingBottom = sidebar.style.paddingBottom || "135px";
+      ensureFocusable(sidebar);
+    }
+  }
+
+  function init(){
+    keepSidebarScrollable();
+    enhanceAll();
+    try{
+      new MutationObserver(() => {
+        keepSidebarScrollable();
+        enhanceAll();
+      }).observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:["class","style"]});
+    }catch{}
+    setInterval(() => { keepSidebarScrollable(); enhanceAll(); }, 1500);
+    window.__OSKAR_SCROLL_FIX__ = PATCH_VERSION;
+  }
+
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
 </body>
 </html>
 <!-- legacy-disabled-patches-2026-04-29-base64: old duplicate scripts after </html> were disabled to prevent app startup errors. Do not execute. 
