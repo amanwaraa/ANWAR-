@@ -2990,6 +2990,8 @@
     window.FIREBASE_ROOT = FIREBASE_ROOT;
     window.OSKAR_STORAGE_PROFILE = STORAGE_PROFILE;
     window.OSKAR_TRIAL_ACTIVE = OSKAR_TRIAL_ACTIVE;
+    const OSKAR_TRIAL_LOCAL_ONLY = OSKAR_TRIAL_ACTIVE;
+    window.OSKAR_TRIAL_LOCAL_ONLY = OSKAR_TRIAL_LOCAL_ONLY;
     const FALLBACK_ROOTS = OSKAR_TRIAL_ACTIVE ? [] : (Array.isArray(externalFirebase.fallbackRoots) ? externalFirebase.fallbackRoots : []);
     const DB_NAME = `cashier_units_pro_${DB_NAMESPACE}_db_v16`;
     const DB_VERSION = 15;
@@ -3950,6 +3952,12 @@
     }
 
     async function refreshPendingCount() {
+      if (OSKAR_TRIAL_LOCAL_ONLY) {
+        try { await idbClear("syncQueue"); } catch {}
+        const badge = $("syncCountBadge"); if (badge) badge.style.display = "none";
+        const ct = $("connectionText"); if (ct) { ct.textContent = "نسخة تجريبية - حفظ محلي فقط"; ct.style.color = "#d97706"; }
+        return 0;
+      }
       const queue = await idbGetAll("syncQueue");
       const count = queue.length;
 
@@ -3963,6 +3971,7 @@
     }
 
     async function enqueueSync(action) {
+      if (OSKAR_TRIAL_LOCAL_ONLY) { await refreshPendingCount(); return; }
       const item = {
         id: uid("queue"),
         ...action,
@@ -4108,6 +4117,7 @@
     }
 
     async function loadFirebaseRoot(rootName) {
+      if (OSKAR_TRIAL_LOCAL_ONLY) return 0;
       if (!navigator.onLine) return 0;
 
       try {
@@ -4170,6 +4180,7 @@
     }
 
     async function loadFirebaseOnce() {
+      if (OSKAR_TRIAL_LOCAL_ONLY) return;
       if (!navigator.onLine) return;
 
       updateSyncUi({
@@ -4193,6 +4204,7 @@
     }
 
     async function syncLocalSnapshotToFirebase() {
+      if (OSKAR_TRIAL_LOCAL_ONLY) return;
       if (!navigator.onLine) return;
 
       const meta = await idbGet("localMeta", "snapshotUploaded");
@@ -4282,6 +4294,7 @@
     }
 
     function startRealtimeListeners() {
+      if (OSKAR_TRIAL_LOCAL_ONLY) return;
       if (state.realtimeStarted) return;
       state.realtimeStarted = true;
 
@@ -4453,6 +4466,13 @@
     }
 
     async function syncNow(showPopover = false) {
+      if (OSKAR_TRIAL_LOCAL_ONLY) {
+        try { await idbClear("syncQueue"); } catch {}
+        await refreshPendingCount();
+        updateSyncUi({ visible: !!showPopover, spin: false, title: "نسخة تجريبية", status: "النسخة التجريبية تحفظ على هذا الجهاز فقط ولا يوجد فيها مزامنة", progress: 100, operations: [] });
+        if (showPopover) toast("النسخة التجريبية لا يوجد فيها مزامنة");
+        return;
+      }
       if (state.syncing) return;
 
       if (!navigator.onLine) {
@@ -4979,7 +4999,7 @@
     }
 
     function addToCart(product, selectedUnit = "") {
-      if (!product) return;
+      if (!product) return null;
 
       const p = normalizeProduct(product);
       const unit = selectedUnit || getDefaultSaleUnit(p);
@@ -5002,6 +5022,7 @@
 
       renderCart();
       toast(`تمت إضافة ${p.name}`);
+      return existing || state.cart[state.cart.length - 1] || null;
     }
 
     function renderCart() {
@@ -5018,40 +5039,37 @@
 
           return `
             <div class="cart-line" data-cart-line="${line.id}">
-              <div>
+              <div class="oskar-cart-product-info">
                 <b>${escapeHtml(line.name)}</b>
-                <div class="muted">
-                  ${escapeHtml(line.unitLabel || "-")} · يخصم ${cleanNumber(line.baseQty)}
-                  ${escapeHtml(unitLabel(p?.baseUnit, p?.customUnit))}
-                </div>
+                <div class="muted">يُخصم تلقائيًا من المخزون عند إتمام البيع</div>
               </div>
 
-              <select class="select" data-change-cart-unit="${line.id}">
-                ${unitOptions.map(opt => `
-                  <option value="${opt.value}" ${line.selectedUnit === opt.value ? "selected" : ""}>
-                    ${escapeHtml(opt.label)}
-                  </option>
-                `).join("")}
-              </select>
-
-              <div style="display:grid;grid-template-columns:34px 1fr 34px;gap:6px;align-items:center">
-                <button type="button" class="qty-btn" data-dec-cart="${line.id}">-</button>
-                <input
-                  class="input cart-qty-input"
-                  type="number"
-                  inputmode="decimal"
-                  min="0"
-                  step="0.001"
-                  data-change-cart-qty="${line.id}"
-                  value="${escapeHtml(String(line.qty ?? 1))}"
-                  style="text-align:center;padding:8px"
-                >
-                <button type="button" class="qty-btn" data-inc-cart="${line.id}">+</button>
+              <div class="oskar-cart-controls">
+                <select class="select oskar-cart-unit" data-change-cart-unit="${line.id}">
+                  ${unitOptions.map(opt => `
+                    <option value="${opt.value}" ${line.selectedUnit === opt.value ? "selected" : ""}>
+                      ${escapeHtml(opt.label)}
+                    </option>
+                  `).join("")}
+                </select>
+                <div class="oskar-cart-qty-wrap">
+                  <button type="button" class="qty-btn" data-dec-cart="${line.id}">-</button>
+                  <input
+                    class="input cart-qty-input"
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    step="0.001"
+                    data-change-cart-qty="${line.id}"
+                    value="${escapeHtml(String(line.qty ?? 1))}"
+                  >
+                  <button type="button" class="qty-btn" data-inc-cart="${line.id}">+</button>
+                </div>
               </div>
 
               <div class="money line-total">${money(line.total)}</div>
 
-              <button class="danger-btn" data-remove-cart="${line.id}" style="padding:8px">
+              <button class="danger-btn oskar-cart-remove" data-remove-cart="${line.id}">
                 <i class="fa-solid fa-xmark"></i>
               </button>
             </div>
@@ -9870,7 +9888,7 @@
         const cartQty = e.target.closest("[data-change-cart-qty]");
         if (cartQty) {
           const line = state.cart.find(x => x.id === cartQty.dataset.changeCartQty);
-          if (line) updateCartLine(line.id, { qty: cartQty.value }, false);
+          if (line) updateCartLine(line.id, { qty: cartQty.value }, true);
           return;
         }
 
@@ -10150,7 +10168,7 @@
 
       await loadLocalData(true);
 
-      if (navigator.onLine) {
+      if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY) {
         await fetchFreshSettingsFromFirebase();
       }
 
@@ -10162,7 +10180,7 @@
 
       renderAll();
 
-      if (navigator.onLine) {
+      if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY) {
         updateSyncUi({
           spin: true,
           visible: false,
@@ -10220,7 +10238,7 @@
       setInterval(async () => {
         await refreshPendingCount();
 
-        if (navigator.onLine) {
+        if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY) {
           await syncNow(false);
           await validateCurrentEmployeeSession();
         }
@@ -10252,6 +10270,16 @@
       money,
       toast,
       renderAll,
+      renderCart,
+      addToCart,
+      updateCartLine,
+      calculateCartTotals,
+      getProductByBarcode,
+      getProductById,
+      normalizeProduct,
+      getDefaultSaleUnit,
+      getSaleUnitOptions,
+      priceForLine,
       loadLocalData,
       refreshPendingCount,
       updateSyncUi,
@@ -11421,7 +11449,7 @@
   function installStyles(){ if($("oskarTrialPurchaseStyles")) return; const style=document.createElement("style"); style.id="oskarTrialPurchaseStyles"; style.textContent=`#oskarPurchaseBox{margin-top:12px;background:linear-gradient(180deg,#f8fafc,#fff);border:1px solid #e2e8f0;border-radius:22px;padding:12px;box-shadow:0 16px 34px rgba(15,23,42,.07)}.oskar-buy-title{font-weight:900;color:#0f172a;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:7px}.oskar-buy-title i{color:#16a34a;font-size:20px}.oskar-plans-row{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;direction:rtl!important}.oskar-plan-card{border:1px solid #dbeafe;background:#fff;border-radius:18px;padding:10px 5px;min-height:74px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-family:Cairo,Arial,sans-serif;box-shadow:0 10px 22px rgba(37,99,235,.08);transition:.16s;white-space:nowrap}.oskar-plan-card b{font-size:13px;color:#0f172a}.oskar-plan-card span{font-size:12px;font-weight:900;color:#1d4ed8}.oskar-plan-card.best{background:linear-gradient(135deg,#fef3c7,#fff);border-color:#f59e0b}.oskar-plan-card:hover{transform:translateY(-2px)}.oskar-wa-btn{margin-top:10px;text-decoration:none;width:100%;border:0;border-radius:18px;padding:12px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 14px 28px rgba(22,163,74,.22)}.oskar-trial-pill{position:fixed;right:14px;bottom:92px;z-index:35000;background:#0f172a;color:#fff;border-radius:999px;padding:10px 13px;font-weight:900;font-size:12px;box-shadow:0 16px 38px rgba(15,23,42,.22)}@media(max-width:420px){.oskar-plan-card{padding:8px 2px;min-height:68px}.oskar-plan-card b{font-size:11px}.oskar-plan-card span{font-size:11px}.oskar-plans-row{gap:5px!important}}`; document.head.appendChild(style); }
   function updateTrialUi(){ installStyles(); ensureTrialButton(); ensurePurchaseCards(); if(expireTrialIfNeeded()) return; const active=trialActive(), used=localStorage.getItem(TRIAL_USED_KEY)==="1", out=localStorage.getItem(TRIAL_LOGGED_OUT_KEY)==="1"; const note=$("trialLoginNote"), btn=$("trialLoginBtn"); if(active){ if(note) note.textContent=out?`التجربة فعالة لهذا الجهاز. اضغط زر التجربة للدخول مرة أخرى. المتبقي ${mmss(leftMs())}.`:`التجربة فعالة الآن. المتبقي ${mmss(leftMs())}. بياناتها محلية وFirebase بمسار مستقل لهذا الجهاز.`; if(btn){btn.disabled=false; btn.style.opacity="1"; btn.innerHTML='<i class="fa-solid fa-flask"></i> دخول التجربة المتبقية';} let pill=$("oskarTrialPill"); if(!pill){pill=document.createElement("div"); pill.id="oskarTrialPill"; pill.className="oskar-trial-pill"; document.body.appendChild(pill);} pill.textContent=`تجربة oskar: ${mmss(leftMs())}`; if(out) forceTrialLoggedOutUi(); } else { const pill=$("oskarTrialPill"); if(pill) pill.remove(); if(used){ if(note) note.textContent="تم استخدام الفترة التجريبية على هذا الجهاز وانتهت. اختر إحدى البطاقات بالأسفل للشراء."; if(btn){btn.disabled=true; btn.style.opacity=".55"; btn.innerHTML='<i class="fa-solid fa-lock"></i> انتهت الفترة التجريبية';} } else { if(note) note.textContent="التجربة تستخدم مرة واحدة لكل جهاز. عند تشغيلها يتم إنشاء تخزين محلي ومسار Firebase مستقلين لهذا الجهاز فقط."; } } }
   function bindLogout(){ document.addEventListener("click", e=>{ const out=e.target.closest("#logoutBtn,#topLogoutBtn"); if(!out) return; if(trialActive()){ localStorage.setItem(TRIAL_LOGGED_OUT_KEY,"1"); setTimeout(()=>{clearAuthOnly(); authLock(true); updateTrialUi();},0); } }, true); }
-  function init(){ getDeviceId(); installStyles(); bindLogout(); updateTrialUi(); setInterval(updateTrialUi,500); window.OSKAR_FORCE_TRIAL_LOGIN=setTrialUser; window.OSKAR_TRIAL_INFO=()=>({active:trialActive(),deviceId:getDeviceId(),startedAt:startedAt(),leftMs:leftMs(),storageProfile:window.OSKAR_STORAGE_PROFILE,firebaseRoot:window.FIREBASE_ROOT}); }
+  function init(){ getDeviceId(); installStyles(); bindLogout(); updateTrialUi(); setInterval(updateTrialUi,60000); window.OSKAR_FORCE_TRIAL_LOGIN=setTrialUser; window.OSKAR_TRIAL_INFO=()=>({active:trialActive(),deviceId:getDeviceId(),startedAt:startedAt(),leftMs:leftMs(),storageProfile:window.OSKAR_STORAGE_PROFILE,firebaseRoot:window.FIREBASE_ROOT}); }
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
 })();
 </script>
@@ -11984,7 +12012,14 @@
     try{ if(typeof window.getProductByBarcode==="function"){ const p=window.getProductByBarcode(c); if(p) return p; } }catch{}
     return (window.state?.products||[]).find(p=>String(p.barcode||"").trim()===c || String(p.code||"").trim()===c) || null;
   }
-  function cartHasProduct(product){ return (window.state?.cart||[]).some(x=>x.productId===product.id); }
+  function cartLineForProduct(product){ return (window.state?.cart||[]).find(x=>x.productId===product.id); }
+  function cartHasProduct(product){ return !!cartLineForProduct(product); }
+  function forceRenderCart(){ try{ if(typeof window.renderCart==="function") window.renderCart(); else { const d=$("discountValue"); if(d) d.dispatchEvent(new Event("input",{bubbles:true})); } }catch{} }
+  function incrementCartProduct(product){
+    const line=cartLineForProduct(product);
+    if(line){ line.qty=cleanNumber(line.qty,1)+1; if(typeof window.updateCartLine==="function") window.updateCartLine(line.id,{qty:line.qty},true); else forceRenderCart(); return; }
+    if(typeof window.addToCart==="function") window.addToCart(product); else { const st=window.state; if(st?.cart){ st.cart.push({id:`cart_${Date.now()}_${Math.random().toString(16).slice(2)}`,productId:product.id,name:product.name,qty:1,total:cleanNumber(product.salePrice),costTotal:cleanNumber(product.costPrice)}); forceRenderCart(); } }
+  }
   function addChip(product){
     const box=$("oskarFastAdded"); if(!box || !product) return;
     if(box.querySelector(`[data-fast-chip="${CSS.escape(product.id)}"]`)) return;
@@ -11997,12 +12032,27 @@
     const total=row.querySelector(".line-total"); if(total){ const money=typeof window.money==="function"?window.money(line.total):String(line.total); total.textContent=money; }
   }
   function afterDetected(){ const page=$("oskarFastScanner"); if(page){ page.classList.add("detected"); clearTimeout(page.__det); page.__det=setTimeout(()=>page.classList.remove("detected"),450); } playSound(); vibrate(); }
+  function showDuplicateKeepNotice(product){
+    let box=$("oskarFastAdded"); if(!box) return;
+    let notice=$("oskarDuplicateNotice");
+    if(!notice){ notice=document.createElement("span"); notice.id="oskarDuplicateNotice"; notice.className="oskar-fast-chip oskar-dup-chip"; box.prepend(notice); }
+    const safe=String(product.name||"منتج").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+    notice.innerHTML=`<i class="fa-solid fa-circle-info"></i> ${safe} مضاف بالفعل <button type="button" data-dup-add>+1</button>`;
+    const btn=notice.querySelector("[data-dup-add]");
+    if(btn) btn.onclick=()=>{ incrementCartProduct(product); forceRenderCart(); toast("تمت زيادة الكمية 1"); };
+  }
   function handleCode(code){
     code=String(code||"").trim(); if(!code) return; afterDetected();
     if(scanMode==="product" || targetInput){ const input=$(targetInput||"productBarcode"); if(input){ input.value=code; input.dispatchEvent(new Event("input",{bubbles:true})); input.dispatchEvent(new Event("change",{bubbles:true})); } toast("تمت قراءة الباركود ووضعه في خانة كود المنتج"); stopScanner(); return; }
     const product=getProductByCode(code); if(!product){ toast("لم يتم العثور على منتج بهذا الباركود"); if(!keepCameraOpen()) stopScanner(); return; }
-    if(cartHasProduct(product)){ toast("تمت الإضافة بالفعل"); if(!keepCameraOpen()) stopScanner(); return; }
-    try{ if(typeof window.addToCart==="function") window.addToCart(product); else throw new Error("no add"); }catch(e){ const st=window.state; if(st?.cart){ st.cart.push({id:`cart_${Date.now()}_${Math.random().toString(16).slice(2)}`,productId:product.id,name:product.name,qty:1,total:cleanNumber(product.salePrice),costTotal:cleanNumber(product.costPrice)}); if(typeof window.renderCart==="function") window.renderCart(); } }
+    if(cartHasProduct(product) && keepCameraOpen()){
+      showDuplicateKeepNotice(product);
+      toast("تمت الإضافة بالفعل - اضغط +1 داخل التنبيه لزيادة الكمية");
+      return;
+    }
+    incrementCartProduct(product);
+    setTimeout(forceRenderCart,0);
+    setTimeout(forceRenderCart,120);
     addChip(product); toast("تمت إضافة " + (product.name||"المنتج")); if(!keepCameraOpen()) stopScanner();
   }
   async function openFastScanner(mode="sale",inputId=""){
@@ -12052,6 +12102,35 @@
 })();
 </script>
 
+
+<script id="oskar-final-user-request-fixes-2026-04-29">
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const $$=(sel,root=document)=>Array.from(root.querySelectorAll(sel));
+  const TRIAL_MODE_KEY='oskar_storage_mode_v1', TRIAL_STARTED_KEY='oskar_trial_started_at_v1', TRIAL_USED_KEY='oskar_trial_used_once_v1';
+  const TRIAL_DURATION_MS=30*60*1000;
+  function toast(msg,ms=2800){ if(typeof window.toast==='function') return window.toast(msg,ms); const el=$('toast'); if(el){ el.textContent=msg; el.classList.add('show'); clearTimeout(el.__t); el.__t=setTimeout(()=>el.classList.remove('show'),ms);} else alert(msg); }
+  function isTrialActive(){ const st=Number(localStorage.getItem(TRIAL_STARTED_KEY)||0); return localStorage.getItem(TRIAL_MODE_KEY)==='trial' && st && Date.now()-st<TRIAL_DURATION_MS; }
+  function leftMinutes(){ const st=Number(localStorage.getItem(TRIAL_STARTED_KEY)||0); const m=Math.max(0,Math.ceil((TRIAL_DURATION_MS-(Date.now()-st))/60000)); return m<=0?'انتهت':(m+' د'); }
+  function installStyles(){ if($('oskarFinalRequestStyle')) return; const st=document.createElement('style'); st.id='oskarFinalRequestStyle'; st.textContent=`
+    #oskarTrialPill{display:none!important}
+    #trialLoginNote{display:none!important}
+    .auth-user-pill{display:inline-flex!important;flex-direction:row!important;align-items:center!important;gap:7px!important;white-space:nowrap!important}
+    .oskar-side-minutes{margin-inline-start:6px;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:900;display:inline-flex!important;align-items:center;gap:4px}
+    .cart-line{display:grid!important;grid-template-columns:1fr auto!important;gap:10px!important;align-items:center!important;background:#fff!important;border:1px solid #e5e7eb!important;border-radius:22px!important;padding:12px!important;position:relative!important;min-height:112px!important;box-shadow:0 12px 24px rgba(15,23,42,.04)!important}
+    .oskar-cart-product-info{padding-left:95px!important;min-width:0!important}.oskar-cart-product-info b{font-size:16px!important;color:#0f172a!important;display:block!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}.oskar-cart-product-info .muted{font-size:11px!important;margin-top:5px!important;color:#64748b!important}
+    .oskar-cart-controls{display:flex!important;align-items:center!important;gap:6px!important;grid-column:1 / -1!important;max-width:100%!important}.oskar-cart-unit{width:96px!important;height:42px!important;padding:6px 8px!important;border-radius:14px!important;font-size:13px!important}.oskar-cart-qty-wrap{display:grid!important;grid-template-columns:34px minmax(52px,70px) 34px!important;gap:5px!important;align-items:center!important}.oskar-cart-qty-wrap .cart-qty-input{text-align:center!important;height:42px!important;padding:6px!important;border-radius:14px!important}.oskar-cart-qty-wrap .qty-btn{width:34px!important;height:42px!important;border-radius:14px!important}.line-total{position:absolute!important;top:14px!important;left:14px!important;background:#eff6ff!important;color:#1d4ed8!important;border-radius:15px!important;padding:8px 12px!important;font-size:15px!important;font-weight:900!important;min-width:86px!important;text-align:center!important}.oskar-cart-remove{position:absolute!important;bottom:12px!important;left:14px!important;width:42px!important;height:42px!important;padding:0!important;border-radius:15px!important;display:flex!important;align-items:center!important;justify-content:center!important}.oskar-dup-chip button[data-dup-add]{background:#2563eb!important;color:#fff!important;width:auto!important;min-width:44px!important;padding:0 10px!important}
+    @media(min-width:901px){.cart-line{grid-template-columns:1fr 250px 100px 44px!important;min-height:82px!important}.oskar-cart-product-info{padding-left:0!important}.oskar-cart-controls{grid-column:auto!important}.line-total{position:static!important}.oskar-cart-remove{position:static!important}}
+  `; document.head.appendChild(st); }
+  function stabilizeTrialSidebar(){ const pill=$('authUserPill'); if(!pill) return; const user=window.state?.auth?.user; if(user && (user.trial || String(user.name||'').includes('تجربة oskar'))){ pill.innerHTML='<i class="fa-solid fa-flask"></i><span>تجربة oskar</span><span id="oskarTrialSidebarMinutes" class="oskar-side-minutes"><i class="fa-solid fa-clock"></i> '+leftMinutes()+'</span>'; } }
+  function patchSyncTrial(){ document.addEventListener('click',function(e){ const b=e.target.closest('#syncNowBtn'); if(!b || !isTrialActive()) return; e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast('النسخة التجريبية لا يوجد فيها مزامنة، البيانات تحفظ محليًا على هذا الجهاز فقط'); try{ if(window.updateSyncUi) window.updateSyncUi({visible:true,spin:false,title:'نسخة تجريبية',status:'لا يوجد مزامنة في النسخة التجريبية، الحفظ محلي فقط',progress:100}); }catch{} },true); }
+  function patchLoginErrors(){ document.addEventListener('submit',function(e){ const f=e.target; if(!f) return; if(f.id==='adminLoginForm'){ const v=($('adminPasswordInput')?.value||'').trim(); if(!v){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast('أدخل كلمة مرور المدير'); } } if(f.id==='employeeLoginForm'){ const n=($('employeeNameInput')?.value||'').trim(), p=($('employeePasswordInput')?.value||'').trim(); if(!n || !p){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast(!n?'أدخل اسم المستخدم':'أدخل كلمة المرور'); } } },true); }
+  function keepTrialLocalOnly(){ if(!isTrialActive()) return; window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true; try{ if(window.idbClear) window.idbClear('syncQueue'); }catch{} }
+  function init(){ installStyles(); patchSyncTrial(); patchLoginErrors(); keepTrialLocalOnly(); stabilizeTrialSidebar(); setInterval(()=>{ keepTrialLocalOnly(); stabilizeTrialSidebar(); },60000); setTimeout(stabilizeTrialSidebar,800); setTimeout(stabilizeTrialSidebar,2500); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+})();
+</script>
 </body>
 </html>
 <!-- legacy-disabled-patches-2026-04-29-base64: old duplicate scripts after </html> were disabled to prevent app startup errors. Do not execute. 
