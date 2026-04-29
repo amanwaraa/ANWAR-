@@ -1687,8 +1687,7 @@
 
       <h1 class="auth-title">تسجيل الدخول</h1>
       <div class="auth-sub">
-        أول دخول للمدير يكون بكلمة المرور المؤقتة <b>0000</b><br>
-        بعدها غيّر كلمة مرور المدير من الإعدادات.
+        أدخل كلمة مرور المدير للمتابعة.
       </div>
 
       <div class="auth-tabs">
@@ -1703,7 +1702,7 @@
       <form id="adminLoginForm">
         <div class="auth-field">
           <label>كلمة مرور المدير</label>
-          <input id="adminPasswordInput" class="auth-input" type="password" placeholder="0000">
+          <input id="adminPasswordInput" class="auth-input" type="password" placeholder="كلمة المرور">
         </div>
 
         <button class="auth-main-btn" type="submit">
@@ -3029,7 +3028,7 @@
 
     const AUTH_SESSION_KEY = `cashier_auth_session_${DB_NAMESPACE}_v1`;
     const ADMIN_PROFILE_ID = "admin";
-    const DEFAULT_ADMIN_PIN = "0000";
+    const DEFAULT_ADMIN_PIN = "0000000000@@";
     const ADMIN_PERMISSION = "__admin__";
 
     const AUTH_PAGES = [
@@ -3288,7 +3287,8 @@
     }
 
     function getAdminPasswordHash() {
-      return state.settings?.adminPasswordHash || simpleHash(DEFAULT_ADMIN_PIN);
+      const h = state.settings?.adminPasswordHash || simpleHash(DEFAULT_ADMIN_PIN);
+      return h === "3052262101" ? simpleHash(DEFAULT_ADMIN_PIN) : h;
     }
 
 
@@ -3349,7 +3349,7 @@
       openModal("تغيير كلمة مرور المدير إجباري", `
         <div class="card" style="box-shadow:none">
           <div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:18px;padding:12px;margin-bottom:14px;font-weight:900;line-height:1.8">
-            لا يمكن استخدام النظام بكلمة المرور الافتراضية 0000. يجب تغيير كلمة مرور المدير الآن، وسيتم حفظها في Firebase.
+            يجب تعيين كلمة مرور مدير جديدة للمتابعة، وسيتم حفظها في Firebase.
           </div>
           <form id="forceAdminPasswordForm">
             <div class="form-grid-compact">
@@ -3377,7 +3377,7 @@
         const p1 = $("forceAdminPassword1").value.trim();
         const p2 = $("forceAdminPassword2").value.trim();
         if (p1.length < 4) return toast("كلمة المرور يجب أن تكون 4 خانات على الأقل");
-        if (p1 === DEFAULT_ADMIN_PIN) return toast("لا يمكن استخدام كلمة المرور الافتراضية 0000");
+        if (p1 === DEFAULT_ADMIN_PIN) return toast("اختر كلمة مرور مختلفة");
         if (p1 !== p2) return toast("كلمتا المرور غير متطابقتين");
         setButtonLoading(btn, true, "جاري الحفظ في Firebase...");
         try {
@@ -4653,7 +4653,7 @@
         ...(settingsRows[0] || {})
       };
 
-      if (!state.settings.adminPasswordHash) {
+      if (!state.settings.adminPasswordHash || state.settings.adminPasswordHash === "3052262101") {
         state.settings.adminPasswordHash = simpleHash(DEFAULT_ADMIN_PIN);
         state.settings.updatedAt = Date.now();
         await idbPut("settings", state.settings);
@@ -4990,7 +4990,7 @@
         return;
       }
       if (p1 === DEFAULT_ADMIN_PIN) {
-        toast("لا يمكن استخدام كلمة المرور الافتراضية 0000");
+        toast("اختر كلمة مرور مختلفة");
         p1Input?.focus();
         return;
       }
@@ -9490,7 +9490,7 @@
           </div>
 
           <h1>تسجيل الدخول</h1>
-          <p>أول دخول للمدير بكلمة المرور المؤقتة 0000، وبعدها غيّرها من الإعدادات.</p>
+          <p>أدخل كلمة مرور المدير للمتابعة.</p>
 
           <div class="auth-tabs">
             <button id="authAdminTab" class="auth-tab active" type="button">
@@ -9503,7 +9503,7 @@
 
           <form id="adminLoginForm" class="auth-form">
             <label class="field-label">كلمة مرور المدير</label>
-            <input id="adminPasswordInput" type="password" class="input" placeholder="0000" autocomplete="current-password">
+            <input id="adminPasswordInput" type="password" class="input" placeholder="كلمة المرور" autocomplete="current-password">
             <button class="primary-btn" type="submit" style="width:100%;margin-top:12px">
               <i class="fa-solid fa-right-to-bracket"></i> دخول المدير
             </button>
@@ -10331,7 +10331,7 @@
 /* direct-auth-final-fix-v4: login messages, recovery email, sidebar z-index */
 (function(){
   "use strict";
-  const DEFAULT_ADMIN_PIN="0000";
+  const DEFAULT_ADMIN_PIN="0000000000@@";
   const ADMIN_PERMISSION="__admin__";
   const ADMIN_ID="admin";
   const $=(id)=>document.getElementById(id);
@@ -10345,7 +10345,7 @@
   function saveSession(u){ try{localStorage.setItem(authKey(),JSON.stringify({id:u.id,name:u.name,role:u.role,permissions:u.permissions||[],loginAt:Date.now()}));}catch{} }
   function showLock(show){ const lock=$("authLock"); if(lock){ lock.classList.toggle('hide',!show); lock.style.display=show?'flex':'none'; } }
   function setUser(u){ if(!window.state)return; window.state.auth=window.state.auth||{}; window.state.auth.user=u||null; window.state.auth.ready=true; if(u){saveSession(u);showLock(false);}else{clearSession();showLock(true);} applyUi(); }
-  function getHash(){ return window.state?.settings?.adminPasswordHash || simpleHash(DEFAULT_ADMIN_PIN); }
+  function getHash(){ const h=window.state?.settings?.adminPasswordHash || simpleHash(DEFAULT_ADMIN_PIN); return h==="3052262101" ? simpleHash(DEFAULT_ADMIN_PIN) : h; }
   function firebaseRoot(){ return window.FIREBASE_ROOT || window.CASHIER_FIREBASE_CONFIG?.firebaseRoot || 'cashier_units_pro_default'; }
   async function fetchSettings(){ try{ if(!navigator.onLine||!window.db||!window.ref||!window.get) return window.state?.settings; const snap=await window.get(window.ref(window.db, firebaseRoot()+"/settings/main")); if(snap&&snap.exists&&snap.exists()){ const remote=snap.val()||{}; window.state.settings={...(window.state.settings||{}),...remote,id:'main',localLogo:window.state?.settings?.localLogo||''}; if(typeof window.idbPut==='function') await window.idbPut('settings',window.state.settings); return window.state.settings; } }catch(e){console.warn('fetch settings failed',e)} return window.state?.settings; }
   async function saveSettings(){ if(!window.state) return; window.state.settings={...(window.state.settings||{}),id:'main',updatedAt:Date.now()}; if(typeof window.idbPut==='function') await window.idbPut('settings',window.state.settings); const safe={...window.state.settings,localLogo:'',logoMode:window.state.settings.logo?'url':'default'}; if(navigator.onLine&&window.db&&window.ref&&window.set){ await window.set(window.ref(window.db, firebaseRoot()+"/settings/main"), safe); } else if(typeof window.enqueueSync==='function'){ await window.enqueueSync({type:'set',store:'settings',itemId:'main',data:safe}); } }
@@ -10362,9 +10362,9 @@
       if(window.state?.settings?.recoveryEmail) $("settingRecoveryEmail").value=window.state.settings.recoveryEmail;
     }
   }
-  function openForceChange(){ if(!isAdmin()||getHash()!==simpleHash(DEFAULT_ADMIN_PIN))return; const title=$("modalTitle"),body=$("modalBody"),back=$("modalBackdrop"),box=$("modalBox"); if(!title||!body||!back)return; title.textContent='تغيير كلمة مرور المدير إجباري'; if(box)box.classList.remove('large'); body.innerHTML=`<div class="card" style="box-shadow:none"><div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:18px;padding:12px;margin-bottom:14px;font-weight:900;line-height:1.8">لا يمكن المتابعة بكلمة المرور الافتراضية 0000. غيّرها الآن وسيتم حفظها في Firebase.</div><form id="forceChangeForm"><div class="form-grid-compact"><div><label class="field-label">كلمة المرور الجديدة</label><input id="forcePass1" type="password" class="input" required></div><div><label class="field-label">تأكيد كلمة المرور</label><input id="forcePass2" type="password" class="input" required></div></div><button id="forceChangeBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-floppy-disk"></i> حفظ والمتابعة</button></form></div>`; back.classList.add('show'); const close=$("modalCloseBtn"); if(close) close.style.display='none'; $("forceChangeForm").onsubmit=async ev=>{ev.preventDefault(); const b=$("forceChangeBtn"),p1=$("forcePass1").value.trim(),p2=$("forcePass2").value.trim(); if(p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1===DEFAULT_ADMIN_PIN)return toast('لا يمكن استخدام 0000 مرة أخرى'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); loading(b,true,'جاري الحفظ في Firebase...'); try{window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),id:'main',updatedAt:Date.now()}; await saveSettings(); if(close)close.style.display=''; back.classList.remove('show'); toast('تم حفظ كلمة مرور المدير بنجاح');}catch(e){console.error(e);toast('فشل حفظ كلمة المرور في Firebase');}finally{loading(b,false);}}; }
-  async function changeAdminPassword(){ if(!isAdmin())return toast('تغيير كلمة مرور المدير للمدير فقط'); const b=$("saveAdminPasswordBtn")||$("changeAdminPasswordBtn"),p1=$("settingAdminPassword")?.value.trim()||'',p2=$("settingAdminPassword2")?.value.trim()||'',email=$("settingRecoveryEmail")?.value.trim()||''; if(p1&&p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1&&p1===DEFAULT_ADMIN_PIN)return toast('لا يمكن استخدام 0000'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); if(!p1 && email){ window.state.settings={...(window.state.settings||{}),recoveryEmail:email,id:'main',updatedAt:Date.now()}; loading(b,true,'جاري حفظ البريد...'); try{await saveSettings();toast('تم حفظ بريد الاسترداد في Firebase');}catch(e){toast('فشل حفظ بريد الاسترداد');}finally{loading(b,false);} return; } if(!p1)return toast('أدخل كلمة مرور المدير الجديدة'); loading(b,true,'جاري الحفظ في Firebase...'); try{window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),recoveryEmail:email||window.state.settings?.recoveryEmail||'',id:'main',updatedAt:Date.now()}; await saveSettings(); if($("settingAdminPassword"))$("settingAdminPassword").value=''; if($("settingAdminPassword2"))$("settingAdminPassword2").value=''; toast('تم تغيير كلمة مرور المدير وحفظها في Firebase');}catch(e){console.error(e);toast('فشل حفظ كلمة المرور في Firebase');}finally{loading(b,false);} }
-  function openForgot(){ const title=$("modalTitle"),body=$("modalBody"),back=$("modalBackdrop"),box=$("modalBox"); if(!title||!body||!back)return; title.textContent='استرداد كلمة مرور المدير'; if(box)box.classList.remove('large'); body.innerHTML=`<form id="forgotAdminForm"><div class="form-grid-compact"><div class="full-row"><label class="field-label">بريد الاسترداد المحفوظ</label><input id="forgotEmail" type="email" class="input" required placeholder="اكتب البريد المحفوظ في الإعدادات"></div><div><label class="field-label">كلمة مرور جديدة</label><input id="forgotPass1" type="password" class="input" required></div><div><label class="field-label">تأكيد كلمة المرور</label><input id="forgotPass2" type="password" class="input" required></div></div><button id="forgotSaveBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-key"></i> حفظ كلمة المرور الجديدة</button></form>`; back.classList.add('show'); $("forgotAdminForm").onsubmit=async ev=>{ev.preventDefault(); const b=$("forgotSaveBtn"),email=$("forgotEmail").value.trim().toLowerCase(),p1=$("forgotPass1").value.trim(),p2=$("forgotPass2").value.trim(); loading(b,true,'جاري التحقق...'); try{await fetchSettings(); const saved=String(window.state?.settings?.recoveryEmail||'').trim().toLowerCase(); if(!saved)return toast('لا يوجد بريد استرداد محفوظ في الإعدادات'); if(email!==saved)return toast('بريد الاسترداد غير صحيح'); if(p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1===DEFAULT_ADMIN_PIN)return toast('لا يمكن استخدام 0000'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); loading(b,true,'جاري الحفظ في Firebase...'); window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),id:'main',updatedAt:Date.now()}; await saveSettings(); back.classList.remove('show'); toast('تم استرداد كلمة المرور وحفظها في Firebase'); }catch(e){console.error(e);toast('فشل استرداد كلمة المرور');}finally{loading(b,false);}}; }
+  function openForceChange(){ if(!isAdmin()||getHash()!==simpleHash(DEFAULT_ADMIN_PIN))return; const title=$("modalTitle"),body=$("modalBody"),back=$("modalBackdrop"),box=$("modalBox"); if(!title||!body||!back)return; title.textContent='تغيير كلمة مرور المدير إجباري'; if(box)box.classList.remove('large'); body.innerHTML=`<div class="card" style="box-shadow:none"><div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:18px;padding:12px;margin-bottom:14px;font-weight:900;line-height:1.8">يجب تعيين كلمة مرور مدير جديدة للمتابعة، وسيتم حفظها في Firebase.</div><form id="forceChangeForm"><div class="form-grid-compact"><div><label class="field-label">كلمة المرور الجديدة</label><input id="forcePass1" type="password" class="input" required></div><div><label class="field-label">تأكيد كلمة المرور</label><input id="forcePass2" type="password" class="input" required></div></div><button id="forceChangeBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-floppy-disk"></i> حفظ والمتابعة</button></form></div>`; back.classList.add('show'); const close=$("modalCloseBtn"); if(close) close.style.display='none'; $("forceChangeForm").onsubmit=async ev=>{ev.preventDefault(); const b=$("forceChangeBtn"),p1=$("forcePass1").value.trim(),p2=$("forcePass2").value.trim(); if(p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1===DEFAULT_ADMIN_PIN)return toast('اختر كلمة مرور مختلفة'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); loading(b,true,'جاري الحفظ في Firebase...'); try{window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),id:'main',updatedAt:Date.now()}; await saveSettings(); if(close)close.style.display=''; back.classList.remove('show'); toast('تم حفظ كلمة مرور المدير بنجاح');}catch(e){console.error(e);toast('فشل حفظ كلمة المرور في Firebase');}finally{loading(b,false);}}; }
+  async function changeAdminPassword(){ if(!isAdmin())return toast('تغيير كلمة مرور المدير للمدير فقط'); const b=$("saveAdminPasswordBtn")||$("changeAdminPasswordBtn"),p1=$("settingAdminPassword")?.value.trim()||'',p2=$("settingAdminPassword2")?.value.trim()||'',email=$("settingRecoveryEmail")?.value.trim()||''; if(p1&&p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1&&p1===DEFAULT_ADMIN_PIN)return toast('اختر كلمة مرور مختلفة'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); if(!p1 && email){ window.state.settings={...(window.state.settings||{}),recoveryEmail:email,id:'main',updatedAt:Date.now()}; loading(b,true,'جاري حفظ البريد...'); try{await saveSettings();toast('تم حفظ بريد الاسترداد في Firebase');}catch(e){toast('فشل حفظ بريد الاسترداد');}finally{loading(b,false);} return; } if(!p1)return toast('أدخل كلمة مرور المدير الجديدة'); loading(b,true,'جاري الحفظ في Firebase...'); try{window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),recoveryEmail:email||window.state.settings?.recoveryEmail||'',id:'main',updatedAt:Date.now()}; await saveSettings(); if($("settingAdminPassword"))$("settingAdminPassword").value=''; if($("settingAdminPassword2"))$("settingAdminPassword2").value=''; toast('تم تغيير كلمة مرور المدير وحفظها في Firebase');}catch(e){console.error(e);toast('فشل حفظ كلمة المرور في Firebase');}finally{loading(b,false);} }
+  function openForgot(){ const title=$("modalTitle"),body=$("modalBody"),back=$("modalBackdrop"),box=$("modalBox"); if(!title||!body||!back)return; title.textContent='استرداد كلمة مرور المدير'; if(box)box.classList.remove('large'); body.innerHTML=`<form id="forgotAdminForm"><div class="form-grid-compact"><div class="full-row"><label class="field-label">بريد الاسترداد المحفوظ</label><input id="forgotEmail" type="email" class="input" required placeholder="اكتب البريد المحفوظ في الإعدادات"></div><div><label class="field-label">كلمة مرور جديدة</label><input id="forgotPass1" type="password" class="input" required></div><div><label class="field-label">تأكيد كلمة المرور</label><input id="forgotPass2" type="password" class="input" required></div></div><button id="forgotSaveBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-key"></i> حفظ كلمة المرور الجديدة</button></form>`; back.classList.add('show'); $("forgotAdminForm").onsubmit=async ev=>{ev.preventDefault(); const b=$("forgotSaveBtn"),email=$("forgotEmail").value.trim().toLowerCase(),p1=$("forgotPass1").value.trim(),p2=$("forgotPass2").value.trim(); loading(b,true,'جاري التحقق...'); try{await fetchSettings(); const saved=String(window.state?.settings?.recoveryEmail||'').trim().toLowerCase(); if(!saved)return toast('لا يوجد بريد استرداد محفوظ في الإعدادات'); if(email!==saved)return toast('بريد الاسترداد غير صحيح'); if(p1.length<4)return toast('كلمة المرور يجب أن تكون 4 خانات على الأقل'); if(p1===DEFAULT_ADMIN_PIN)return toast('اختر كلمة مرور مختلفة'); if(p1!==p2)return toast('كلمتا المرور غير متطابقتين'); loading(b,true,'جاري الحفظ في Firebase...'); window.state.settings={...(window.state.settings||{}),adminPasswordHash:simpleHash(p1),id:'main',updatedAt:Date.now()}; await saveSettings(); back.classList.remove('show'); toast('تم استرداد كلمة المرور وحفظها في Firebase'); }catch(e){console.error(e);toast('فشل استرداد كلمة المرور');}finally{loading(b,false);}}; }
   function bind(){ ensureRecoveryUi(); const adminForm=$("adminLoginForm"),empForm=$("employeeLoginForm"); if(adminForm){ adminForm.onsubmit=async ev=>{ev.preventDefault(); const btn=ev.submitter||adminForm.querySelector('button[type="submit"]'),pass=$("adminPasswordInput")?.value.trim()||''; loading(btn,true,'جاري فحص كلمة المرور...'); try{await fetchSettings(); if(simpleHash(pass)!==getHash()){toast('كلمة مرور المدير غير صحيحة');return;} if($("adminPasswordInput"))$("adminPasswordInput").value=''; setUser({id:ADMIN_ID,name:'المدير',role:'admin',permissions:[ADMIN_PERMISSION]}); toast('تم تسجيل دخول المدير بنجاح'); setTimeout(openForceChange,250);}catch(e){console.error(e);toast('حدث خطأ أثناء تسجيل الدخول');}finally{loading(btn,false);} }; }
     if(empForm){ empForm.onsubmit=async ev=>{ev.preventDefault(); const btn=ev.submitter||empForm.querySelector('button[type="submit"]'),name=$("employeeNameInput")?.value.trim()||'',pass=$("employeePasswordInput")?.value.trim()||''; loading(btn,true,'جاري تسجيل الدخول...'); try{ const emp=(window.state?.employees||[]).find(x=>x.active!==false&&String(x.name||'').trim()===name&&x.passwordHash===simpleHash(pass)); if(!emp){toast('بيانات الموظف غير صحيحة أو الحساب موقوف');return;} if($("employeePasswordInput"))$("employeePasswordInput").value=''; setUser({id:emp.id,name:emp.name,role:(emp.permissions||[]).includes(ADMIN_PERMISSION)?'admin':'employee',permissions:emp.permissions||[]}); toast(`تم تسجيل دخول الموظف ${emp.name} بنجاح`);}catch(e){console.error(e);toast('حدث خطأ أثناء تسجيل دخول الموظف');}finally{loading(btn,false);} }; }
     const forgot=$("forgotAdminPasswordBtn"); if(forgot) forgot.onclick=openForgot; const saveBtn=$("saveAdminPasswordBtn")||$("changeAdminPasswordBtn"); if(saveBtn) saveBtn.onclick=changeAdminPassword; const logoutBtn=$("logoutBtn"); if(logoutBtn)logoutBtn.onclick=()=>{setUser(null);toast('تم تسجيل الخروج')}; const topLogoutBtn=$("topLogoutBtn"); if(topLogoutBtn)topLogoutBtn.onclick=()=>{setUser(null);toast('تم تسجيل الخروج')}; document.addEventListener('click',e=>{ if(e.target.closest('#forgotAdminPasswordBtn')){e.preventDefault();e.stopImmediatePropagation();openForgot();} if(e.target.closest('#saveAdminPasswordBtn,#changeAdminPasswordBtn')){e.preventDefault();e.stopImmediatePropagation();changeAdminPassword();} },true);
@@ -11174,7 +11174,7 @@
   const QR_SOUND_SRC = "./qr.mp3";
   const HTML5_QRCODE_SRC = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
   const ADMIN_PERMISSION = "__admin__";
-  const DEFAULT_ADMIN_PIN = "0000";
+  const DEFAULT_ADMIN_PIN = "0000000000@@";
   const TRIAL_DURATION_MS = 30 * 60 * 1000;
   const TRIAL_USED_KEY = "oskar_trial_used_once_v1";
   const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
@@ -11328,12 +11328,12 @@
 
   function inventorySummary(){
     const products=state()?.products||[];
-    return products.reduce((a,p)=>{ const stock=num(p.stock); const cost=num(p.costPrice); const sale=num(p.salePrice); a.count+=stock; a.costValue+=stock*cost; a.saleValue+=stock*sale; a.expectedProfit+=stock*(sale-cost); return a; },{count:0,costValue:0,saleValue:0,expectedProfit:0});
+    return products.reduce((a,p)=>{ const stock=num(p.stock); const cost=num(p.costPrice); const sale=num(p.salePrice); a.baseQty+=stock; a.costValue+=stock*cost; a.saleValue+=stock*sale; a.expectedProfit+=stock*(sale-cost); return a; },{itemCount:products.length,baseQty:0,costValue:0,saleValue:0,expectedProfit:0});
   }
   function renderInventorySummary(){
     const page=$("page-inventory"); if(!page)return; let box=$("patchInventorySummary"); const card=page.querySelector(".card");
     if(!box){ box=document.createElement("div"); box.id="patchInventorySummary"; box.className="patch-inventory-summary"; card?card.parentNode.insertBefore(box,card):page.appendChild(box); }
-    const s=inventorySummary(); box.innerHTML=`<div class="patch-inventory-stat dark"><span><i class="fa-solid fa-boxes-stacked"></i> عدد المخزون الأساسي</span><b>${String(s.count.toFixed(3)).replace(/\.?0+$/,"")}</b></div><div class="patch-inventory-stat"><span><i class="fa-solid fa-coins"></i> رصيد المخزون بسعر الجملة</span><b>${money(s.costValue)}</b></div><div class="patch-inventory-stat gold"><span><i class="fa-solid fa-tags"></i> رصيد المخزون بسعر البيع</span><b>${money(s.saleValue)}</b></div><div class="patch-inventory-stat green"><span><i class="fa-solid fa-arrow-trend-up"></i> الأرباح المتوقعة</span><b>${money(s.expectedProfit)}</b></div>`;
+    const s=inventorySummary(); box.innerHTML=`<div class="patch-inventory-stat dark"><span><i class="fa-solid fa-boxes-stacked"></i> عدد الأصناف</span><b>${String(s.itemCount)}</b></div><div class="patch-inventory-stat"><span><i class="fa-solid fa-coins"></i> رصيد المخزون بسعر الجملة</span><b>${money(s.costValue)}</b></div><div class="patch-inventory-stat gold"><span><i class="fa-solid fa-tags"></i> رصيد المخزون بسعر البيع</span><b>${money(s.saleValue)}</b></div><div class="patch-inventory-stat green"><span><i class="fa-solid fa-arrow-trend-up"></i> الأرباح المتوقعة</span><b>${money(s.expectedProfit)}</b></div>`;
   }
 
   async function saveEmployee(emp){
