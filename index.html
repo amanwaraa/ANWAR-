@@ -8217,7 +8217,43 @@
           </head>
           <body>
             ${html}
-          </body>
+          
+<!-- OSKAR_FINAL_INVENTORY_EXPORT_PATCH_V4 -->
+<style id="oskar-final-export-style-v4">
+  .oskar-export-tools{position:fixed;left:14px;top:96px;z-index:260;display:flex;flex-direction:column;gap:8px;direction:rtl}
+  .oskar-export-main{border:0;border-radius:18px;padding:11px 13px;background:linear-gradient(135deg,#0f172a,#2563eb);color:#fff;font-family:Cairo,Arial,sans-serif;font-weight:900;box-shadow:0 14px 34px rgba(15,23,42,.22);display:flex;align-items:center;gap:8px}
+  .oskar-export-menu{display:none;background:rgba(255,255,255,.98);border:1px solid #e2e8f0;border-radius:20px;padding:8px;box-shadow:0 18px 44px rgba(15,23,42,.16);min-width:170px}
+  .oskar-export-tools.open .oskar-export-menu{display:grid;gap:7px}
+  .oskar-export-action{border:0;border-radius:15px;padding:10px 11px;background:#f8fafc;color:#0f172a;font-family:Cairo,Arial,sans-serif;font-weight:900;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .oskar-export-action:hover{background:#dbeafe;color:#1d4ed8}
+  .oskar-export-clone{position:absolute!important;left:-99999px!important;top:0!important;background:#fff!important;direction:rtl!important;padding:22px!important;border-radius:0!important;overflow:visible!important;max-height:none!important}
+  .oskar-export-clone .table-wrap,.oskar-export-clone .card,.oskar-export-clone .section{overflow:visible!important;max-height:none!important}
+  .oskar-export-clone table{width:100%!important;min-width:0!important}
+  @media(max-width:900px){.oskar-export-tools{top:auto;bottom:92px;left:12px}.oskar-export-main{width:48px;height:48px;border-radius:18px;padding:0;justify-content:center}.oskar-export-main span{display:none}}
+</style>
+<script id="oskar-final-inventory-export-patch-v4">
+(function(){
+  "use strict";
+  const $=id=>document.getElementById(id);
+  const clean=v=>{const n=Number(String(v??0).replace(",","."));return Number.isFinite(n)?n:0;};
+  function toast(msg,ms=2600){if(typeof window.toast==="function"){try{window.toast(msg,ms);return;}catch{}}let t=$("toast");if(!t){t=document.createElement("div");t.id="toast";t.className="toast";document.body.appendChild(t);}t.textContent=msg;t.classList.add("show");clearTimeout(t.__oskarTimer);t.__oskarTimer=setTimeout(()=>t.classList.remove("show"),ms);}
+  function money(v){if(typeof window.money==="function"){try{return window.money(v);}catch{}}const cur=window.state?.settings?.currency||"₪";return cur+" "+clean(v).toFixed(2);}
+  function getProducts(){return Array.isArray(window.state?.products)?window.state.products:[];}
+  function productStockValue(p,priceKey){const stock=clean(p.stock??p.qty??p.quantity??p.baseStock??0);const price=clean(p[priceKey]??(priceKey==="costPrice"?(p.buyPrice??p.cost??0):(p.price??0)));return stock*price;}
+  function fixInventorySummary(){const box=$("patchInventorySummary");if(!box)return;const products=getProducts();const costValue=products.reduce((s,p)=>s+productStockValue(p,"costPrice"),0);const saleValue=products.reduce((s,p)=>s+productStockValue(p,"salePrice"),0);const expectedProfit=saleValue-costValue;const cards=box.querySelectorAll(".patch-inventory-stat");if(cards[0]){const label=cards[0].querySelector("span"),value=cards[0].querySelector("b");if(label)label.innerHTML='<i class="fa-solid fa-boxes-stacked"></i> عدد الأصناف';if(value)value.textContent=String(products.length);}if(cards[1]){const label=cards[1].querySelector("span"),value=cards[1].querySelector("b");if(label)label.innerHTML='<i class="fa-solid fa-coins"></i> رصيد المخزون بسعر الجملة / القطعة';if(value)value.textContent=money(costValue);}if(cards[2]){const label=cards[2].querySelector("span"),value=cards[2].querySelector("b");if(label)label.innerHTML='<i class="fa-solid fa-tags"></i> رصيد المخزون بسعر البيع / القطعة';if(value)value.textContent=money(saleValue);}if(cards[3]){const label=cards[3].querySelector("span"),value=cards[3].querySelector("b");if(label)label.innerHTML='<i class="fa-solid fa-arrow-trend-up"></i> الأرباح المتوقعة من المخزون';if(value)value.textContent=money(expectedProfit);}}
+  function activeSection(){return document.querySelector(".section.active")||$("page-home")||document.body;}
+  function activeTitle(){const s=activeSection();const h=s.querySelector("h1,h2,.modal-title")||document.querySelector(".nav-btn.active");return(h?.textContent||document.title||"oskar").replace(/[\\/:*?\"<>|]+/g," ").replace(/\s+/g," ").trim().slice(0,50)||"oskar";}
+  function prepareClone(){const section=activeSection();const clone=section.cloneNode(true);clone.classList.add("oskar-export-clone","active");clone.style.display="block";clone.style.width=Math.max(section.scrollWidth||900,980)+"px";clone.querySelectorAll("button,.oskar-export-tools,.bottom-nav,.fab-add,.no-print").forEach(x=>x.remove());clone.querySelectorAll("input,textarea,select").forEach(el=>{const span=document.createElement("span");span.style.cssText="display:inline-block;min-width:80px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc";span.textContent=el.tagName==="SELECT"?(el.options[el.selectedIndex]?.textContent||el.value||"-"):(el.value||el.placeholder||"-");el.replaceWith(span);});clone.querySelectorAll(".table-wrap").forEach(w=>{w.style.overflow="visible";w.style.width="auto";});document.body.appendChild(clone);return clone;}
+  async function ensureLibs(){if(!window.html2canvas){toast("مكتبة تنزيل الصورة غير جاهزة، انتظر قليلاً ثم أعد المحاولة");throw new Error("html2canvas missing");}if(!window.jspdf?.jsPDF){toast("مكتبة PDF غير جاهزة، انتظر قليلاً ثم أعد المحاولة");throw new Error("jsPDF missing");}}
+  function downloadDataUrl(url,filename){const a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();}
+  async function exportCurrent(kind){try{await ensureLibs();toast("جاري تجهيز الملف...");fixInventorySummary();const clone=prepareClone();await new Promise(r=>setTimeout(r,80));const canvas=await html2canvas(clone,{scale:2,useCORS:true,allowTaint:true,backgroundColor:"#ffffff",scrollX:0,scrollY:0,windowWidth:clone.scrollWidth,windowHeight:clone.scrollHeight});clone.remove();const name=activeTitle()+" - oskar";if(kind==="image"){downloadDataUrl(canvas.toDataURL("image/png"),name+".png");toast("تم تنزيل الصورة");return;}const img=canvas.toDataURL("image/jpeg",.95);const{jsPDF}=window.jspdf;const pdf=new jsPDF({orientation:"p",unit:"mm",format:"a4"});const pageW=pdf.internal.pageSize.getWidth(),pageH=pdf.internal.pageSize.getHeight(),margin=8,imgW=pageW-margin*2,imgH=canvas.height*imgW/canvas.width;let remaining=imgH,y=margin;pdf.addImage(img,"JPEG",margin,y,imgW,imgH);remaining-=pageH-margin*2;while(remaining>0){pdf.addPage();y=margin-(imgH-remaining);pdf.addImage(img,"JPEG",margin,y,imgW,imgH);remaining-=pageH-margin*2;}pdf.save(name+".pdf");toast("تم تنزيل PDF");}catch(e){console.warn(e);if(!String(e.message||e).includes("missing"))toast("تعذر تجهيز الملف، أعد المحاولة");}}
+  function addExportTools(){if($("oskarExportTools"))return;const box=document.createElement("div");box.id="oskarExportTools";box.className="oskar-export-tools";box.innerHTML='<button id="oskarExportToggle" class="oskar-export-main" type="button" title="تنزيل القسم الحالي"><i class="fa-solid fa-download"></i><span>تنزيل</span></button><div class="oskar-export-menu"><button class="oskar-export-action" id="oskarExportPdf" type="button"><span>PDF للقسم الحالي</span><i class="fa-solid fa-file-pdf"></i></button><button class="oskar-export-action" id="oskarExportImage" type="button"><span>صورة للقسم الحالي</span><i class="fa-solid fa-image"></i></button></div>';document.body.appendChild(box);$("oskarExportToggle").onclick=()=>box.classList.toggle("open");$("oskarExportPdf").onclick=()=>{box.classList.remove("open");exportCurrent("pdf");};$("oskarExportImage").onclick=()=>{box.classList.remove("open");exportCurrent("image");};document.addEventListener("click",e=>{if(!box.contains(e.target))box.classList.remove("open");},true);}
+  function init(){addExportTools();fixInventorySummary();setInterval(fixInventorySummary,1000);}
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
+  window.OSKAR_EXPORT_CURRENT_SECTION=exportCurrent;
+})();
+</script>
+</body>
         </html>
       `;
 
