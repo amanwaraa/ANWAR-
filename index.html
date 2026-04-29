@@ -11581,7 +11581,7 @@
   function trialUsed(){ return localStorage.getItem(TRIAL_USED_KEY) === "1"; }
   function trialTimeValid(){ const st = startedAt(); return !!st && (now() - st) < TRIAL_DURATION_MS; }
   function trialModeActive(){ return localStorage.getItem(TRIAL_MODE_KEY) === "trial" && trialTimeValid(); }
-  function trialExpired(){ const st = startedAt(); return !!st && (now() - st) >= TRIAL_DURATION_MS; }
+  function trialExpired(){ const st = startedAt(); return localStorage.getItem(TRIAL_MODE_KEY) === "trial" && !!st && (now() - st) >= TRIAL_DURATION_MS; }
   function leftMs(){ return Math.max(0, TRIAL_DURATION_MS - (now() - startedAt())); }
   function leftMinutesText(){
     const min = Math.max(0, Math.ceil(leftMs() / 60000));
@@ -11873,6 +11873,182 @@
 
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
+})();
+</script>
+
+<script id="oskar-user-request-final-patch-2026-04-29">
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+  const TRIAL_DURATION_MS = 30*60*1000;
+  const TRIAL_USED_KEY = "oskar_trial_used_once_v1";
+  const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
+  const TRIAL_MODE_KEY = "oskar_storage_mode_v1";
+  const TRIAL_LOGGED_OUT_KEY = "oskar_trial_logged_out_v1";
+  const KEEP_CAMERA_KEY = "oskar_keep_cashier_barcode_camera_open_v1";
+  const HTML5_QRCODE_SRC = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+  const QR_SOUND_SRC = "./qr.mp3";
+  const ADMIN_PERMISSION = "__admin__";
+  const now = ()=>Date.now();
+  const num = v => { const n=Number(v||0); return Number.isFinite(n)?n:0; };
+  function toast(msg,ms=2600){ if(typeof window.toast==="function") return window.toast(msg,ms); const el=$("toast"); if(el){el.textContent=msg; el.classList.add("show"); clearTimeout(el.__t); el.__t=setTimeout(()=>el.classList.remove("show"),ms);} else alert(msg); }
+  function startedAt(){ return num(localStorage.getItem(TRIAL_STARTED_KEY)); }
+  function trialTimeValid(){ const st=startedAt(); return !!st && now()-st<TRIAL_DURATION_MS; }
+  function trialMode(){ return localStorage.getItem(TRIAL_MODE_KEY)==="trial"; }
+  function isTrialUser(){ const u=window.state?.auth?.user; return !!(u && (u.trial || String(u.id||"").includes("trial") || String(u.name||"").includes("تجربة oskar"))); }
+  function trialExpiredInTrialOnly(){ const st=startedAt(); return trialMode() && !!st && now()-st>=TRIAL_DURATION_MS; }
+  function leftMinutes(){ const st=startedAt(); const left=Math.max(0,TRIAL_DURATION_MS-(now()-st)); const m=Math.ceil(left/60000); return m<=0?"انتهت":(m===1?"دقيقة واحدة":m===2?"دقيقتان":m+" دقيقة"); }
+  function stabilizeTrialAfterExpiry(){
+    try{
+      const st=startedAt();
+      const expired=!!st && now()-st>=TRIAL_DURATION_MS;
+      const normalUser=!!window.state?.auth?.user && !isTrialUser();
+      if(expired && (!trialMode() || normalUser)){
+        localStorage.setItem(TRIAL_MODE_KEY,"main");
+        localStorage.removeItem(TRIAL_LOGGED_OUT_KEY);
+        localStorage.removeItem(TRIAL_STARTED_KEY);
+        localStorage.setItem(TRIAL_USED_KEY,"1");
+        window.OSKAR_TRIAL_ACTIVE=false;
+        const pill=$("oskarTrialPill"); if(pill) pill.remove();
+      }
+      if(trialExpiredInTrialOnly()){
+        localStorage.setItem(TRIAL_MODE_KEY,"main");
+        localStorage.removeItem(TRIAL_LOGGED_OUT_KEY);
+        localStorage.removeItem(TRIAL_STARTED_KEY);
+        localStorage.setItem(TRIAL_USED_KEY,"1");
+        if(isTrialUser()){
+          try{ Object.keys(localStorage).forEach(k=>{ if(k.startsWith("cashier_auth_session_")) localStorage.removeItem(k); }); }catch{}
+          if(window.state?.auth) window.state.auth.user=null;
+          const lock=$("authLock"); if(lock){lock.classList.remove("hide"); lock.style.display="flex";}
+          toast("انتهت الفترة التجريبية");
+        }
+      }
+    }catch(e){}
+  }
+
+  function installStyles(){
+    if($("oskarUserRequestFinalStyles")) return;
+    const s=document.createElement("style"); s.id="oskarUserRequestFinalStyles";
+    s.textContent=`
+      .auth-user-pill{display:inline-flex!important;align-items:center!important;justify-content:center!important;flex-direction:row!important;gap:7px!important;white-space:nowrap!important}.auth-user-pill span{display:inline-flex!important;align-items:center!important;gap:7px!important}
+      @media(max-width:520px){.auth-user-pill{flex-direction:row!important;align-items:center!important;border-radius:999px!important}.auth-user-pill .oskar-trial-side-chip{margin-top:0!important}}
+      .cart-line{grid-template-columns:minmax(150px,1fr) 82px 120px 88px 42px!important;gap:7px!important;position:relative!important;align-items:center!important}.cart-line .select{padding:8px 7px!important;border-radius:13px!important;font-size:12px!important}.cart-line .cart-qty-input{padding:7px 5px!important;height:36px!important}.cart-line .qty-btn{width:28px!important;height:34px!important;border-radius:10px!important;font-size:16px!important}.cart-line .line-total{justify-self:end!important;text-align:left!important;font-size:14px!important;background:#eff6ff!important;border-radius:12px!important;padding:7px 8px!important;min-width:82px!important}
+      @media(max-width:900px){.cart-line{grid-template-columns:1fr 78px 112px!important;padding:10px!important}.cart-line .line-total{position:absolute!important;top:10px!important;left:10px!important}.cart-line>button.danger-btn{position:absolute!important;bottom:10px!important;left:10px!important}.cart-line>div:first-child{padding-left:92px!important}.cart-line .select{grid-column:auto!important}}
+      .oskar-keep-camera-setting{margin-top:12px;border:1px solid #dbeafe;background:linear-gradient(135deg,#eff6ff,#fff);border-radius:20px;padding:13px;display:flex;align-items:center;justify-content:space-between;gap:12px}.oskar-keep-camera-setting b{font-weight:900;color:#0f172a}.oskar-keep-camera-setting small{display:block;color:#64748b;font-weight:800;line-height:1.7}.oskar-switch{position:relative;width:54px;height:30px;flex:0 0 auto}.oskar-switch input{display:none}.oskar-slider{position:absolute;inset:0;background:#cbd5e1;border-radius:999px;transition:.2s}.oskar-slider:before{content:"";position:absolute;width:24px;height:24px;right:3px;top:3px;background:white;border-radius:999px;box-shadow:0 5px 12px rgba(15,23,42,.22);transition:.2s}.oskar-switch input:checked+.oskar-slider{background:#2563eb}.oskar-switch input:checked+.oskar-slider:before{right:27px}
+      .oskar-fast-scanner{position:fixed;inset:0;background:#000;z-index:10000;display:none}.oskar-fast-scanner.show{display:block}.oskar-fast-reader,.oskar-fast-reader video{width:100vw!important;height:100vh!important;object-fit:cover!important}.oskar-fast-reader__dashboard,#oskarFastReader__dashboard,#oskarFastReader__scan_region{display:none!important}.oskar-fast-frame{pointer-events:none;position:fixed;top:50%;left:50%;width:min(84vw,430px);height:230px;transform:translate(-50%,-50%);border:3px solid rgba(255,255,255,.55);border-radius:28px;z-index:10002;box-shadow:0 0 0 9999px rgba(0,0,0,.18),0 0 35px rgba(255,255,255,.15)}.oskar-fast-scanner.detected .oskar-fast-frame{border-color:#22c55e;box-shadow:0 0 0 9999px rgba(0,0,0,.12),0 0 45px rgba(34,197,94,.95),inset 0 0 35px rgba(34,197,94,.24)}.oskar-fast-laser{position:fixed;top:50%;left:50%;width:min(72vw,360px);height:3px;transform:translate(-50%,-50%);background:linear-gradient(90deg,transparent,#22c55e,transparent);box-shadow:0 0 22px #22c55e;border-radius:999px;z-index:10003;animation:oskarLaser 1.05s ease-in-out infinite}@keyframes oskarLaser{0%,100%{transform:translate(-50%,calc(-50% - 90px));opacity:.55}50%{transform:translate(-50%,calc(-50% + 90px));opacity:1}}.oskar-fast-close{position:fixed;top:15px;left:15px;z-index:10005;width:48px;height:48px;border:0;border-radius:16px;background:rgba(15,23,42,.86);color:white;font-size:22px;font-weight:900}.oskar-fast-title{position:fixed;top:16px;right:15px;z-index:10005;max-width:calc(100vw - 88px);background:rgba(15,23,42,.86);color:#fff;border-radius:16px;padding:10px 14px;font-weight:900}.oskar-fast-added{position:fixed;top:72px;right:12px;left:12px;z-index:10006;display:flex;gap:8px;overflow-x:auto;padding:4px}.oskar-fast-chip{background:rgba(255,255,255,.95);color:#0f172a;border-radius:999px;padding:8px 10px;font-weight:900;font-size:12px;display:inline-flex;align-items:center;gap:8px;box-shadow:0 12px 26px rgba(0,0,0,.22);white-space:nowrap}.oskar-fast-chip button{border:0;background:#fee2e2;color:#b91c1c;border-radius:999px;width:22px;height:22px;font-weight:900}
+    `; document.head.appendChild(s);
+  }
+
+  function patchLoginGuideButtons(){
+    document.addEventListener("click",function(e){
+      const go=e.target.closest('[data-guide-go]'); if(!go) return;
+      const lock=$("authLock"); const loginVisible=lock && !lock.classList.contains("hide") && lock.style.display!=="none";
+      if(loginVisible){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast("يجب تسجيل الدخول أولاً"); }
+    },true);
+  }
+
+  function addKeepCameraSetting(){
+    const settingsPage=$("page-settings"); if(!settingsPage || $("oskarKeepCameraSetting")) return;
+    const anchor=$("adminSecurityBox") || settingsPage.querySelector(".card") || settingsPage;
+    const box=document.createElement("div"); box.id="oskarKeepCameraSetting"; box.className="oskar-keep-camera-setting";
+    box.innerHTML=`<div><b><i class="fa-solid fa-camera"></i> إبقاء كاميرا الباركود في الكاشير مفتوحة</b><small>عند التفعيل تبقى الكاميرا مفتوحة بعد قراءة المنتج وتظهر الأصناف المضافة أعلى الكاميرا.</small></div><label class="oskar-switch"><input id="keepCashierBarcodeCameraOpen" type="checkbox"><span class="oskar-slider"></span></label>`;
+    anchor.insertAdjacentElement("beforebegin",box);
+    const input=$("keepCashierBarcodeCameraOpen"); input.checked=localStorage.getItem(KEEP_CAMERA_KEY)==="1";
+    input.addEventListener("change",()=>{ localStorage.setItem(KEEP_CAMERA_KEY,input.checked?"1":"0"); toast(input.checked?"تم تفعيل إبقاء كاميرا الباركود مفتوحة":"تم إيقاف إبقاء كاميرا الباركود مفتوحة"); });
+  }
+  function keepCameraOpen(){ return localStorage.getItem(KEEP_CAMERA_KEY)==="1"; }
+
+  const scanSound=new Audio(QR_SOUND_SRC); scanSound.preload="auto"; scanSound.volume=1;
+  function unlockSound(){ scanSound.play().then(()=>{scanSound.pause(); scanSound.currentTime=0;}).catch(()=>{}); }
+  document.addEventListener("click",unlockSound,{once:true,passive:true}); document.addEventListener("touchstart",unlockSound,{once:true,passive:true});
+  function playSound(){ try{scanSound.pause(); scanSound.currentTime=0; scanSound.play().catch(()=>{});}catch{} }
+  function vibrate(){ try{ if(navigator.vibrate) navigator.vibrate([45,25,45]); }catch{} }
+  let libPromise=null; function loadQrLib(){ if(window.Html5Qrcode) return Promise.resolve(true); if(libPromise) return libPromise; libPromise=new Promise((resolve,reject)=>{ const old=[...document.scripts].find(s=>s.src.includes("html5-qrcode")); if(old){old.addEventListener("load",()=>resolve(true),{once:true}); setTimeout(()=>resolve(!!window.Html5Qrcode),800); return;} const sc=document.createElement("script"); sc.src=HTML5_QRCODE_SRC; sc.async=true; sc.onload=()=>resolve(true); sc.onerror=reject; document.head.appendChild(sc); }); return libPromise; }
+  function prewarmQr(){ setTimeout(()=>loadQrLib().catch(()=>{}),600); }
+  let scanner=null, running=false, scanMode="sale", targetInput="", lastCode="", lastAt=0;
+  function scannerDom(){
+    let page=$("oskarFastScanner"); if(page) return page;
+    page=document.createElement("div"); page.id="oskarFastScanner"; page.className="oskar-fast-scanner";
+    page.innerHTML=`<div id="oskarFastReader" class="oskar-fast-reader"></div><div class="oskar-fast-frame"></div><div class="oskar-fast-laser"></div><button id="oskarFastClose" class="oskar-fast-close" type="button">×</button><div id="oskarFastTitle" class="oskar-fast-title">قراءة باركود للبيع</div><div id="oskarFastAdded" class="oskar-fast-added"></div>`;
+    document.body.appendChild(page); $("oskarFastClose").onclick=()=>stopScanner(); return page;
+  }
+  async function stopScanner(){
+    try{ if(scanner && running) await scanner.stop(); }catch{}
+    try{ if(scanner) await scanner.clear(); }catch{}
+    running=false; scanner=null; const p=$("oskarFastScanner"); if(p) p.classList.remove("show","detected");
+  }
+  function cleanNumber(v,f=0){ if(typeof window.cleanNumber==="function") return window.cleanNumber(v,f); const n=Number(String(v??"").replace(",",".")); return Number.isFinite(n)?n:f; }
+  function getProductByCode(code){
+    const c=String(code||"").trim(); if(!c) return null;
+    try{ if(typeof window.getProductByBarcode==="function"){ const p=window.getProductByBarcode(c); if(p) return p; } }catch{}
+    return (window.state?.products||[]).find(p=>String(p.barcode||"").trim()===c || String(p.code||"").trim()===c) || null;
+  }
+  function cartHasProduct(product){ return (window.state?.cart||[]).some(x=>x.productId===product.id); }
+  function addChip(product){
+    const box=$("oskarFastAdded"); if(!box || !product) return;
+    if(box.querySelector(`[data-fast-chip="${CSS.escape(product.id)}"]`)) return;
+    const chip=document.createElement("span"); chip.className="oskar-fast-chip"; chip.dataset.fastChip=product.id; chip.innerHTML=`<i class="fa-solid fa-check"></i> ${String(product.name||"منتج").replace(/[&<>\"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]))} <button type="button" title="حذف">×</button>`;
+    chip.querySelector("button").onclick=()=>{ const st=window.state; if(st?.cart){ st.cart=st.cart.filter(x=>x.productId!==product.id); if(typeof window.renderCart==="function") window.renderCart(); } chip.remove(); };
+    box.prepend(chip);
+  }
+  function updateLineTotalDom(lineId){
+    const st=window.state; const line=st?.cart?.find(x=>x.id===lineId); const row=document.querySelector(`[data-cart-line="${CSS.escape(lineId)}"]`); if(!line||!row) return;
+    const total=row.querySelector(".line-total"); if(total){ const money=typeof window.money==="function"?window.money(line.total):String(line.total); total.textContent=money; }
+  }
+  function afterDetected(){ const page=$("oskarFastScanner"); if(page){ page.classList.add("detected"); clearTimeout(page.__det); page.__det=setTimeout(()=>page.classList.remove("detected"),450); } playSound(); vibrate(); }
+  function handleCode(code){
+    code=String(code||"").trim(); if(!code) return; afterDetected();
+    if(scanMode==="product" || targetInput){ const input=$(targetInput||"productBarcode"); if(input){ input.value=code; input.dispatchEvent(new Event("input",{bubbles:true})); input.dispatchEvent(new Event("change",{bubbles:true})); } toast("تمت قراءة الباركود ووضعه في خانة كود المنتج"); stopScanner(); return; }
+    const product=getProductByCode(code); if(!product){ toast("لم يتم العثور على منتج بهذا الباركود"); if(!keepCameraOpen()) stopScanner(); return; }
+    if(cartHasProduct(product)){ toast("تمت الإضافة بالفعل"); if(!keepCameraOpen()) stopScanner(); return; }
+    try{ if(typeof window.addToCart==="function") window.addToCart(product); else throw new Error("no add"); }catch(e){ const st=window.state; if(st?.cart){ st.cart.push({id:`cart_${Date.now()}_${Math.random().toString(16).slice(2)}`,productId:product.id,name:product.name,qty:1,total:cleanNumber(product.salePrice),costTotal:cleanNumber(product.costPrice)}); if(typeof window.renderCart==="function") window.renderCart(); } }
+    addChip(product); toast("تمت إضافة " + (product.name||"المنتج")); if(!keepCameraOpen()) stopScanner();
+  }
+  async function openFastScanner(mode="sale",inputId=""){
+    try{ await loadQrLib(); }catch{ return toast("تعذر تحميل قارئ الباركود"); }
+    if(!window.Html5Qrcode) return toast("تعذر تشغيل قارئ الباركود");
+    await stopScanner(); scanMode=mode; targetInput=inputId||""; const page=scannerDom(); const title=$("oskarFastTitle"), added=$("oskarFastAdded"); if(added) added.innerHTML=""; if(title) title.textContent=mode==="product"?"قراءة باركود المنتج":"قراءة باركود للبيع"; page.classList.add("show");
+    try{
+      const formats = window.Html5QrcodeSupportedFormats ? [Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.CODE_93,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.DATA_MATRIX,Html5QrcodeSupportedFormats.AZTEC,Html5QrcodeSupportedFormats.PDF_417] : undefined;
+      scanner=new Html5Qrcode("oskarFastReader", formats?{formatsToSupport:formats,verbose:false}:undefined);
+      const config={fps:45,qrbox:(w,h)=>({width:Math.floor(w*.86),height:Math.floor(h*.34)}),aspectRatio:1.7777778,disableFlip:false,experimentalFeatures:{useBarCodeDetectorIfSupported:true},videoConstraints:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:"continuous"},{exposureMode:"continuous"}]}};
+      await scanner.start({facingMode:"environment"},config,(txt)=>{ const c=String(txt||"").trim(); const t=Date.now(); if(!c) return; if(c===lastCode && t-lastAt<1700) return; lastCode=c; lastAt=t; handleCode(c); },()=>{}); running=true;
+    }catch(e){ console.error(e); await stopScanner(); toast("اسمح باستخدام الكاميرا وتأكد أن الرابط HTTPS"); }
+  }
+  function bindFastScannerButtons(){
+    window.addEventListener("click",function(e){
+      const sale=e.target.closest("#openScannerBtn"); const prod=e.target.closest("#scanProductBarcodeBtn"); const oldClose=e.target.closest("#floatingScannerCloseBtn");
+      if(sale){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); openFastScanner("sale"); }
+      if(prod){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); openFastScanner("product","productBarcode"); }
+      if(oldClose){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); stopScanner(); }
+    },true);
+    window.openScanner=(mode="sale",target="")=>openFastScanner(mode,target);
+    window.openFloatingProductBarcodeScanner=(target="productBarcode")=>openFastScanner("product",target);
+    window.stopScanner=stopScanner; window.stopFloatingScanner=stopScanner;
+  }
+
+  function patchCartLiveTotals(){
+    document.addEventListener("input",function(e){ const inp=e.target.closest("[data-change-cart-qty]"); if(!inp) return; setTimeout(()=>updateLineTotalDom(inp.dataset.changeCartQty),0); },true);
+    document.addEventListener("change",function(e){ const sel=e.target.closest("[data-change-cart-unit]"); if(!sel) return; setTimeout(()=>updateLineTotalDom(sel.dataset.changeCartUnit),0); },true);
+  }
+  function fixTrialTextStable(){
+    const note=$("trialLoginNote"), btn=$("trialLoginBtn");
+    if(!btn) return;
+    if(trialTimeValid() && trialMode()) { btn.innerHTML='<i class="fa-solid fa-flask"></i> دخول التجربة المتبقية'; if(note) note.textContent='التجربة فعالة لهذا الجهاز. المتبقي '+leftMinutes()+'. اضغط زر التجربة للدخول.'; }
+    else if(localStorage.getItem(TRIAL_USED_KEY)==="1") { btn.innerHTML='<i class="fa-solid fa-lock"></i> انتهت الفترة التجريبية'; btn.disabled=true; btn.style.opacity='.55'; if(note) note.textContent='تم استخدام الفترة التجريبية على هذا الجهاز وانتهت. اختر إحدى الباقات أو تواصل واتساب للشراء.'; }
+    else { btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 30 دقيقة'; btn.disabled=false; btn.style.opacity='1'; if(note) note.textContent='التجربة مرة واحدة لكل جهاز، وبمساحة بيانات مستقلة عن النسخة الأساسية.'; }
+  }
+  function optimizeExternalScripts(){
+    $$('script[src]').forEach(sc=>{ const src=sc.src||''; if(/zxing|JsBarcode|html2canvas|jspdf|xlsx|html5-qrcode/.test(src)){ sc.defer=true; sc.async=false; } });
+  }
+  function init(){
+    installStyles(); optimizeExternalScripts(); stabilizeTrialAfterExpiry(); patchLoginGuideButtons(); addKeepCameraSetting(); bindFastScannerButtons(); patchCartLiveTotals(); prewarmQr(); fixTrialTextStable();
+    setInterval(()=>{ stabilizeTrialAfterExpiry(); addKeepCameraSetting(); fixTrialTextStable(); const b=$("oskarTrialSidebarMinutes"); if(b && isTrialUser()) b.textContent=leftMinutes(); },800);
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+  document.addEventListener("visibilitychange",()=>{ if(document.hidden && running && !keepCameraOpen()) stopScanner(); });
+  window.addEventListener("beforeunload",()=>{ if(running) stopScanner(); });
 })();
 </script>
 
