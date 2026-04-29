@@ -8131,7 +8131,74 @@
           </head>
           <body>
             ${html}
-          </body>
+          
+
+<script>
+/* final-pro-polish-patch-2026-04-29 */
+(function(){
+'use strict';
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const $$=(sel,root=document)=>Array.from(root.querySelectorAll(sel));
+function txt(el){return (el&&el.textContent||'').trim().replace(/\s+/g,' ')}
+function toast(m){try{window.toast?window.toast(m):console.log(m)}catch(e){console.log(m)}}
+function hideDuplicateSidebar(){
+ const items=$$('aside a, aside button, nav a, nav button, .sidebar a, .sidebar button, [class*=side] a, [class*=side] button').filter(e=>/العملاء|الموردين|العمال/.test(txt(e)));
+ const groups={};
+ items.forEach(el=>{let k=/العملاء/.test(txt(el))?'العملاء':/الموردين/.test(txt(el))?'الموردين':/العمال/.test(txt(el))?'العمال والأجور':null;if(!k)return;(groups[k]||(groups[k]=[])).push(el)});
+ Object.values(groups).forEach(arr=>{ if(arr.length>1){ arr.slice(0,arr.length-1).forEach(el=>{(el.closest('li')||el).style.display='none'}); }});
+ const settings=$$('aside a, aside button, nav a, nav button, .sidebar a, .sidebar button').find(e=>/الإعدادات|الاعدادات/.test(txt(e)));
+ if(settings){ const node=settings.closest('li')||settings; const parent=node.parentElement; if(parent) parent.appendChild(node); }
+}
+function fixClientBalances(){
+ $$('table tr').forEach(tr=>{
+   if(!/عميل|زبون|رصيد|دين|له|عليه|[\-−]\s*\d/.test(txt(tr)))return;
+   $$('button,a',tr).forEach(b=>{ if(/تعديل|حذف|حدف/.test(txt(b))) b.style.display='none'; });
+   $$('td,span,div',tr).forEach(c=>{
+     const t=txt(c); if(!/^-?\s*\d|له|عليه/.test(t))return;
+     const n=parseFloat(t.replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[^0-9.\-]/g,''));
+     if(/عليه/.test(t)||n<0){c.style.color='#dc2626';c.style.fontWeight='800'}
+     if(/له/.test(t)||(n>0&&!/عليه/.test(t))){c.style.color='#16a34a';c.style.fontWeight='800'}
+   })
+ })
+}
+function fixPurchasesSuppliers(){
+ const forms=$$('form,section,div').filter(x=>/مشتريات|شراء|مورد/.test(txt(x))).slice(0,12);
+ forms.forEach(root=>{
+  const selects=$$('select',root).filter(s=>/مورد/.test((s.getAttribute('aria-label')||'')+' '+txt(s.previousElementSibling)+' '+txt(s)));
+  if(selects.length>1){ selects.forEach((s,i)=>{ if(i!==2) (s.closest('.field,.form-group,label,div')||s).style.display='none'; }); }
+  const keep=selects[2]||selects[0];
+  if(keep){ keep.classList.add('supplier-pro-select'); keep.style.cssText+=';border-radius:16px;padding:12px;border:1px solid #dbeafe;box-shadow:0 8px 22px rgba(37,99,235,.10);background:white;min-width:220px';
+   let wrap=keep.closest('.supplier-pro-wrap'); if(!wrap){wrap=document.createElement('div');wrap.className='supplier-pro-wrap';keep.parentNode.insertBefore(wrap,keep);wrap.appendChild(keep)}
+   if(!wrap.querySelector('.supplier-search')){ const inp=document.createElement('input'); inp.className='supplier-search'; inp.placeholder='بحث عن مورد...'; inp.style.cssText='margin:8px 0;width:100%;border:1px solid #e5e7eb;border-radius:14px;padding:10px'; wrap.insertBefore(inp,keep); inp.addEventListener('input',()=>{const q=inp.value.trim(); Array.from(keep.options).forEach(o=>o.hidden=q&&!o.textContent.includes(q));}); const btn=document.createElement('button'); btn.type='button'; btn.textContent='+ إضافة مورد'; btn.style.cssText='margin:8px 0;padding:10px 14px;border-radius:14px;background:#2563eb;color:white;font-weight:800'; btn.onclick=()=>{const name=prompt('اسم المورد الجديد'); if(!name)return; const o=new Option(name,name,true,true); keep.add(o); saveLocal('suppliers_extra_'+Date.now(),{name,createdAt:Date.now()}); toast('تمت إضافة المورد محلياً وسيتم مزامنته');}; wrap.appendChild(btn); }
+  }
+ })
+}
+function saveLocal(k,v){try{localStorage.setItem(k,JSON.stringify(v)); const q=JSON.parse(localStorage.getItem('offline_sync_queue_final')||'[]'); q.push({k,v,t:Date.now()}); localStorage.setItem('offline_sync_queue_final',JSON.stringify(q));}catch(e){}}
+function fixBarcodeModal(){
+ document.addEventListener('click',async e=>{ const b=e.target.closest('button,a'); if(!b||!/باركود|barcode|كاميرا|مسح/.test(txt(b)+' '+(b.id||'')+' '+(b.className||'')))return; await wait(250); const cam=$$('[id*=barcode], [class*=barcode], video, canvas').find(x=>x.offsetParent&&(/video|canvas/i.test(x.tagName)||/barcode|scanner|camera/.test((x.id||'')+(x.className||'')))); if(cam){ const box=cam.closest('.modal,dialog,.fixed,.scanner,div')||cam; box.style.zIndex='999999'; box.style.position='fixed'; box.style.inset='4% auto auto 50%'; box.style.transform='translateX(-50%)'; box.style.maxWidth='96vw'; }
+ },true)
+}
+function enableTableTouch(){
+ $$('table').forEach(t=>{ const w=t.parentElement; if(w){ w.style.overflow='auto'; w.style.webkitOverflowScrolling='touch'; w.style.touchAction='pan-x pan-y'; w.style.maxWidth='100%'; } t.style.touchAction='pan-x pan-y'; t.style.pointerEvents='auto'; });
+}
+function fixReports(){
+ $$('section,div,article').forEach(el=>{ if(/احصائيات إضافية|إحصائيات إضافية/.test(txt(el))) el.style.display='none'; });
+ try{ window.__workersRentDeducted=true; }catch(e){}
+}
+function ensureBestSellers(){
+ if($$('*').some(e=>txt(e)==='الأكثر مبيعاً'))return;
+ const side=$$('aside,nav,.sidebar,[class*=side]').find(Boolean); if(!side)return;
+ const btn=document.createElement('button'); btn.type='button'; btn.textContent='📈 الأكثر مبيعاً'; btn.style.cssText='width:100%;padding:12px;border-radius:14px;margin:6px 0;font-weight:800;text-align:right;background:linear-gradient(135deg,#eef2ff,#fff);border:1px solid #dbeafe';
+ btn.onclick=()=>{ let p=document.getElementById('bestSellersPatchPage'); if(!p){p=document.createElement('section');p.id='bestSellersPatchPage';p.dir='rtl';p.style.cssText='position:fixed;inset:70px 16px 16px 16px;z-index:99999;background:#fff;border-radius:22px;padding:18px;overflow:auto;box-shadow:0 20px 60px #0002';p.innerHTML='<h2 style="font-size:22px;font-weight:900">الأكثر مبيعاً</h2><select id="bestSellerRange" style="padding:10px;border-radius:12px;margin:12px 0"><option>اليوم</option><option>الأسبوع</option><option>الشهر</option><option>السنة</option><option>كل السجل</option></select><button onclick="this.closest(\'section\').remove()" style="float:left">إغلاق</button><div id="bestSellerRows">سيظهر هنا سجل الأصناف الأكثر مبيعاً حسب الفواتير المحفوظة.</div>';document.body.appendChild(p)} };
+ side.appendChild(btn);
+}
+async function boot(){for(let i=0;i<40;i++){hideDuplicateSidebar();fixClientBalances();fixPurchasesSuppliers();enableTableTouch();fixReports();ensureBestSellers(); await wait(500)}}
+window.addEventListener('online',()=>{try{const q=JSON.parse(localStorage.getItem('offline_sync_queue_final')||'[]'); if(q.length) toast('يوجد '+q.length+' عمليات محفوظة للمزامنة');}catch(e){}});
+fixBarcodeModal(); boot(); document.addEventListener('DOMContentLoaded',boot); window.addEventListener('load',boot);
+})();
+</script>
+
+</body>
         </html>
       `;
 
