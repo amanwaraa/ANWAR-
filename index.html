@@ -1803,7 +1803,7 @@
   <div class="app-shell">
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
-        <img id="sideShopLogo" class="shop-logo" alt="logo" src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22220%22%20height%3D%22220%22%20viewBox%3D%220%200%20220%20220%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20stop-color%3D%22%232563eb%22/%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%237c3aed%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230891b2%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22220%22%20height%3D%22220%22%20rx%3D%2254%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22174%22%20cy%3D%2246%22%20r%3D%2234%22%20fill%3D%22rgba%28255%2C255%2C255%2C.16%29%22/%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2258%25%22%20text-anchor%3D%22middle%22%20font-size%3D%2282%22%20font-family%3D%22Arial%22%20font-weight%3D%22900%22%20fill%3D%22white%22%3EO%3C/text%3E%3C/svg%3E" decoding="sync" loading="eager">
+        <img id="sideShopLogo" class="shop-logo" alt="logo">
         <div>
           <div id="sideShopName" class="brand-title">oskar</div>
           <div class="brand-sub">كاشير أونلاين / أوفلاين</div>
@@ -1837,7 +1837,7 @@
       <header class="topbar">
         <div class="brand">
           <button id="openMenuBtn" class="icon-btn hamburger"><i class="fa-solid fa-bars"></i></button>
-          <img id="topShopLogo" class="shop-logo" alt="logo" src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22220%22%20height%3D%22220%22%20viewBox%3D%220%200%20220%20220%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20stop-color%3D%22%232563eb%22/%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%237c3aed%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230891b2%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22220%22%20height%3D%22220%22%20rx%3D%2254%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22174%22%20cy%3D%2246%22%20r%3D%2234%22%20fill%3D%22rgba%28255%2C255%2C255%2C.16%29%22/%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2258%25%22%20text-anchor%3D%22middle%22%20font-size%3D%2282%22%20font-family%3D%22Arial%22%20font-weight%3D%22900%22%20fill%3D%22white%22%3EO%3C/text%3E%3C/svg%3E" decoding="sync" loading="eager">
+          <img id="topShopLogo" class="shop-logo" alt="logo">
           <div>
             <div id="topShopName" class="brand-title">oskar</div>
             <div id="connectionText" class="brand-sub">جاري فحص الاتصال...</div>
@@ -5549,19 +5549,6 @@
                 </div>
               </div>
 
-              <div class="oskar-cart-price-field">
-                <label class="muted" style="font-size:11px;font-weight:900">السعر</label>
-                <input
-                  class="input cart-price-input"
-                  type="number"
-                  inputmode="decimal"
-                  min="0"
-                  step="0.001"
-                  data-change-cart-price="${line.id}"
-                  value="${escapeHtml(String(line.manualPrice ?? line.price ?? 0))}"
-                >
-              </div>
-
               <div class="money line-total">${money(line.total)}</div>
 
               <button class="danger-btn oskar-cart-remove" data-remove-cart="${line.id}">
@@ -5578,69 +5565,7 @@
       $("cartTotal").textContent = money(totals.total);
     }
 
-    function refreshCartLineDom(lineId) {
-      const line = state.cart.find(x => x.id === lineId);
-      const row = document.querySelector(`[data-cart-line="${lineId}"]`);
-      if (!line || !row) return;
-
-      const totalEl = row.querySelector(".line-total");
-      if (totalEl) totalEl.textContent = money(line.total);
-
-      const priceInput = row.querySelector("[data-change-cart-price]");
-      if (priceInput && document.activeElement !== priceInput) {
-        priceInput.value = String(cleanNumber(line.price ?? 0));
-      }
-
-      const qtyInput = row.querySelector("[data-change-cart-qty]");
-      if (qtyInput && document.activeElement !== qtyInput) {
-        qtyInput.value = String(cleanNumber(line.qty ?? 1));
-      }
-    }
-
     function updateCartLine(lineId, patch = {}, rerender = true) {
-      const line = state.cart.find(x => x.id === lineId);
-      if (!line) return;
-
-      const hasManualPrice = Object.prototype.hasOwnProperty.call(patch, "manualPrice");
-      const unitChanged = Object.prototype.hasOwnProperty.call(patch, "selectedUnit");
-
-      Object.assign(line, patch);
-
-      if (unitChanged && !hasManualPrice) {
-        delete line.manualPrice;
-      }
-
-      if (hasManualPrice) {
-        line.manualPrice = cleanNumber(patch.manualPrice, 0);
-      }
-
-      const product = getProductById(line.productId);
-      if (!product) {
-        if (rerender) renderCart();
-        return;
-      }
-
-      const selectedUnit = line.selectedUnit || getDefaultSaleUnit(product);
-      const qty = cleanNumber(line.qty, 0);
-      const pricing = priceForLine(product, qty, selectedUnit);
-
-      if (line.manualPrice !== undefined && line.manualPrice !== null && line.manualPrice !== "") {
-        pricing.price = cleanNumber(line.manualPrice, pricing.price);
-        pricing.total = pricing.price * pricing.qty;
-      }
-
-      Object.assign(line, pricing);
-
-      if (rerender) {
-        renderCart();
-      } else {
-        refreshCartLineDom(lineId);
-        const totals = calculateCartTotals();
-        $("cartSubtotal").textContent = money(totals.subtotal);
-        $("cartDiscount").textContent = money(totals.discount);
-        $("cartTotal").textContent = money(totals.total);
-      }
-    }, rerender = true) {
       const line = state.cart.find(x => x.id === lineId);
       if (!line) return;
 
@@ -8786,299 +8711,255 @@
             ${html}
           
             
-<style id="oskar-stable-final-no-mojibake-fixes-2026-04-30">
-  html, body { font-family:"Cairo", Arial, sans-serif !important; }
-  html body .cart-line {
-    grid-template-columns:minmax(160px,1fr) 165px 120px 105px 44px !important;
-    align-items:center !important;
+
+<!-- OSKAR_FINAL_USER_REQUEST_2026_04_30: trial lock only + mobile payments + fast logo + editable cashier price + stable prime/trial buttons -->
+<style id="oskar-final-user-request-2026-04-30-style">
+  body:not(.oskar-trial-mode) #page-settings > .card.oskar-trial-locked-settings-card,
+  body:not(.oskar-trial-mode) #page-settings > .card.oskar-trial-locked-settings-card > *{
+    filter:none!important;opacity:1!important;pointer-events:auto!important;
   }
-  html body .oskar-cart-price-field {
-    display:grid !important;
-    gap:4px !important;
-    min-width:0 !important;
+  body:not(.oskar-trial-mode) #page-settings > .card.oskar-trial-locked-settings-card::before,
+  body:not(.oskar-trial-mode) #page-settings > .card.oskar-trial-locked-settings-card::after{
+    display:none!important;content:none!important;
   }
-  html body .cart-price-input {
-    height:42px !important;
-    padding:8px 10px !important;
-    direction:ltr !important;
-    text-align:center !important;
-    font-weight:900 !important;
+  body:not(.oskar-trial-mode) #oskarTrialSettingsNote{display:none!important;}
+  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card{
+    display:block!important;position:relative!important;opacity:1!important;filter:none!important;overflow:hidden!important;
   }
-  html body .oskar-cart-unit {
-    min-height:42px !important;
-    backface-visibility:hidden !important;
-    transform:translateZ(0) !important;
-    will-change:auto !important;
+  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card > *{
+    filter:none!important;opacity:1!important;pointer-events:none!important;user-select:none!important;
   }
-  body:not(.oskar-trial-mode) #page-settings > .card.oskar-trial-locked-settings-card {
-    display:block !important;
-    opacity:1 !important;
-    filter:none !important;
-    pointer-events:auto !important;
+  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card::after{
+    content:"\f023  مقفول"!important;
+    font-family:"Font Awesome 6 Free","Cairo",Arial,sans-serif!important;font-weight:900!important;
+    position:absolute!important;inset:50% auto auto 50%!important;transform:translate(-50%,-50%)!important;
+    width:min(230px,72%)!important;min-height:76px!important;border-radius:26px!important;
+    background:rgba(15,23,42,.78)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+    color:#fff!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:10px!important;
+    font-size:22px!important;z-index:20!important;border:1px solid rgba(255,255,255,.28)!important;
+    box-shadow:0 22px 55px rgba(15,23,42,.24)!important;text-shadow:0 2px 10px rgba(0,0,0,.25)!important;
+    pointer-events:auto!important;
   }
-  body:not(.oskar-trial-mode) #page-settings > .card.oskar-trial-locked-settings-card > * {
-    pointer-events:auto !important;
+  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card::before{
+    content:"غير متاح في النسخة التجريبية"!important;
+    position:absolute!important;left:50%!important;top:calc(50% + 38px)!important;transform:translateX(-50%)!important;
+    z-index:21!important;color:#e0f2fe!important;font-size:11px!important;font-weight:900!important;white-space:nowrap!important;pointer-events:none!important;
   }
-  body:not(.oskar-trial-mode) #page-settings > .card.oskar-trial-locked-settings-card::after {
-    content:none !important;
-    display:none !important;
+  body.oskar-trial-mode #page-settings .oskar-payment-settings-card,
+  body.oskar-trial-mode #page-settings .oskar-payment-settings-card > *{
+    filter:none!important;opacity:1!important;pointer-events:auto!important;user-select:auto!important;
   }
-  body:not(.oskar-trial-mode) #oskarTrialSettingsNote {
-    display:none !important;
+  body.oskar-trial-mode #page-settings .oskar-payment-settings-card::before,
+  body.oskar-trial-mode #page-settings .oskar-payment-settings-card::after{display:none!important;content:none!important;}
+
+  @media(max-width:520px){
+    .payment-choice-grid,#paymentChoiceGrid{grid-template-columns:1fr!important;gap:10px!important;}
+    .payment-choice{min-height:88px!important;padding:14px 12px!important;border-radius:20px!important;}
+    .oskar-prime-method-grid,.oskar-prime-safe-methods{grid-template-columns:1fr!important;}
   }
-  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card {
-    display:block !important;
-    position:relative !important;
-    opacity:.72 !important;
-    filter:none !important;
-    overflow:hidden !important;
+
+  .cart-line{grid-template-columns:minmax(170px,1fr) minmax(355px,430px) 105px 44px!important;}
+  .cart-line .oskar-cart-controls{display:grid!important;grid-template-columns:112px minmax(136px,1fr) 116px!important;gap:8px!important;align-items:end!important;}
+  .oskar-cart-price-wrap{min-width:0!important;display:flex!important;flex-direction:column!important;gap:5px!important;}
+  .oskar-cart-price-label{font-size:11px!important;font-weight:900!important;color:#64748b!important;line-height:1!important;white-space:nowrap!important;}
+  .oskar-cart-price-input{height:42px!important;text-align:center!important;direction:ltr!important;font-weight:900!important;border-radius:14px!important;padding:6px 8px!important;background:#fff7ed!important;border:1px solid #fed7aa!important;color:#9a3412!important;}
+  .oskar-cart-price-input:focus{background:#fff!important;border-color:#f59e0b!important;box-shadow:0 0 0 4px rgba(245,158,11,.12)!important;}
+  .oskar-cart-price-note{font-size:10px!important;color:#d97706!important;font-weight:900!important;line-height:1.1!important;}
+
+  @media(max-width:900px){
+    .cart-line{grid-template-columns:1fr!important;min-height:205px!important;padding:14px!important;overflow:visible!important;}
+    .cart-line .line-total{position:absolute!important;top:14px!important;right:14px!important;left:auto!important;background:#eff6ff!important;color:#1d4ed8!important;border-radius:16px!important;padding:9px 12px!important;font-weight:900!important;min-width:96px!important;text-align:center!important;z-index:3!important;}
+    .cart-line .oskar-cart-remove{position:absolute!important;top:14px!important;left:14px!important;right:auto!important;width:42px!important;height:42px!important;padding:0!important;border-radius:15px!important;z-index:4!important;background:#fee2e2!important;color:#b91c1c!important;display:flex!important;align-items:center!important;justify-content:center!important;}
+    .cart-line .oskar-cart-product-info{padding-left:62px!important;padding-right:124px!important;padding-top:2px!important;min-width:0!important;}
+    .cart-line .oskar-cart-product-info b{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;font-size:17px!important;line-height:1.5!important;}
+    .cart-line .oskar-cart-product-info .muted{display:none!important;}
+    .cart-line .oskar-cart-controls{margin-top:14px!important;width:100%!important;display:grid!important;grid-template-columns:minmax(86px,.85fr) minmax(128px,1fr) minmax(112px,.9fr)!important;gap:8px!important;align-items:end!important;grid-column:1 / -1!important;}
+    .cart-line .oskar-cart-unit{width:100%!important;min-width:0!important;height:42px!important;padding:6px 8px!important;border-radius:14px!important;font-size:13px!important;}
+    .cart-line .oskar-cart-qty-wrap{display:grid!important;grid-template-columns:38px minmax(58px,1fr) 38px!important;gap:6px!important;align-items:center!important;}
+    .cart-line .cart-qty-input{height:42px!important;text-align:center!important;direction:ltr!important;font-size:15px!important;padding:6px!important;border-radius:14px!important;}
+    .cart-line .qty-btn{width:38px!important;height:42px!important;border-radius:14px!important;font-size:18px!important;}
   }
-  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card > * {
-    pointer-events:none !important;
+  @media(max-width:420px){
+    .cart-line{min-height:252px!important;}
+    .cart-line .oskar-cart-controls{grid-template-columns:1fr!important;}
+    .cart-line .oskar-cart-unit,.cart-line .cart-qty-input,.oskar-cart-price-input{height:44px!important;}
   }
-  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card::after {
-    content:"\f023  مقفول" !important;
-    font-family:"Font Awesome 6 Free","Cairo",Arial,sans-serif !important;
-    font-weight:900 !important;
-    position:absolute !important;
-    top:50% !important;
-    left:50% !important;
-    right:auto !important;
-    bottom:auto !important;
-    transform:translate(-50%,-50%) !important;
-    min-width:132px !important;
-    min-height:52px !important;
-    padding:13px 20px !important;
-    border-radius:20px !important;
-    background:#fff7ed !important;
-    border:1px solid #fed7aa !important;
-    color:#9a3412 !important;
-    box-shadow:0 18px 42px rgba(154,52,18,.16) !important;
-    display:flex !important;
-    align-items:center !important;
-    justify-content:center !important;
-    font-size:18px !important;
-    z-index:8 !important;
-    opacity:1 !important;
-    pointer-events:auto !important;
-    white-space:nowrap !important;
-  }
-  body.oskar-trial-mode #page-settings .oskar-payment-settings-card {
-    display:block !important;
-    opacity:1 !important;
-    filter:none !important;
-    pointer-events:auto !important;
-  }
-  body.oskar-trial-mode #page-settings .oskar-payment-settings-card::after {
-    content:none !important;
-    display:none !important;
-  }
-  #trialLoginBtn {
-    display:flex !important;
-    width:100% !important;
-    position:relative !important;
-    z-index:2 !important;
-  }
-  #oskarPrimeBuyLoginBtn {
-    display:flex !important;
-    width:100% !important;
-    position:relative !important;
-    z-index:1 !important;
-    margin-top:10px !important;
-    clear:both !important;
-  }
-  img.shop-logo, img.invoice-logo {
-    object-fit:cover !important;
-    object-position:center !important;
-    background:#dbeafe !important;
-  }
-  @media(max-width:900px) {
-    html body .cart-line {
-      grid-template-columns:1fr !important;
-      gap:10px !important;
-    }
-  }
-  @media(max-width:650px) {
-    #oskarPrimeSafeContent .oskar-prime-safe-grid {
-      grid-template-columns:1fr !important;
-    }
-    #oskarPrimeSafeContent .oskar-prime-safe-method {
-      display:flex !important;
-      width:100% !important;
-      min-height:112px !important;
-      align-items:center !important;
-      justify-content:space-between !important;
-      text-align:right !important;
-    }
-    #oskarPrimeSafeContent .oskar-prime-safe-method img {
-      width:76px !important;
-      height:76px !important;
-      flex:0 0 auto !important;
-    }
-  }
+
+  #trialLoginBtn{display:flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;order:10!important;}
+  #trialLoginNote{order:11!important;}
+  #oskarPrimeBuyLoginBtn,#oskarPurchaseBox{order:12!important;}
+  #authLock .auth-card{display:flex!important;flex-direction:column!important;}
+  .shop-logo,.invoice-logo{background:linear-gradient(135deg,#2563eb,#7c3aed)!important;object-fit:cover!important;object-position:center!important;}
+  img.shop-logo:not([src]),img.invoice-logo:not([src]){visibility:hidden!important;}
 </style>
-<script id="oskar-stable-final-no-mojibake-fixes-2026-04-30">
+<script id="oskar-final-user-request-2026-04-30-script">
 (function(){
   "use strict";
-  if(window.__OSKAR_STABLE_FINAL_NO_MOJIBAKE_20260430__) return;
-  window.__OSKAR_STABLE_FINAL_NO_MOJIBAKE_20260430__ = true;
-
-  const MODE_KEY = "oskar_storage_mode_v1";
-  const START_KEY = "oskar_trial_started_at_v1";
-  const DUR = 12 * 60 * 60 * 1000;
-  const FALLBACK_LOGO = "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22220%22%20height%3D%22220%22%20viewBox%3D%220%200%20220%20220%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20stop-color%3D%22%232563eb%22/%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%237c3aed%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230891b2%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22220%22%20height%3D%22220%22%20rx%3D%2254%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22174%22%20cy%3D%2246%22%20r%3D%2234%22%20fill%3D%22rgba%28255%2C255%2C255%2C.16%29%22/%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2258%25%22%20text-anchor%3D%22middle%22%20font-size%3D%2282%22%20font-family%3D%22Arial%22%20font-weight%3D%22900%22%20fill%3D%22white%22%3EO%3C/text%3E%3C/svg%3E";
-  const $ = (id) => document.getElementById(id);
+  const $ = id => document.getElementById(id);
   const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const TRIAL_MODE_KEY = "oskar_storage_mode_v1";
+  const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
+  const TRIAL_DURATION_MS = 12 * 60 * 60 * 1000;
+  let cartObserver = null, runtimeInstalled = false, logoRuns = 0;
+  const logoCache = new Map();
 
-  function isTrial(){
-    const st = Number(localStorage.getItem(START_KEY) || 0);
-    return localStorage.getItem(MODE_KEY) === "trial" && st && (Date.now() - st) < DUR;
+  function num(v, fallback=0){ if(typeof window.cleanNumber === "function") return window.cleanNumber(v, fallback); const n = Number(String(v ?? "").replace(",", ".")); return Number.isFinite(n) ? n : fallback; }
+  function money(v){ return typeof window.money === "function" ? window.money(v) : ("₪ " + num(v,0).toFixed(2)); }
+  function esc(s){ return String(s ?? "").replace(/[&<>\"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
+  function toast(msg, ms=2300){ if(typeof window.toast === "function") return window.toast(msg, ms); console.log(msg); }
+  function trialActive(){ const st = Number(localStorage.getItem(TRIAL_STARTED_KEY) || 0); return localStorage.getItem(TRIAL_MODE_KEY) === "trial" && !!st && Date.now() - st < TRIAL_DURATION_MS; }
+
+  function fallbackLogo(){
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#2563eb"/><stop offset=".55" stop-color="#7c3aed"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="120" height="120" rx="34" fill="url(#g)"/><circle cx="88" cy="30" r="16" fill="#f59e0b" opacity=".92"/><path d="M30 76h60M30 58h60M40 40h40" stroke="#fff" stroke-width="9" stroke-linecap="round"/><text x="60" y="101" text-anchor="middle" font-size="17" font-family="Arial" font-weight="700" fill="#fff">OSKAR</text></svg>`;
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   }
-
-  function applyModeClass(){
-    const trial = !!isTrial();
-    document.body.classList.toggle("oskar-trial-mode", trial);
-    document.body.classList.toggle("oskar-main-mode", !trial);
-    if(!trial){
-      const note = $("oskarTrialSettingsNote");
-      if(note) note.style.display = "none";
-      $$("#page-settings .oskar-trial-locked-settings-card input,#page-settings .oskar-trial-locked-settings-card select,#page-settings .oskar-trial-locked-settings-card textarea,#page-settings .oskar-trial-locked-settings-card button").forEach(el => {
-        if(el.dataset && el.dataset.oskarOldDisabled === "0") el.disabled = false;
-      });
-    }
-  }
-
-  function invalidLogo(src){
-    src = String(src || "");
-    return !src || /undefined|null|about:blank/i.test(src);
-  }
-
+  function badLogo(v){ const s = String(v || "").trim(); return !s || s === "undefined" || s === "null" || s === "#" || s === "about:blank" || /\/undefined$|\/null$/.test(s); }
   function bestLogo(){
     const st = (window.state && window.state.settings) || {};
-    const c = [
-      st.localLogo,
-      st.logo,
-      st.logoUrl,
-      st.shopLogo,
-      localStorage.getItem("oskar_cached_shop_logo_data_url_v1"),
-      $("topShopLogo")?.getAttribute("src"),
-      $("sideShopLogo")?.getAttribute("src"),
-      $("topShopLogo")?.src,
-      $("sideShopLogo")?.src
-    ].filter(x => !invalidLogo(x));
-    return c[0] || FALLBACK_LOGO;
+    const fromStorage = ["oskar_fast_logo_cache_v1","oskar_last_logo_v1"].map(k => { try{return localStorage.getItem(k)}catch{return ""} });
+    const candidates = [st.localLogo, st.logoData, st.logo, st.logoUrl, st.shopLogo, ...fromStorage, $("topShopLogo")?.getAttribute("src"), $("sideShopLogo")?.getAttribute("src")];
+    return candidates.find(v => !badLogo(v)) || fallbackLogo();
   }
-
-  function applyFastLogo(force){
-    const src = bestLogo() || FALLBACK_LOGO;
-    $$(".shop-logo,.invoice-logo").forEach(img => {
-      if(!img) return;
-      img.removeAttribute("crossorigin");
-      img.referrerPolicy = "no-referrer";
-      img.decoding = "sync";
-      img.loading = "eager";
-      img.onerror = function(){ this.onerror = null; this.src = FALLBACK_LOGO; };
-      if(force || invalidLogo(img.getAttribute("src")) || invalidLogo(img.src) || (img.complete && img.naturalWidth === 0)){
-        img.src = src;
-      }
-      if(img.classList.contains("invoice-logo")){
-        img.style.width = "54px";
-        img.style.height = "54px";
-        img.style.maxWidth = "54px";
-        img.style.maxHeight = "54px";
-        img.style.objectFit = "cover";
-      }
+  function preloadLogo(src){ if(badLogo(src) || logoCache.has(src)) return; const img = new Image(); img.decoding = "async"; img.loading = "eager"; img.src = src; logoCache.set(src, img); if(img.decode) img.decode().catch(()=>{}); }
+  function applyFastLogo(force=false){
+    logoRuns++;
+    const src = bestLogo(), fallback = fallbackLogo();
+    preloadLogo(src);
+    try{ if(src.startsWith("data:image/")) localStorage.setItem("oskar_fast_logo_cache_v1", src); }catch{}
+    $$("#topShopLogo,#sideShopLogo,img.shop-logo,img.invoice-logo").forEach(img => {
+      img.loading = "eager"; img.decoding = "sync"; img.setAttribute("fetchpriority", "high"); img.referrerPolicy = "no-referrer"; img.removeAttribute("crossorigin");
+      img.onerror = function(){ this.onerror = null; this.src = fallback; this.style.visibility = "visible"; };
+      const cur = img.getAttribute("src") || "", broken = img.complete && img.naturalWidth === 0;
+      if(force || badLogo(cur) || broken || logoRuns < 8) img.src = src;
+      img.style.visibility = "visible";
     });
   }
 
-  function cacheLogoUpload(){
-    const input = $("settingLogoFile");
-    if(!input || input.dataset.oskarStableLogoCache === "1") return;
-    input.dataset.oskarStableLogoCache = "1";
-    input.addEventListener("change", function(){
-      const file = input.files && input.files[0];
-      if(!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const data = String(reader.result || "");
-        if(data.startsWith("data:image/")){
-          try{ localStorage.setItem("oskar_cached_shop_logo_data_url_v1", data); }catch{}
-          applyFastLogo(true);
-        }
-      };
-      reader.readAsDataURL(file);
+  function normalizeTrialLock(){
+    const active = trialActive();
+    document.body.classList.toggle("oskar-trial-mode", !!active);
+    const page = $("page-settings"); if(!page) return;
+    const pay = $("paymentAccountsList")?.closest(".card") || $$(":scope > .card", page).find(c => /حسابات الدفع|التحويل|payment/i.test(c.textContent || ""));
+    $$(":scope > .card", page).forEach(card => {
+      if(pay && card === pay){ card.classList.add("oskar-payment-settings-card"); card.classList.remove("oskar-trial-locked-settings-card"); }
+      else card.classList.toggle("oskar-trial-locked-settings-card", !!active);
     });
+    const note = $("oskarTrialSettingsNote"); if(note) note.style.display = active ? "block" : "none";
+    const homeCard = $("oskarPrimeHomeCard"); if(homeCard) homeCard.style.display = active ? "block" : "none";
   }
 
-  function fixPrimeButtons(){
-    const trial = $("trialLoginBtn");
-    const prime = $("oskarPrimeBuyLoginBtn");
-    const note = $("trialLoginNote");
-    if(trial){
-      trial.classList.remove("oskar-prime-open-btn");
-      trial.style.display = "flex";
-      trial.style.width = "100%";
-    }
-    if(prime){
-      prime.classList.add("oskar-prime-open-btn");
-      prime.style.display = "flex";
-      prime.style.width = "100%";
-      if(note && note.nextElementSibling !== prime) note.insertAdjacentElement("afterend", prime);
-    }
+  function stabilizeLoginButtons(){
+    const card = document.querySelector("#authLock .auth-card"); if(!card) return;
+    const trial = $("trialLoginBtn"), note = $("trialLoginNote"), prime = $("oskarPrimeBuyLoginBtn");
+    if(trial && note && trial.nextElementSibling !== note) trial.insertAdjacentElement("afterend", note);
+    if(note && prime && note.nextElementSibling !== prime) note.insertAdjacentElement("afterend", prime);
+    if(trial){ trial.style.display = "flex"; trial.style.alignItems = "center"; trial.style.justifyContent = "center"; trial.style.gap = "8px"; if(!trial.innerHTML.trim()) trial.innerHTML = '<i class="fa-solid fa-flask"></i> فترة تجريبية 12 ساعة'; }
+    if(prime) prime.style.marginTop = "10px";
   }
 
-  function fixCartLivePriceDom(){
-    const st = window.state;
-    if(!st || !Array.isArray(st.cart)) return;
-    st.cart.forEach(line => {
-      if(line.manualPrice === undefined && line.price !== undefined) line.manualPrice = line.price;
-      const row = document.querySelector(`[data-cart-line="${line.id}"]`);
-      if(!row) return;
-      const priceInp = row.querySelector("[data-change-cart-price]");
-      if(priceInp && document.activeElement !== priceInp) priceInp.value = String(Number(line.price || 0));
-    });
+  function productForLine(line){ if(!line) return null; try{ if(typeof window.getProductById === "function") return window.getProductById(line.productId); }catch{} return (window.state?.products || []).find(p => p.id === line.productId) || null; }
+  function defaultUnit(product){ try{ if(typeof window.getDefaultSaleUnit === "function") return window.getDefaultSaleUnit(product); }catch{} return product?.unitType || product?.baseUnit || "piece"; }
+  function priceInfo(product, qty, unit){ try{ if(typeof window.priceForLine === "function") return window.priceForLine(product, qty, unit); }catch{} const unitPrice = num(product?.salePrice,0), unitCost = num(product?.costPrice,0); return {qty, selectedUnit:unit, baseQty:qty, unitLabel:unit, price:unitPrice, costPrice:unitCost, total:unitPrice*qty, costTotal:unitCost*qty}; }
+  function recalcLine(line, resetManualPrice=false){
+    if(!line) return line;
+    const product = productForLine(line), qty = num(line.qty, 0), unit = line.selectedUnit || defaultUnit(product);
+    if(resetManualPrice){ line.manualPrice = false; delete line.manualUnitPrice; }
+    const base = product ? priceInfo(product, qty, unit) : {};
+    const keepManual = !!line.manualPrice;
+    const currentPrice = keepManual ? num(line.manualUnitPrice ?? line.price, num(base.price,0)) : num(base.price, num(line.price,0));
+    Object.assign(line, base);
+    line.qty = qty; line.selectedUnit = unit; line.price = currentPrice; line.total = currentPrice * qty;
+    if(keepManual) line.manualUnitPrice = currentPrice;
+    if(base.costPrice !== undefined) line.costPrice = num(base.costPrice,0);
+    if(base.costTotal !== undefined) line.costTotal = num(base.costTotal,0);
+    return line;
   }
-
-  document.addEventListener("input", function(e){
-    const price = e.target.closest && e.target.closest("[data-change-cart-price]");
-    if(!price || !window.state || !Array.isArray(window.state.cart)) return;
-    const line = window.state.cart.find(x => x.id === price.dataset.changeCartPrice);
+  function totals(){
+    const cart = window.state?.cart || [];
+    const subtotal = cart.reduce((s,x) => s + num(x.total,0), 0);
+    const type = $("discountType")?.value || "fixed", val = num($("discountValue")?.value || 0, 0);
+    let discount = type === "percent" ? subtotal * val / 100 : val;
+    discount = Math.min(Math.max(discount, 0), subtotal);
+    const total = subtotal - discount, cost = cart.reduce((s,x) => s + num(x.costTotal,0), 0);
+    return {subtotal, discount, total, cost, profit: total - cost};
+  }
+  function updateTotalsDom(){ const t = totals(); if($("cartSubtotal")) $("cartSubtotal").textContent = money(t.subtotal); if($("cartDiscount")) $("cartDiscount").textContent = money(t.discount); if($("cartTotal")) $("cartTotal").textContent = money(t.total); return t; }
+  function updateLineDom(line){
     if(!line) return;
-    const value = Math.round((Number(String(price.value || "0").replace(",", ".")) || 0) * 1000) / 1000;
-    line.manualPrice = value;
-    line.price = value;
-    line.total = value * (Number(line.qty || 0) || 0);
-    const row = price.closest("[data-cart-line]");
-    const total = row && row.querySelector(".line-total");
-    if(total && typeof window.money === "function") total.textContent = window.money(line.total);
-    if(typeof window.calculateCartTotals === "function"){
-      const t = window.calculateCartTotals();
-      if($("cartSubtotal")) $("cartSubtotal").textContent = window.money(t.subtotal);
-      if($("cartDiscount")) $("cartDiscount").textContent = window.money(t.discount);
-      if($("cartTotal")) $("cartTotal").textContent = window.money(t.total);
+    const row = document.querySelector(`[data-cart-line="${CSS.escape(line.id)}"]`); if(!row) return;
+    const price = row.querySelector("[data-change-cart-price]"); if(price && document.activeElement !== price) price.value = String(num(line.price,0));
+    const total = row.querySelector(".line-total"); if(total) total.textContent = money(line.total);
+  }
+  function customUpdateCartLine(lineId, patch={}, rerender=true){
+    const line = (window.state?.cart || []).find(x => x.id === lineId); if(!line) return;
+    const resetManual = Object.prototype.hasOwnProperty.call(patch,"selectedUnit");
+    Object.assign(line, patch || {});
+    if(Object.prototype.hasOwnProperty.call(patch,"price")){ line.manualPrice = true; line.manualUnitPrice = num(patch.price,0); }
+    if(resetManual){ line.manualPrice = false; delete line.manualUnitPrice; }
+    recalcLine(line, resetManual);
+    if(rerender && typeof window.renderCart === "function"){ try{ window.renderCart(); }catch{} setTimeout(enhanceCartPrices,0); }
+    else{ updateLineDom(line); updateTotalsDom(); }
+  }
+  function ensurePriceInput(row){
+    const id = row?.dataset?.cartLine; if(!id || row.querySelector("[data-change-cart-price]")) return;
+    const line = (window.state?.cart || []).find(x => x.id === id); if(!line) return;
+    recalcLine(line, false);
+    const controls = row.querySelector(".oskar-cart-controls") || row;
+    const wrap = document.createElement("div");
+    wrap.className = "oskar-cart-price-wrap";
+    wrap.innerHTML = `<span class="oskar-cart-price-label">سعر البيع</span><input class="input oskar-cart-price-input" type="number" inputmode="decimal" min="0" step="0.001" data-change-cart-price="${esc(id)}" value="${esc(String(num(line.price,0)))}"><span class="oskar-cart-price-note">قابل للتعديل</span>`;
+    const unit = controls.querySelector("[data-change-cart-unit]");
+    if(unit && unit.nextSibling) unit.parentNode.insertBefore(wrap, unit.nextSibling); else controls.appendChild(wrap);
+  }
+  function enhanceCartPrices(){ $$("[data-cart-line]").forEach(ensurePriceInput); updateTotalsDom(); }
+
+  function installCartRuntime(){
+    if(runtimeInstalled || !window.state) return;
+    runtimeInstalled = true;
+    window.updateCartLine = customUpdateCartLine;
+    window.calculateCartTotals = function(){ try{ (window.state?.cart || []).forEach(line => recalcLine(line,false)); }catch{} return totals(); };
+    if(typeof window.renderCart === "function" && !window.renderCart.__oskarEditablePriceFinal){
+      const old = window.renderCart;
+      window.renderCart = function(){ const res = old.apply(this, arguments); setTimeout(enhanceCartPrices,0); return res; };
+      window.renderCart.__oskarEditablePriceFinal = true;
     }
-  }, true);
-
-  function tick(force){
-    applyModeClass();
-    applyFastLogo(!!force);
-    cacheLogoUpload();
-    fixPrimeButtons();
-    fixCartLivePriceDom();
+    if(typeof window.addToCart === "function" && !window.addToCart.__oskarEditablePriceFinal){
+      const oldAdd = window.addToCart;
+      window.addToCart = function(){ const res = oldAdd.apply(this, arguments); try{ (window.state?.cart || []).forEach(line => { if(line.manualPrice === undefined) line.manualPrice = false; recalcLine(line,false); }); }catch{} setTimeout(enhanceCartPrices,0); return res; };
+      window.addToCart.__oskarEditablePriceFinal = true;
+    }
+    document.addEventListener("input", function(e){
+      const price = e.target.closest && e.target.closest("[data-change-cart-price]");
+      if(price){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); customUpdateCartLine(price.dataset.changeCartPrice, {price:num(price.value,0), manualPrice:true}, false); }
+    }, true);
+    document.addEventListener("change", function(e){
+      const unit = e.target.closest && e.target.closest("[data-change-cart-unit]");
+      if(unit){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); customUpdateCartLine(unit.dataset.changeCartUnit, {selectedUnit:unit.value, manualPrice:false}, true); }
+    }, true);
+    document.addEventListener("click", function(e){
+      const inc = e.target.closest && e.target.closest("[data-inc-cart]");
+      const dec = e.target.closest && e.target.closest("[data-dec-cart]");
+      const rem = e.target.closest && e.target.closest("[data-remove-cart]");
+      if(inc || dec || rem){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }
+      if(inc){ const line = (window.state?.cart || []).find(x => x.id === inc.dataset.incCart); if(line) customUpdateCartLine(line.id, {qty:num(line.qty,1)+1}, true); return; }
+      if(dec){ const line = (window.state?.cart || []).find(x => x.id === dec.dataset.decCart); if(line) customUpdateCartLine(line.id, {qty:Math.max(0,num(line.qty,1)-1)}, true); return; }
+      if(rem){ if(window.state?.cart) window.state.cart = window.state.cart.filter(x => x.id !== rem.dataset.removeCart); if(typeof window.renderCart === "function") window.renderCart(); else enhanceCartPrices(); }
+    }, true);
+    const cartBox = $("cartLines");
+    if(cartBox && !cartObserver){ cartObserver = new MutationObserver(() => requestAnimationFrame(enhanceCartPrices)); cartObserver.observe(cartBox,{childList:true,subtree:true}); }
+    enhanceCartPrices();
   }
 
-  if(document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => tick(true), { once:true });
-  } else {
-    tick(true);
+  function tick(){ normalizeTrialLock(); stabilizeLoginButtons(); applyFastLogo(logoRuns < 3); installCartRuntime(); enhanceCartPrices(); }
+  function init(){
+    tick();
+    let fast = 0;
+    const fastTimer = setInterval(() => { tick(); if(++fast > 30) clearInterval(fastTimer); }, 160);
+    setInterval(tick, 2500);
+    document.addEventListener("visibilitychange", () => { if(!document.hidden) tick(); });
+    window.addEventListener("online", () => applyFastLogo(true));
   }
-  window.addEventListener("load", () => tick(true), { once:true });
-  document.addEventListener("click", () => setTimeout(() => tick(false), 80), true);
-  let n = 0;
-  const iv = setInterval(() => {
-    tick(n < 6);
-    if(++n > 30) clearInterval(iv);
-  }, 250);
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, {once:true}); else init();
 })();
 </script>
 
@@ -10524,7 +10405,7 @@
           const line = state.cart.find(x => x.id === inc.dataset.incCart);
           if (line) {
             line.qty = cleanNumber(line.qty, 1) + 1;
-            updateCartLine(line.id, { qty: line.qty }, false);
+            updateCartLine(line.id, { qty: line.qty });
           }
           return;
         }
@@ -10534,7 +10415,7 @@
           const line = state.cart.find(x => x.id === dec.dataset.decCart);
           if (line) {
             line.qty = Math.max(0, cleanNumber(line.qty, 1) - 1);
-            updateCartLine(line.id, { qty: line.qty }, false);
+            updateCartLine(line.id, { qty: line.qty });
           }
           return;
         }
@@ -10770,7 +10651,7 @@
         const cartUnit = e.target.closest("[data-change-cart-unit]");
         if (cartUnit) {
           const line = state.cart.find(x => x.id === cartUnit.dataset.changeCartUnit);
-          if (line) updateCartLine(line.id, { selectedUnit: cartUnit.value }, false);
+          if (line) updateCartLine(line.id, { selectedUnit: cartUnit.value });
           return;
         }
       });
@@ -10779,13 +10660,6 @@
         if (cartQty) {
           const line = state.cart.find(x => x.id === cartQty.dataset.changeCartQty);
           if (line) updateCartLine(line.id, { qty: cartQty.value }, false);
-          return;
-        }
-
-        const cartPrice = e.target.closest("[data-change-cart-price]");
-        if (cartPrice) {
-          const line = state.cart.find(x => x.id === cartPrice.dataset.changeCartPrice);
-          if (line) updateCartLine(line.id, { manualPrice: cartPrice.value }, false);
           return;
         }
 
@@ -13869,7 +13743,7 @@
     window.getSaleUnitOptions = saleOptions; window.getDefaultSaleUnit = defaultSaleUnit; window.getUnitFactor = unitFactor; window.getUnitText = unitText; window.priceForLine = priceLine;
     const sel = $("productUnitType");
     if(sel){ const desired=["piece","carton","kg","liter"], labels={piece:"قطعة",carton:"كرتونة",kg:"كيلو",liter:"لتر"}; desired.forEach((value,idx)=>{ let opt=sel.querySelector('option[value="'+value+'"]'); if(!opt){opt=document.createElement("option");opt.value=value;opt.textContent=labels[value];} if(sel.children[idx]!==opt) sel.insertBefore(opt,sel.children[idx]||null); }); if(!sel.value) sel.value="piece"; }
-    /* تم تعطيل إعادة كتابة قائمة الوحدة بشكل متكرر حتى لا تغمز القائمة أثناء البيع. */
+    document.querySelectorAll("select.oskar-cart-unit").forEach(select=>{ const lineId=select.dataset.changeCartUnit; const line=(window.state?.cart||[]).find(x=>x.id===lineId); const product=line?(window.state?.products||[]).find(p=>p.id===line.productId):null; if(product && getCleanProduct(product)?.unitType==="carton"){ const val=select.value||"piece"; select.innerHTML=saleOptions(product).map(o=>'<option value="'+o.value+'" '+(o.value===val?'selected':'')+'>'+o.label+'</option>').join(""); } });
   }
   function patchAddToCart(){
     if(!window.addToCart || window.addToCart.__oskarPieceFirstV2) return;
@@ -14410,303 +14284,6 @@
   function schedule(){if(scheduled)return;scheduled=true;setTimeout(()=>{scheduled=false;lightTick()},160)}
   function init(){staticWork();lightTick();let count=0;const iv=setInterval(()=>{lightTick();if(++count>40)clearInterval(iv)},1000);new MutationObserver(muts=>{let needs=false;for(const m of muts){if(m.addedNodes&&m.addedNodes.length){needs=true;break}}if(needs){schedule();for(const m of muts) m.addedNodes&&m.addedNodes.forEach(n=>{if(n.nodeType===1)renameLabels(n)})}}).observe(document.body,{childList:true,subtree:true});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-})();
-</script>
-
-
-<style id="oskar-stable-final-no-mojibake-fixes-2026-04-30">
-  html, body { font-family:"Cairo", Arial, sans-serif !important; }
-  html body .cart-line {
-    grid-template-columns:minmax(160px,1fr) 165px 120px 105px 44px !important;
-    align-items:center !important;
-  }
-  html body .oskar-cart-price-field {
-    display:grid !important;
-    gap:4px !important;
-    min-width:0 !important;
-  }
-  html body .cart-price-input {
-    height:42px !important;
-    padding:8px 10px !important;
-    direction:ltr !important;
-    text-align:center !important;
-    font-weight:900 !important;
-  }
-  html body .oskar-cart-unit {
-    min-height:42px !important;
-    backface-visibility:hidden !important;
-    transform:translateZ(0) !important;
-    will-change:auto !important;
-  }
-  body:not(.oskar-trial-mode) #page-settings > .card.oskar-trial-locked-settings-card {
-    display:block !important;
-    opacity:1 !important;
-    filter:none !important;
-    pointer-events:auto !important;
-  }
-  body:not(.oskar-trial-mode) #page-settings > .card.oskar-trial-locked-settings-card > * {
-    pointer-events:auto !important;
-  }
-  body:not(.oskar-trial-mode) #page-settings > .card.oskar-trial-locked-settings-card::after {
-    content:none !important;
-    display:none !important;
-  }
-  body:not(.oskar-trial-mode) #oskarTrialSettingsNote {
-    display:none !important;
-  }
-  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card {
-    display:block !important;
-    position:relative !important;
-    opacity:.72 !important;
-    filter:none !important;
-    overflow:hidden !important;
-  }
-  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card > * {
-    pointer-events:none !important;
-  }
-  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card::after {
-    content:"\f023  مقفول" !important;
-    font-family:"Font Awesome 6 Free","Cairo",Arial,sans-serif !important;
-    font-weight:900 !important;
-    position:absolute !important;
-    top:50% !important;
-    left:50% !important;
-    right:auto !important;
-    bottom:auto !important;
-    transform:translate(-50%,-50%) !important;
-    min-width:132px !important;
-    min-height:52px !important;
-    padding:13px 20px !important;
-    border-radius:20px !important;
-    background:#fff7ed !important;
-    border:1px solid #fed7aa !important;
-    color:#9a3412 !important;
-    box-shadow:0 18px 42px rgba(154,52,18,.16) !important;
-    display:flex !important;
-    align-items:center !important;
-    justify-content:center !important;
-    font-size:18px !important;
-    z-index:8 !important;
-    opacity:1 !important;
-    pointer-events:auto !important;
-    white-space:nowrap !important;
-  }
-  body.oskar-trial-mode #page-settings .oskar-payment-settings-card {
-    display:block !important;
-    opacity:1 !important;
-    filter:none !important;
-    pointer-events:auto !important;
-  }
-  body.oskar-trial-mode #page-settings .oskar-payment-settings-card::after {
-    content:none !important;
-    display:none !important;
-  }
-  #trialLoginBtn {
-    display:flex !important;
-    width:100% !important;
-    position:relative !important;
-    z-index:2 !important;
-  }
-  #oskarPrimeBuyLoginBtn {
-    display:flex !important;
-    width:100% !important;
-    position:relative !important;
-    z-index:1 !important;
-    margin-top:10px !important;
-    clear:both !important;
-  }
-  img.shop-logo, img.invoice-logo {
-    object-fit:cover !important;
-    object-position:center !important;
-    background:#dbeafe !important;
-  }
-  @media(max-width:900px) {
-    html body .cart-line {
-      grid-template-columns:1fr !important;
-      gap:10px !important;
-    }
-  }
-  @media(max-width:650px) {
-    #oskarPrimeSafeContent .oskar-prime-safe-grid {
-      grid-template-columns:1fr !important;
-    }
-    #oskarPrimeSafeContent .oskar-prime-safe-method {
-      display:flex !important;
-      width:100% !important;
-      min-height:112px !important;
-      align-items:center !important;
-      justify-content:space-between !important;
-      text-align:right !important;
-    }
-    #oskarPrimeSafeContent .oskar-prime-safe-method img {
-      width:76px !important;
-      height:76px !important;
-      flex:0 0 auto !important;
-    }
-  }
-</style>
-<script id="oskar-stable-final-no-mojibake-fixes-2026-04-30">
-(function(){
-  "use strict";
-  if(window.__OSKAR_STABLE_FINAL_NO_MOJIBAKE_20260430__) return;
-  window.__OSKAR_STABLE_FINAL_NO_MOJIBAKE_20260430__ = true;
-
-  const MODE_KEY = "oskar_storage_mode_v1";
-  const START_KEY = "oskar_trial_started_at_v1";
-  const DUR = 12 * 60 * 60 * 1000;
-  const FALLBACK_LOGO = "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22220%22%20height%3D%22220%22%20viewBox%3D%220%200%20220%20220%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20stop-color%3D%22%232563eb%22/%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%237c3aed%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%230891b2%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22220%22%20height%3D%22220%22%20rx%3D%2254%22%20fill%3D%22url%28%23g%29%22/%3E%3Ccircle%20cx%3D%22174%22%20cy%3D%2246%22%20r%3D%2234%22%20fill%3D%22rgba%28255%2C255%2C255%2C.16%29%22/%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2258%25%22%20text-anchor%3D%22middle%22%20font-size%3D%2282%22%20font-family%3D%22Arial%22%20font-weight%3D%22900%22%20fill%3D%22white%22%3EO%3C/text%3E%3C/svg%3E";
-  const $ = (id) => document.getElementById(id);
-  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-
-  function isTrial(){
-    const st = Number(localStorage.getItem(START_KEY) || 0);
-    return localStorage.getItem(MODE_KEY) === "trial" && st && (Date.now() - st) < DUR;
-  }
-
-  function applyModeClass(){
-    const trial = !!isTrial();
-    document.body.classList.toggle("oskar-trial-mode", trial);
-    document.body.classList.toggle("oskar-main-mode", !trial);
-    if(!trial){
-      const note = $("oskarTrialSettingsNote");
-      if(note) note.style.display = "none";
-      $$("#page-settings .oskar-trial-locked-settings-card input,#page-settings .oskar-trial-locked-settings-card select,#page-settings .oskar-trial-locked-settings-card textarea,#page-settings .oskar-trial-locked-settings-card button").forEach(el => {
-        if(el.dataset && el.dataset.oskarOldDisabled === "0") el.disabled = false;
-      });
-    }
-  }
-
-  function invalidLogo(src){
-    src = String(src || "");
-    return !src || /undefined|null|about:blank/i.test(src);
-  }
-
-  function bestLogo(){
-    const st = (window.state && window.state.settings) || {};
-    const c = [
-      st.localLogo,
-      st.logo,
-      st.logoUrl,
-      st.shopLogo,
-      localStorage.getItem("oskar_cached_shop_logo_data_url_v1"),
-      $("topShopLogo")?.getAttribute("src"),
-      $("sideShopLogo")?.getAttribute("src"),
-      $("topShopLogo")?.src,
-      $("sideShopLogo")?.src
-    ].filter(x => !invalidLogo(x));
-    return c[0] || FALLBACK_LOGO;
-  }
-
-  function applyFastLogo(force){
-    const src = bestLogo() || FALLBACK_LOGO;
-    $$(".shop-logo,.invoice-logo").forEach(img => {
-      if(!img) return;
-      img.removeAttribute("crossorigin");
-      img.referrerPolicy = "no-referrer";
-      img.decoding = "sync";
-      img.loading = "eager";
-      img.onerror = function(){ this.onerror = null; this.src = FALLBACK_LOGO; };
-      if(force || invalidLogo(img.getAttribute("src")) || invalidLogo(img.src) || (img.complete && img.naturalWidth === 0)){
-        img.src = src;
-      }
-      if(img.classList.contains("invoice-logo")){
-        img.style.width = "54px";
-        img.style.height = "54px";
-        img.style.maxWidth = "54px";
-        img.style.maxHeight = "54px";
-        img.style.objectFit = "cover";
-      }
-    });
-  }
-
-  function cacheLogoUpload(){
-    const input = $("settingLogoFile");
-    if(!input || input.dataset.oskarStableLogoCache === "1") return;
-    input.dataset.oskarStableLogoCache = "1";
-    input.addEventListener("change", function(){
-      const file = input.files && input.files[0];
-      if(!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const data = String(reader.result || "");
-        if(data.startsWith("data:image/")){
-          try{ localStorage.setItem("oskar_cached_shop_logo_data_url_v1", data); }catch{}
-          applyFastLogo(true);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function fixPrimeButtons(){
-    const trial = $("trialLoginBtn");
-    const prime = $("oskarPrimeBuyLoginBtn");
-    const note = $("trialLoginNote");
-    if(trial){
-      trial.classList.remove("oskar-prime-open-btn");
-      trial.style.display = "flex";
-      trial.style.width = "100%";
-    }
-    if(prime){
-      prime.classList.add("oskar-prime-open-btn");
-      prime.style.display = "flex";
-      prime.style.width = "100%";
-      if(note && note.nextElementSibling !== prime) note.insertAdjacentElement("afterend", prime);
-    }
-  }
-
-  function fixCartLivePriceDom(){
-    const st = window.state;
-    if(!st || !Array.isArray(st.cart)) return;
-    st.cart.forEach(line => {
-      if(line.manualPrice === undefined && line.price !== undefined) line.manualPrice = line.price;
-      const row = document.querySelector(`[data-cart-line="${line.id}"]`);
-      if(!row) return;
-      const priceInp = row.querySelector("[data-change-cart-price]");
-      if(priceInp && document.activeElement !== priceInp) priceInp.value = String(Number(line.price || 0));
-    });
-  }
-
-  document.addEventListener("input", function(e){
-    const price = e.target.closest && e.target.closest("[data-change-cart-price]");
-    if(!price || !window.state || !Array.isArray(window.state.cart)) return;
-    const line = window.state.cart.find(x => x.id === price.dataset.changeCartPrice);
-    if(!line) return;
-    const value = Math.round((Number(String(price.value || "0").replace(",", ".")) || 0) * 1000) / 1000;
-    line.manualPrice = value;
-    line.price = value;
-    line.total = value * (Number(line.qty || 0) || 0);
-    const row = price.closest("[data-cart-line]");
-    const total = row && row.querySelector(".line-total");
-    if(total && typeof window.money === "function") total.textContent = window.money(line.total);
-    if(typeof window.calculateCartTotals === "function"){
-      const t = window.calculateCartTotals();
-      if($("cartSubtotal")) $("cartSubtotal").textContent = window.money(t.subtotal);
-      if($("cartDiscount")) $("cartDiscount").textContent = window.money(t.discount);
-      if($("cartTotal")) $("cartTotal").textContent = window.money(t.total);
-    }
-  }, true);
-
-  function tick(force){
-    applyModeClass();
-    applyFastLogo(!!force);
-    cacheLogoUpload();
-    fixPrimeButtons();
-    fixCartLivePriceDom();
-  }
-
-  if(document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => tick(true), { once:true });
-  } else {
-    tick(true);
-  }
-  window.addEventListener("load", () => tick(true), { once:true });
-  document.addEventListener("click", () => setTimeout(() => tick(false), 80), true);
-  let n = 0;
-  const iv = setInterval(() => {
-    tick(n < 6);
-    if(++n > 30) clearInterval(iv);
-  }, 250);
 })();
 </script>
 
