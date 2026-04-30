@@ -2671,6 +2671,7 @@
           <label class="field-label">نوع الوحدة</label>
           <select id="productUnitType" class="select">
             <option value="piece">قطعة</option>
+            <option value="carton">كرتونة</option>
             <option value="kg">كيلو</option>
             <option value="liter">لتر</option>
           </select>
@@ -3712,6 +3713,7 @@
     }
 
     function factorForUnitType(unitType, cartonUnits = 1) {
+      if (unitType === "carton") return Math.max(1, cleanNumber(cartonUnits, 1));
       if (unitType === "kg") return 1000;
       if (unitType === "liter") return 1000;
       return 1;
@@ -3722,10 +3724,12 @@
       let unitType = rawUnitType;
       if (unitType === "g") unitType = "kg";
       if (unitType === "ml") unitType = "liter";
-      const convertedUnsupportedToPiece = !["piece", "kg", "liter", "g", "ml"].includes(rawUnitType);
-      if (!["piece", "kg", "liter"].includes(unitType)) unitType = "piece";
 
-      const cartonUnits = 1;
+      const allowedUnits = ["piece", "carton", "kg", "liter", "g", "ml"];
+      const convertedUnsupportedToPiece = !allowedUnits.includes(rawUnitType);
+      if (!["piece", "carton", "kg", "liter"].includes(unitType)) unitType = "piece";
+
+      const cartonUnits = unitType === "carton" ? Math.max(1, cleanNumber(p.cartonUnits, 1)) : 1;
       const factor = factorForUnitType(unitType, cartonUnits);
       const stock = cleanNumber(p.stock || 0);
       const costPrice = cleanNumber(p.costPrice || 0);
@@ -3750,7 +3754,7 @@
         salePrice,
         displayCostPrice,
         displaySalePrice,
-        cartonPrice: 0,
+        cartonPrice: unitType === "carton" ? displaySalePrice : 0,
         lowStock: cleanNumber(p.lowStock || state.settings?.lowStock || 5, 5),
         image: ""
       };
@@ -3824,6 +3828,14 @@
         ];
       }
 
+      if (p.unitType === "carton") {
+        const cartonFactor = Math.max(1, cleanNumber(p.cartonUnits, 1));
+        return [
+          { value: "carton", label: `كرتونة (${cartonFactor} قطعة)`, factor: cartonFactor },
+          { value: "piece", label: "قطعة", factor: 1 }
+        ];
+      }
+
       return [
         { value: "piece", label: "قطعة", factor: 1 }
       ];
@@ -3833,6 +3845,7 @@
       const p = normalizeProduct(product);
       if (p.unitType === "kg") return "kg";
       if (p.unitType === "liter") return "liter";
+      if (p.unitType === "carton") return "carton";
       return "piece";
     }
 
@@ -4918,7 +4931,7 @@
             <span class="stock-pill ${low ? "stock-low" : ""}">${cleanNumber(p.stock)} ${escapeHtml(unitLabel(p.baseUnit, p.customUnit))}</span>
           </div>
           <div class="product-meta">
-            <span>${p.unitType === "kg" ? "1 كيلو = 1000 جرام" : p.unitType === "liter" ? "1 لتر = 1000 مل" : "بيع بالقطعة"}</span>
+            <span>${p.unitType === "kg" ? "1 كيلو = 1000 جرام" : p.unitType === "liter" ? "1 لتر = 1000 مل" : p.unitType === "carton" ? `1 كرتونة = ${cleanNumber(p.cartonUnits,1)} قطعة` : "بيع بالقطعة"}</span>
             <span>${escapeHtml(p.category || "-")}</span>
           </div>
         </div>
@@ -5453,7 +5466,9 @@
               ? "1 كيلو = 1000 جرام، ويمكن البيع بالكسور مثل 0.25"
               : p.unitType === "liter"
                 ? "1 لتر = 1000 مل، ويمكن البيع بالكسور مثل 0.25"
-                : "بيع بالقطعة فقط";
+                : p.unitType === "carton"
+                  ? `1 كرتونة = ${cleanNumber(p.cartonUnits,1)} قطعة، ويمكن البيع بالكرتونة أو القطعة`
+                  : "بيع بالقطعة فقط";
 
           return `
             <tr>
@@ -6090,13 +6105,13 @@
     }
     function refreshProductUnitUI() {
       const unitType = $("productUnitType").value;
-      const isCarton = false;
+      const isCarton = unitType === "carton";
       const isCustom = false;
 
-      $("cartonUnitsBox").classList.toggle("show", false);
-      $("customUnitBox").classList.toggle("show", false);
+      $("cartonUnitsBox").classList.toggle("show", isCarton);
+      $("customUnitBox").classList.toggle("show", isCustom);
 
-      const cartonUnits = 1;
+      const cartonUnits = isCarton ? Math.max(1, cleanNumber($("productCartonUnits").value, 1)) : 1;
       const factor = factorForUnitType(unitType, cartonUnits);
       const baseUnit = baseUnitForType(unitType);
       const enteredStock = cleanNumber($("productStock").value, 0);
@@ -6110,8 +6125,9 @@
       $("basePreviewText").value =
         `${baseStock} ${unitLabel(baseUnit, $("productCustomUnit").value.trim())}`;
 
+      const priceUnitText = unitType === "kg" ? "جرام" : unitType === "liter" ? "مل" : "قطعة";
       $("piecePricePreview").value =
-        `جملة: ${money(baseCost)} / بيع: ${money(baseSale)} لكل ${unitLabel(baseUnit, $("productCustomUnit").value.trim())}`;
+        `جملة داخلي: ${baseCost} / بيع داخلي: ${baseSale} لكل ${priceUnitText}`;
     }
 
     function openProductForm(productId = "") {
@@ -6157,8 +6173,8 @@
 
         const id = $("productId").value || uid("prod");
         const old = getProductById(id);
-        const unitType = ["piece", "kg", "liter"].includes($("productUnitType").value) ? $("productUnitType").value : "piece";
-        const cartonUnits = 1;
+        const unitType = ["piece", "carton", "kg", "liter"].includes($("productUnitType").value) ? $("productUnitType").value : "piece";
+        const cartonUnits = unitType === "carton" ? Math.max(1, cleanNumber($("productCartonUnits").value, 1)) : 1;
         const factor = factorForUnitType(unitType, cartonUnits);
 
         const enteredStock = cleanNumber($("productStock").value, 0);
@@ -10408,6 +10424,8 @@
       normalizeProduct,
       getDefaultSaleUnit,
       getSaleUnitOptions,
+      getUnitFactor,
+      getUnitText,
       priceForLine,
       loadLocalData,
       refreshPendingCount,
@@ -12476,21 +12494,35 @@
 })();
 </script>
 
-<!-- OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3 -->
-<style id="oskarTableTouchScrollFinalV3Style">
+<!-- OSKAR_TABLE_NATIVE_SCROLL_FINAL_V4 -->
+<style id="oskarTableNativeScrollFinalV4Style">
   html body .table-wrap,
   html body .new-page-table-holder{
-    overflow-x:auto!important;
-    overflow-y:visible!important;
+    overflow:auto!important;
     -webkit-overflow-scrolling:touch!important;
-    touch-action:none!important;
-    overscroll-behavior:auto!important;
+    touch-action:pan-x pan-y!important;
+    overscroll-behavior:contain!important;
+    scroll-behavior:auto!important;
+    max-height:min(72dvh,720px);
+    transform:translateZ(0);
+    will-change:scroll-position;
+    contain:layout paint;
     cursor:grab;
   }
   html body .table-wrap:active,
   html body .new-page-table-holder:active{cursor:grabbing;}
   html body .table-wrap table,
-  html body .new-page-table-holder table{touch-action:none!important;}
+  html body .new-page-table-holder table{
+    transform:translateZ(0);
+    backface-visibility:hidden;
+    touch-action:auto!important;
+  }
+  html body .table-wrap thead th,
+  html body .new-page-table-holder thead th{
+    position:sticky;
+    top:0;
+    z-index:3;
+  }
   html body .table-wrap button,
   html body .table-wrap input,
   html body .table-wrap select,
@@ -12499,150 +12531,42 @@
   html body .new-page-table-holder input,
   html body .new-page-table-holder select,
   html body .new-page-table-holder textarea{touch-action:manipulation!important;}
+  @media(max-width:900px){html body .table-wrap,html body .new-page-table-holder{max-height:68dvh;margin-inline:-6px;padding-inline:6px;}}
 </style>
-<script id="oskarTableTouchScrollFinalV3Script">
+<script id="oskarTableNativeScrollFinalV4Script">
 (function(){
   "use strict";
-  if (window.__OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3__) return;
-  window.__OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3__ = true;
-
-  const TABLE_SELECTOR = ".table-wrap,.new-page-table-holder";
-  const INTERACTIVE_SELECTOR = "input,textarea,select,option,button,a,label,[contenteditable='true']";
-  const THRESHOLD = 6;
-  let active = null;
-  let suppressClickUntil = 0;
-
-  function closestTableWrap(target){
-    return target && target.closest ? target.closest(TABLE_SELECTOR) : null;
+  if(window.__OSKAR_TABLE_NATIVE_SCROLL_FINAL_V4__) return;
+  window.__OSKAR_TABLE_NATIVE_SCROLL_FINAL_V4__ = true;
+  const SEL = ".table-wrap,.new-page-table-holder";
+  const INTERACTIVE = "input,textarea,select,button,a,label,[contenteditable='true']";
+  function prep(el){
+    if(!el || el.dataset.nativeScrollV4) return;
+    el.dataset.nativeScrollV4 = "1";
+    el.style.overflow = "auto";
+    el.style.webkitOverflowScrolling = "touch";
+    el.style.touchAction = "pan-x pan-y";
+    el.style.overscrollBehavior = "contain";
+    let drag = null;
+    el.addEventListener("pointerdown", function(e){
+      if(e.pointerType !== "mouse" || e.button !== 0) return;
+      if(e.target.closest && e.target.closest(INTERACTIVE)) return;
+      drag = {x:e.clientX, y:e.clientY, left:el.scrollLeft, top:el.scrollTop};
+      el.setPointerCapture?.(e.pointerId);
+    }, {passive:true});
+    el.addEventListener("pointermove", function(e){
+      if(!drag) return;
+      el.scrollLeft = drag.left - (e.clientX - drag.x);
+      el.scrollTop = drag.top - (e.clientY - drag.y);
+    }, {passive:true});
+    el.addEventListener("pointerup", function(){ drag=null; }, {passive:true});
+    el.addEventListener("pointercancel", function(){ drag=null; }, {passive:true});
   }
-  function canScrollY(el){
-    if (!el || el === document.body || el === document.documentElement) return false;
-    const cs = window.getComputedStyle(el);
-    const oy = cs.overflowY || "";
-    return /(auto|scroll|overlay)/.test(oy) && el.scrollHeight > el.clientHeight + 2;
-  }
-  function verticalTarget(from){
-    let node = from;
-    while (node && node !== document.body && node !== document.documentElement) {
-      if (!node.matches || !node.matches(TABLE_SELECTOR)) {
-        if (canScrollY(node)) return node;
-      }
-      node = node.parentElement;
-    }
-    return document.scrollingElement || document.documentElement;
-  }
-  function maxScrollTop(el){
-    if (el === document.scrollingElement || el === document.documentElement || el === document.body) {
-      const doc = document.documentElement;
-      const body = document.body;
-      return Math.max(0, Math.max(doc.scrollHeight, body ? body.scrollHeight : 0) - window.innerHeight);
-    }
-    return Math.max(0, el.scrollHeight - el.clientHeight);
-  }
-  function getScrollTop(el){
-    if (el === document.scrollingElement || el === document.documentElement || el === document.body) {
-      return window.pageYOffset || document.documentElement.scrollTop || 0;
-    }
-    return el.scrollTop || 0;
-  }
-  function setScrollTop(el, value){
-    const next = Math.max(0, Math.min(maxScrollTop(el), value));
-    if (el === document.scrollingElement || el === document.documentElement || el === document.body) {
-      window.scrollTo(window.pageXOffset || document.documentElement.scrollLeft || 0, next);
-    } else {
-      el.scrollTop = next;
-    }
-  }
-  function onTouchStart(e){
-    if (!e.touches || e.touches.length !== 1) return;
-    const wrap = closestTableWrap(e.target);
-    if (!wrap) return;
-    const t = e.touches[0];
-    active = {
-      wrap: wrap,
-      yTarget: verticalTarget(wrap.parentElement || wrap),
-      startX: t.clientX,
-      startY: t.clientY,
-      lastX: t.clientX,
-      lastY: t.clientY,
-      mode: ""
-    };
-  }
-  function onTouchMove(e){
-    if (!active || !e.touches || e.touches.length !== 1) return;
-    const t = e.touches[0];
-    const dxTotal = t.clientX - active.startX;
-    const dyTotal = t.clientY - active.startY;
-    const absX = Math.abs(dxTotal);
-    const absY = Math.abs(dyTotal);
-    if (!active.mode) {
-      if (absX < THRESHOLD && absY < THRESHOLD) return;
-      active.mode = absY >= absX ? "vertical" : "horizontal";
-    }
-    e.preventDefault();
-    e.stopPropagation();
-    suppressClickUntil = Date.now() + 350;
-    if (active.mode === "vertical") {
-      const dy = active.lastY - t.clientY;
-      setScrollTop(active.yTarget, getScrollTop(active.yTarget) + dy);
-    } else {
-      const dx = t.clientX - active.lastX;
-      const before = active.wrap.scrollLeft || 0;
-      active.wrap.scrollLeft = before - dx;
-      if ((active.wrap.scrollLeft || 0) === before && Math.abs(dx) > 0) active.wrap.scrollLeft = before + dx;
-    }
-    active.lastX = t.clientX;
-    active.lastY = t.clientY;
-  }
-  function onTouchEnd(){ active = null; }
-
-  let mouseDrag = null;
-  document.addEventListener("mousedown", function(e){
-    const wrap = closestTableWrap(e.target);
-    if (!wrap || e.button !== 0) return;
-    if (e.target.closest && e.target.closest(INTERACTIVE_SELECTOR)) return;
-    mouseDrag = {wrap:wrap, x:e.clientX, y:e.clientY, left:wrap.scrollLeft || 0, down:false};
-  }, true);
-  document.addEventListener("mousemove", function(e){
-    if (!mouseDrag) return;
-    const dx = e.clientX - mouseDrag.x;
-    const dy = e.clientY - mouseDrag.y;
-    if (!mouseDrag.down && Math.max(Math.abs(dx), Math.abs(dy)) < THRESHOLD) return;
-    mouseDrag.down = true;
-    if (Math.abs(dx) >= Math.abs(dy)) {
-      e.preventDefault();
-      mouseDrag.wrap.scrollLeft = mouseDrag.left - dx;
-      suppressClickUntil = Date.now() + 350;
-    }
-  }, true);
-  document.addEventListener("mouseup", function(){ mouseDrag = null; }, true);
-  document.addEventListener("click", function(e){
-    if (Date.now() < suppressClickUntil && closestTableWrap(e.target)) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }, true);
-
-  document.addEventListener("touchstart", onTouchStart, {capture:true, passive:false});
-  document.addEventListener("touchmove", onTouchMove, {capture:true, passive:false});
-  document.addEventListener("touchend", onTouchEnd, {capture:true, passive:true});
-  document.addEventListener("touchcancel", onTouchEnd, {capture:true, passive:true});
-
-  function refreshTableTouchCss(){
-    document.querySelectorAll(TABLE_SELECTOR).forEach(function(el){
-      el.style.overflowX = "auto";
-      el.style.overflowY = "visible";
-      el.style.webkitOverflowScrolling = "touch";
-      el.style.touchAction = "none";
-      el.style.overscrollBehavior = "auto";
-    });
-  }
-  refreshTableTouchCss();
-  document.addEventListener("DOMContentLoaded", refreshTableTouchCss);
-  setInterval(refreshTableTouchCss, 1200);
+  function tick(){ document.querySelectorAll(SEL).forEach(prep); }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", tick); else tick();
+  new MutationObserver(tick).observe(document.documentElement, {childList:true, subtree:true});
 })();
 </script>
-<!-- /OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3 -->
 
 <script id="oskar-trial-12h-isolated-firebase-and-report-stability-2026-04-30">
 (function(){
@@ -12779,6 +12703,205 @@
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", tick); else tick();
   setInterval(tick, 1500);
+})();
+</script>
+
+
+
+<!-- OSKAR_CARTON_SIDEBAR_SCROLL_FINAL_2026_04_30 -->
+<style id="oskarCartonSidebarScrollFinalStyle">
+  html body .sidebar{
+    height:100dvh!important;
+    max-height:100dvh!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior:contain!important;
+    padding-bottom:170px!important;
+    scrollbar-width:thin;
+  }
+  .oskar-sidebar-scroll-rail{
+    position:absolute;
+    left:7px;
+    top:112px;
+    bottom:98px;
+    width:34px;
+    z-index:9001;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:7px;
+    pointer-events:none;
+  }
+  .oskar-sidebar-scroll-line{
+    flex:1;
+    width:5px;
+    border-radius:999px;
+    background:linear-gradient(180deg,rgba(37,99,235,.12),rgba(37,99,235,.35),rgba(217,164,65,.24));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.65);
+    position:relative;
+    pointer-events:auto;
+  }
+  .oskar-sidebar-scroll-thumb{
+    position:absolute;
+    left:50%;
+    width:28px;
+    height:42px;
+    transform:translate(-50%,0);
+    border:1px solid rgba(191,219,254,.9);
+    border-radius:999px;
+    background:rgba(255,255,255,.96);
+    color:#1d4ed8;
+    box-shadow:0 12px 28px rgba(15,23,42,.16);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:grab;
+    pointer-events:auto;
+    touch-action:none;
+  }
+  .oskar-sidebar-scroll-thumb:active{cursor:grabbing;}
+  .oskar-sidebar-scroll-btn{
+    width:30px;
+    height:30px;
+    border:0;
+    border-radius:14px;
+    background:linear-gradient(135deg,#2563eb,#1d4ed8);
+    color:#fff;
+    box-shadow:0 10px 22px rgba(37,99,235,.22);
+    pointer-events:auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:12px;
+  }
+  .oskar-sidebar-scroll-hint{
+    position:absolute;
+    left:39px;
+    top:50%;
+    transform:translateY(-50%) rotate(-90deg);
+    transform-origin:left center;
+    color:#64748b;
+    font-size:10px;
+    font-weight:900;
+    white-space:nowrap;
+    opacity:.75;
+    pointer-events:none;
+  }
+  @media(max-width:900px){.oskar-sidebar-scroll-rail{left:6px;top:105px;bottom:95px;}}
+  html body .table-wrap,
+  html body .new-page-table-holder{
+    overflow:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+    touch-action:pan-x pan-y!important;
+    overscroll-behavior:contain!important;
+    max-height:min(72dvh,720px)!important;
+    will-change:scroll-position!important;
+  }
+</style>
+<script id="oskarCartonSidebarScrollFinalScript">
+(function(){
+  "use strict";
+  if(window.__OSKAR_CARTON_SIDEBAR_SCROLL_FINAL__) return;
+  window.__OSKAR_CARTON_SIDEBAR_SCROLL_FINAL__ = true;
+  const $ = id => document.getElementById(id);
+  const num = (v,d=0)=>{ const n=parseFloat(String(v??"").replace(/[^0-9+\-.]/g,"")); return Number.isFinite(n)?n:d; };
+  const toast = msg => typeof window.toast === "function" ? window.toast(msg) : console.log(msg);
+
+  function cleanProduct(p){
+    if(!p) return p;
+    const u = ["piece","carton","kg","liter"].includes(p.unitType) ? p.unitType : (p.unitType === "g" ? "kg" : p.unitType === "ml" ? "liter" : "piece");
+    const cartonUnits = u === "carton" ? Math.max(1, num(p.cartonUnits,1)) : 1;
+    const factor = u === "kg" || u === "liter" ? 1000 : u === "carton" ? cartonUnits : 1;
+    return {
+      ...p,
+      unitType:u,
+      baseUnit:u === "kg" ? "g" : u === "liter" ? "ml" : "piece",
+      cartonUnits,
+      unitFactor:factor,
+      displayCostPrice: p.displayCostPrice !== undefined && p.displayCostPrice !== "" ? num(p.displayCostPrice,0) : num(p.costPrice,0)*factor,
+      displaySalePrice: p.displaySalePrice !== undefined && p.displaySalePrice !== "" ? num(p.displaySalePrice,0) : num(p.salePrice,0)*factor,
+      cartonPrice: u === "carton" ? (p.displaySalePrice !== undefined && p.displaySalePrice !== "" ? num(p.displaySalePrice,0) : num(p.salePrice,0)*factor) : 0
+    };
+  }
+  function options(p){
+    p=cleanProduct(p);
+    if(!p) return [{value:"piece",label:"قطعة",factor:1}];
+    if(p.unitType==="kg") return [{value:"kg",label:"كيلو / كسور مثل 0.25",factor:1000}];
+    if(p.unitType==="liter") return [{value:"liter",label:"لتر / كسور مثل 0.25",factor:1000}];
+    if(p.unitType==="carton") return [{value:"carton",label:`كرتونة (${p.cartonUnits} قطعة)`,factor:p.cartonUnits},{value:"piece",label:"قطعة",factor:1}];
+    return [{value:"piece",label:"قطعة",factor:1}];
+  }
+  function factor(p, unit){ const opt=options(p).find(x=>x.value===unit); return opt ? opt.factor : 1; }
+  function defaultUnit(p){ p=cleanProduct(p); return p?.unitType==="carton" ? "carton" : p?.unitType==="kg" ? "kg" : p?.unitType==="liter" ? "liter" : "piece"; }
+  function priceLine(product, qtyValue, selectedUnit){
+    const p=cleanProduct(product), qty=Math.max(0,num(qtyValue,0)), f=factor(p, selectedUnit);
+    const opt=options(p).find(x=>x.value===selectedUnit);
+    const unitPrice=num(p?.salePrice,0)*f, unitCost=num(p?.costPrice,0)*f;
+    return {qty, qtyText:String(qty), selectedUnit, baseQty:qty*f, unitLabel:opt?.label||selectedUnit, price:unitPrice, costPrice:unitCost, total:unitPrice*qty, costTotal:unitCost*qty};
+  }
+  function runtimeUnits(){
+    const sel=$("productUnitType");
+    if(sel && !sel.querySelector('option[value="carton"]')){
+      const opt=document.createElement("option"); opt.value="carton"; opt.textContent="كرتونة";
+      sel.insertBefore(opt, sel.querySelector('option[value="kg"]') || null);
+    }
+    if(typeof window.normalizeProduct === "function" && !window.normalizeProduct.__cartonFinal){
+      const old=window.normalizeProduct;
+      const wrapped=function(p){ try{return cleanProduct(old(p||{}));}catch{return cleanProduct(p||{});} };
+      wrapped.__cartonFinal=true;
+      window.normalizeProduct=wrapped;
+    }
+    window.getSaleUnitOptions=options;
+    window.getDefaultSaleUnit=defaultUnit;
+    window.getUnitFactor=factor;
+    window.priceForLine=priceLine;
+    document.querySelectorAll('input[type="number"][inputmode="decimal"]').forEach(i=>{ i.step="0.001"; i.inputMode="decimal"; });
+  }
+  function installSidebarHandle(){
+    const side=$("sidebar");
+    if(!side || side.querySelector(".oskar-sidebar-scroll-rail")) return;
+    const rail=document.createElement("div");
+    rail.className="oskar-sidebar-scroll-rail";
+    rail.innerHTML='<button class="oskar-sidebar-scroll-btn" type="button" data-side-scroll="up"><i class="fa-solid fa-chevron-up"></i></button><div class="oskar-sidebar-scroll-line"><div class="oskar-sidebar-scroll-thumb"><i class="fa-solid fa-chevron-down"></i></div></div><button class="oskar-sidebar-scroll-btn" type="button" data-side-scroll="down"><i class="fa-solid fa-chevron-down"></i></button><div class="oskar-sidebar-scroll-hint">اسحب للنزول</div>';
+    side.appendChild(rail);
+    const line=rail.querySelector(".oskar-sidebar-scroll-line"), thumb=rail.querySelector(".oskar-sidebar-scroll-thumb");
+    const max=()=>Math.max(1, side.scrollHeight-side.clientHeight);
+    function update(){ const h=line.clientHeight, th=thumb.offsetHeight; thumb.style.top=Math.max(0,Math.min(h-th,(side.scrollTop/max())*Math.max(0,h-th)))+"px"; }
+    function setFromY(y){ const r=line.getBoundingClientRect(), h=line.clientHeight, th=thumb.offsetHeight; const pct=Math.max(0,Math.min(1,(y-r.top-th/2)/Math.max(1,h-th))); side.scrollTop=pct*max(); update(); }
+    rail.addEventListener("click", e=>{ const btn=e.target.closest("[data-side-scroll]"); if(!btn) return; e.preventDefault(); side.scrollBy({top:btn.dataset.sideScroll==="down"?260:-260, behavior:"smooth"}); });
+    let dragging=false;
+    thumb.addEventListener("pointerdown", e=>{ dragging=true; thumb.setPointerCapture?.(e.pointerId); setFromY(e.clientY); e.preventDefault(); });
+    thumb.addEventListener("pointermove", e=>{ if(dragging){ setFromY(e.clientY); e.preventDefault(); } });
+    thumb.addEventListener("pointerup", ()=>dragging=false);
+    thumb.addEventListener("pointercancel", ()=>dragging=false);
+    line.addEventListener("pointerdown", e=>setFromY(e.clientY));
+    side.addEventListener("scroll", update, {passive:true});
+    window.addEventListener("resize", update, {passive:true});
+    setTimeout(update,80);
+    setInterval(update,1200);
+  }
+  function patchAddToCart(){
+    if(window.addToCart && !window.addToCart.__cartonFinal){
+      const wrapped=function(product, selectedUnit=""){
+        const st=window.state, p=cleanProduct(product);
+        if(!st || !p) return null;
+        st.cart=Array.isArray(st.cart)?st.cart:[];
+        const unit=selectedUnit||defaultUnit(p);
+        const existing=st.cart.find(x=>x.productId===p.id && x.selectedUnit===unit);
+        if(existing){ existing.qty=num(existing.qty,1)+1; Object.assign(existing, priceLine(p, existing.qty, unit)); }
+        else st.cart.push({id:`cart_${Date.now()}_${Math.random().toString(16).slice(2)}`,productId:p.id,name:p.name,selectedUnit:unit,...priceLine(p,1,unit)});
+        if(typeof window.renderCart==="function") window.renderCart();
+        toast(`تمت إضافة ${p.name || "المنتج"}`);
+        return existing || st.cart[st.cart.length-1] || null;
+      };
+      wrapped.__cartonFinal=true;
+      window.addToCart=wrapped;
+    }
+  }
+  function tick(){ runtimeUnits(); installSidebarHandle(); patchAddToCart(); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", tick); else tick();
+  setInterval(tick,1200);
 })();
 </script>
 
