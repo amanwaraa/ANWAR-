@@ -2023,12 +2023,9 @@
                   <th>المنتج</th>
                   <th>التصنيف</th>
                   <th>نوع الوحدة</th>
-                  <th>الوحدة الأساسية</th>
-                  <th>التحويل</th>
-                  <th>المخزون الأساسي</th>
+                  <th>المخزون</th>
                   <th>سعر الجملة للوحدة</th>
                   <th>سعر البيع للوحدة</th>
-                  <th>ملاحظات الوحدة</th>
                   <th>باركود</th>
                   <th>الإجراءات</th>
                 </tr>
@@ -2698,22 +2695,22 @@
         </div>
 
         <div>
-          <label class="field-label">سعر الجملة للوحدة المختارة</label>
-          <input id="productCostPrice" type="number" inputmode="decimal" class="input" value="0" min="0" step="0.01">
+          <label class="field-label">سعر الجملة</label>
+          <input id="productCostPrice" type="number" inputmode="decimal" class="input" value="0" min="0" step="0.001">
         </div>
 
         <div>
-          <label class="field-label">سعر البيع للوحدة المختارة</label>
-          <input id="productSalePrice" type="number" inputmode="decimal" class="input" value="0" min="0" step="0.01">
+          <label class="field-label">سعر البيع</label>
+          <input id="productSalePrice" type="number" inputmode="decimal" class="input" value="0" min="0" step="0.001">
         </div>
 
         <div>
-          <label class="field-label">الحفظ الداخلي الدقيق</label>
+          <label class="field-label">الحفظ الداخلي</label>
           <input id="basePreviewText" class="input" disabled value="">
         </div>
 
         <div>
-          <label class="field-label">السعر المحسوب بدون تقريب</label>
+          <label class="field-label">السعر</label>
           <input id="piecePricePreview" class="input" disabled value="">
         </div>
       </div>
@@ -2975,8 +2972,8 @@
     window.OSKAR_TRIAL_EARLY_ACTIVE=!!active;
     if(active){
       window.OSKAR_TRIAL_ACTIVE=true;
-      window.OSKAR_TRIAL_LOCAL_ONLY=false;
-      window.OSKAR_TRIAL_FIREBASE_ALLOWED=true;
+      window.OSKAR_TRIAL_LOCAL_ONLY=true;
+      window.OSKAR_TRIAL_FIREBASE_ALLOWED=false;
     }
   })();
   </script>
@@ -3050,9 +3047,9 @@
     window.OSKAR_STORAGE_PROFILE = STORAGE_PROFILE;
     window.OSKAR_TRIAL_FIREBASE_ROOT = OSKAR_TRIAL_ACTIVE ? FIREBASE_ROOT : "";
     window.OSKAR_TRIAL_ACTIVE = OSKAR_TRIAL_ACTIVE;
-    const OSKAR_TRIAL_LOCAL_ONLY = false;
-    window.OSKAR_TRIAL_LOCAL_ONLY = false;
-    window.OSKAR_TRIAL_FIREBASE_ALLOWED = OSKAR_TRIAL_ACTIVE;
+    const OSKAR_TRIAL_LOCAL_ONLY = !!OSKAR_TRIAL_ACTIVE;
+    window.OSKAR_TRIAL_LOCAL_ONLY = !!OSKAR_TRIAL_ACTIVE;
+    window.OSKAR_TRIAL_FIREBASE_ALLOWED = !OSKAR_TRIAL_ACTIVE;
     const FALLBACK_ROOTS = OSKAR_TRIAL_ACTIVE ? [] : (Array.isArray(externalFirebase.fallbackRoots) ? externalFirebase.fallbackRoots : []);
     const DB_NAME = `cashier_units_pro_${DB_NAMESPACE}_db_v16`;
     const DB_VERSION = 15;
@@ -3184,7 +3181,8 @@
       const s = String(v ?? "").trim().replace(",", ".");
       if (s === "." || s === "" || s === "-") return fallback;
       const n = Number(s);
-      return Number.isFinite(n) ? n : fallback;
+      if (!Number.isFinite(n)) return fallback;
+      return Math.round((n + Number.EPSILON) * 1000) / 1000;
     }
 
     function todayKey(date = new Date()) {
@@ -3197,7 +3195,7 @@
     function money(value) {
       const n = cleanNumber(value);
       const c = state.settings?.currency || "₪";
-      return `${c} ${n.toFixed(2)}`;
+      return `${c} ${n.toFixed(3)}`;
     }
 
     function escapeHtml(str) {
@@ -3382,6 +3380,7 @@
     async function saveSettingsToFirebaseNow(settings) {
       const cleanSettings = stripLocalOnlySettings(settings);
       await idbPut("settings", settings);
+      if (OSKAR_TRIAL_LOCAL_ONLY) return;
       if (navigator.onLine) {
         await set(ref(db, `${FIREBASE_ROOT}/settings/main`), cleanSettings);
       } else {
@@ -3898,7 +3897,27 @@
       return new Promise((resolve, reject) => {
         if (!file) return resolve("");
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
+        reader.onload = () => {
+          const raw = String(reader.result || "");
+          const img = new Image();
+          img.onload = () => {
+            try {
+              const max = 720;
+              const ratio = Math.min(1, max / Math.max(img.width || max, img.height || max));
+              const canvas = document.createElement("canvas");
+              canvas.width = Math.max(1, Math.round((img.width || max) * ratio));
+              canvas.height = Math.max(1, Math.round((img.height || max) * ratio));
+              const ctx = canvas.getContext("2d");
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              resolve(canvas.toDataURL("image/png"));
+            } catch {
+              resolve(raw);
+            }
+          };
+          img.onerror = () => resolve(raw);
+          img.src = raw;
+        };
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(file);
       });
@@ -4057,7 +4076,7 @@
       if (OSKAR_TRIAL_LOCAL_ONLY) {
         try { await idbClear("syncQueue"); } catch {}
         const badge = $("syncCountBadge"); if (badge) badge.style.display = "none";
-        const ct = $("connectionText"); if (ct) { ct.textContent = "نسخة تجريبية - مزامنة مستقلة"; ct.style.color = "#d97706"; }
+        const ct = $("connectionText"); if (ct) { ct.textContent = "نسخة تجريبية - أوفلاين فقط بدون مزامنة"; ct.style.color = "#d97706"; }
         return 0;
       }
       const queue = await idbGetAll("syncQueue");
@@ -4571,8 +4590,8 @@
       if (OSKAR_TRIAL_LOCAL_ONLY) {
         try { await idbClear("syncQueue"); } catch {}
         await refreshPendingCount();
-        updateSyncUi({ visible: !!showPopover, spin: false, title: "نسخة تجريبية", status: "النسخة التجريبية تستخدم مسار Firebase مستقلًا", progress: 100, operations: [] });
-        if (showPopover) toast("النسخة التجريبية لها مزامنة مستقلة");
+        updateSyncUi({ visible: !!showPopover, spin: false, title: "نسخة تجريبية", status: "النسخة التجريبية أوفلاين فقط ولا تزامن أي بيانات", progress: 100, operations: [] });
+        if (showPopover) toast("النسخة التجريبية أوفلاين فقط ولا تزامن أي بيانات");
         return;
       }
       if (state.syncing) return;
@@ -4724,7 +4743,7 @@
         updateSyncUi({
           spin: true,
           visible: false,
-          title: OSKAR_TRIAL_ACTIVE ? "مزامنة التجربة" : "المزامنة",
+          title: OSKAR_TRIAL_ACTIVE ? "تجربة أوفلاين" : "المزامنة",
           status: "رفع العمليات المحلية أولاً بعد تسجيل الدخول",
           progress: 20,
           operations: []
@@ -4735,7 +4754,7 @@
         updateSyncUi({
           spin: true,
           visible: false,
-          title: OSKAR_TRIAL_ACTIVE ? "تنزيل بيانات التجربة" : "تنزيل البيانات",
+          title: OSKAR_TRIAL_ACTIVE ? "تشغيل التجربة" : "تنزيل البيانات",
           status: OSKAR_TRIAL_ACTIVE ? "تنزيل مسار التجربة المستقل فقط" : "تنزيل تحديثات Firebase بعد تسجيل الدخول",
           progress: 45
         });
@@ -4748,7 +4767,7 @@
           spin: true,
           visible: false,
           title: "تثبيت البيانات",
-          status: OSKAR_TRIAL_ACTIVE ? "تثبيت بيانات التجربة في مسارها المستقل" : "تثبيت نسخة الجهاز على المشروع الحالي عند الحاجة",
+          status: OSKAR_TRIAL_ACTIVE ? "تثبيت بيانات التجربة محليًا فقط" : "تثبيت نسخة الجهاز على المشروع الحالي عند الحاجة",
           progress: 72
         });
 
@@ -4761,7 +4780,7 @@
           spin: false,
           visible: false,
           title: "جاهز",
-          status: OSKAR_TRIAL_ACTIVE ? "التجربة تعمل على تخزين ومزامنة مستقلة" : "تم تشغيل المزامنة بعد تسجيل الدخول",
+          status: OSKAR_TRIAL_ACTIVE ? "التجربة أوفلاين فقط بدون مزامنة" : "تم تشغيل المزامنة بعد تسجيل الدخول",
           progress: 100
         });
       } catch (e) {
@@ -5385,12 +5404,12 @@
 
             <div>
               <label class="field-label">سعر الجملة للوحدة</label>
-              <input type="number" inputmode="decimal" class="input free-cost" value="${cleanNumber(line.cost)}" min="0" step="0.01">
+              <input type="number" inputmode="decimal" class="input free-cost" value="${cleanNumber(line.cost)}" min="0" step="0.001">
             </div>
 
             <div>
               <label class="field-label">سعر البيع للوحدة</label>
-              <input type="number" inputmode="decimal" class="input free-price" value="${cleanNumber(line.price)}" min="0" step="0.01">
+              <input type="number" inputmode="decimal" class="input free-price" value="${cleanNumber(line.price)}" min="0" step="0.001">
             </div>
           </div>
 
@@ -5480,8 +5499,6 @@
               </td>
               <td>${escapeHtml(p.category || "-")}</td>
               <td>${escapeHtml(unitLabel(p.unitType, p.customUnit))}</td>
-              <td>${escapeHtml(unitLabel(p.baseUnit, p.customUnit))}</td>
-              <td>${escapeHtml(conversionText)}</td>
               <td>
                 <span class="badge ${low ? "red" : "green"}">
                   ${cleanNumber(p.stock)} ${escapeHtml(unitLabel(p.baseUnit, p.customUnit))}
@@ -5489,10 +5506,6 @@
               </td>
               <td>${money(p.displayCostPrice)}</td>
               <td class="money">${money(p.displaySalePrice)}</td>
-              <td>
-                ${escapeHtml(unitLabel(p.unitType, p.customUnit))}
-                <div class="muted" style="font-size:11px">${escapeHtml(conversionText)}</div>
-              </td>
               <td>
                 <button class="ghost-btn" data-show-barcode="${p.id}">
                   <i class="fa-solid fa-barcode"></i> باركود
@@ -5512,7 +5525,7 @@
 
       $("inventoryTable").innerHTML =
         rows ||
-        `<tr><td colspan="12" class="muted" style="text-align:center">لا توجد منتجات</td></tr>`;
+        `<tr><td colspan="9" class="muted" style="text-align:center">لا توجد منتجات</td></tr>`;
     }
 
     function paymentMethodLabel(method) {
@@ -8203,7 +8216,6 @@
               <tr>
                 <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:8px;font-size:11px">الصنف</th>
                 <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:8px;font-size:11px">الكمية</th>
-                <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:8px;font-size:11px">الوحدة</th>
                 <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:8px;font-size:11px">السعر</th>
                 <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:8px;font-size:11px">الإجمالي</th>
               </tr>
@@ -8214,7 +8226,6 @@
                 <tr>
                   <td style="border:1px solid #e5e7eb;padding:8px;font-size:11px">${escapeHtml(item.name)}</td>
                   <td style="border:1px solid #e5e7eb;padding:8px;font-size:11px">${escapeHtml(item.qtyText || item.qty || "1")}</td>
-                  <td style="border:1px solid #e5e7eb;padding:8px;font-size:11px">${escapeHtml(item.unitLabel || "-")}</td>
                   <td style="border:1px solid #e5e7eb;padding:8px;font-size:11px">${money(item.price)}</td>
                   <td style="border:1px solid #e5e7eb;padding:8px;font-size:11px;font-weight:900">${money(item.total)}</td>
                 </tr>
@@ -8356,8 +8367,23 @@
           .invoice-header{
             background:#eff6ff!important;
             border-radius:14px!important;
-            padding:12px!important;
+            padding:10px 12px!important;
             margin-bottom:12px!important;
+            align-items:center!important;
+            gap:10px!important;
+          }
+
+          .invoice-logo{
+            width:46px!important;
+            height:46px!important;
+            max-width:46px!important;
+            max-height:46px!important;
+            min-width:46px!important;
+            min-height:46px!important;
+            object-fit:cover!important;
+            border-radius:14px!important;
+            flex:0 0 46px!important;
+            display:block!important;
           }
 
           .no-print{
@@ -8377,7 +8403,7 @@
           <body>
             ${html}
           
-</body>
+            </body>
         </html>
       `;
 
@@ -8880,7 +8906,6 @@
               <td>${escapeHtml(inv.employeeName || "-")}</td>
               <td>-</td>
               <td>-</td>
-              <td>-</td>
               <td>${money(0)}</td>
               <td>${money(inv.total)}</td>
             </tr>
@@ -8898,8 +8923,7 @@
                 <td>${escapeHtml(inv.employeeName || "-")}</td>
                 <td>${escapeHtml(item.name || "-")}</td>
                 <td>${escapeHtml(item.qtyText || item.qty || "1")}</td>
-                <td>${escapeHtml(item.unitLabel || "-")}</td>
-                <td>${money(item.price)}</td>
+                  <td>${money(item.price)}</td>
                 <td>${money(item.total)}</td>
               </tr>
             `);
@@ -8920,13 +8944,12 @@
               <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:7px;font-size:10px">الموظف</th>
               <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:7px;font-size:10px">الصنف</th>
               <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:7px;font-size:10px">الكمية</th>
-              <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:7px;font-size:10px">الوحدة</th>
               <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:7px;font-size:10px">السعر</th>
               <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:7px;font-size:10px">الإجمالي</th>
             </tr>
           </thead>
           <tbody>
-            ${rows.join("") || `<tr><td colspan="12" style="text-align:center;padding:15px">لا توجد بيانات</td></tr>`}
+            ${rows.join("") || `<tr><td colspan="11" style="text-align:center;padding:15px">لا توجد بيانات</td></tr>`}
           </tbody>
         </table>
       `);
@@ -10370,7 +10393,7 @@
           spin: false,
           visible: false,
           title: currentUser() ? "جاهز" : "بانتظار الدخول",
-          status: currentUser() ? "التطبيق يعمل من التخزين المحلي وسيزامن بعد توفر الاتصال" : "لن يتم تنزيل بيانات Firebase قبل تسجيل الدخول",
+          status: currentUser() ? (OSKAR_TRIAL_LOCAL_ONLY ? "النسخة التجريبية أوفلاين فقط بدون مزامنة" : "التطبيق يعمل من التخزين المحلي وسيزامن بعد توفر الاتصال") : "لن يتم تنزيل بيانات Firebase قبل تسجيل الدخول",
           progress: 0
         });
       }
@@ -11977,7 +12000,7 @@
     if(note){
       if(trialTimeValid()) note.textContent = "التجربة فعالة لهذا الجهاز. المتبقي " + leftMinutesText() + ". اضغط زر التجربة للدخول إلى بيانات التجربة المستقلة.";
       else if(trialUsed()) note.textContent = "تم استخدام الفترة التجريبية على هذا الجهاز وانتهت. اختر إحدى الباقات للشراء.";
-      else note.textContent = "التجربة مرة واحدة لكل جهاز. عند تشغيلها يتم إنشاء مسار Firebase مستقل لهذا الجهاز.";
+      else note.textContent = "التجربة مرة واحدة لكل جهاز وتعمل أوفلاين فقط بدون مزامنة.";
     }
   }
 
@@ -12286,9 +12309,9 @@
     @media(min-width:901px){.cart-line{grid-template-columns:1fr 250px 100px 44px!important;min-height:82px!important}.oskar-cart-product-info{padding-left:0!important}.oskar-cart-controls{grid-column:auto!important}.line-total{position:static!important}.oskar-cart-remove{position:static!important}}
   `; document.head.appendChild(st); }
   function stabilizeTrialSidebar(){ const pill=$('authUserPill'); if(!pill) return; const user=window.state?.auth?.user; if(user && (user.trial || String(user.name||'').includes('تجربة oskar'))){ pill.innerHTML='<i class="fa-solid fa-flask"></i><span>تجربة oskar</span><span id="oskarTrialSidebarMinutes" class="oskar-side-minutes"><i class="fa-solid fa-clock"></i> '+leftMinutes()+'</span>'; } }
-  function patchSyncTrial(){ /* مزامنة التجربة مسموحة على مسار Firebase مستقل. */ }
+  function patchSyncTrial(){ /* تجربة أوفلاين فقط بدون مزامنة. */ }
   function patchLoginErrors(){ document.addEventListener('submit',function(e){ const f=e.target; if(!f) return; if(f.id==='adminLoginForm'){ const v=($('adminPasswordInput')?.value||'').trim(); if(!v){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast('أدخل كلمة مرور المدير'); } } if(f.id==='employeeLoginForm'){ const n=($('employeeNameInput')?.value||'').trim(), p=($('employeePasswordInput')?.value||'').trim(); if(!n || !p){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast(!n?'أدخل اسم المستخدم':'أدخل كلمة المرور'); } } },true); }
-  function keepTrialLocalOnly(){ if(!isTrialActive()) return; window.OSKAR_TRIAL_LOCAL_ONLY=false; window.OSKAR_TRIAL_ACTIVE=true; window.OSKAR_TRIAL_FIREBASE_ALLOWED=true; }
+  function keepTrialLocalOnly(){ if(!isTrialActive()) return; window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true; window.OSKAR_TRIAL_FIREBASE_ALLOWED=false; }
   function init(){ installStyles(); patchLoginErrors(); stabilizeTrialSidebar(); setInterval(()=>{ stabilizeTrialSidebar(); },60000); setTimeout(stabilizeTrialSidebar,800); setTimeout(stabilizeTrialSidebar,2500); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
@@ -12346,7 +12369,7 @@
       pill.innerHTML='<span class="oskar-side-title"><i class="fa-solid fa-flask"></i> تجربة oskar</span><span id="oskarTrialSidebarMinutes" class="oskar-side-minutes"><i class="fa-solid fa-clock"></i> '+min+'</span>';
     }
   }
-  function blockTrialSyncAndCloud(){ /* مزامنة التجربة مسموحة على مسار Firebase مستقل. */ }
+  function blockTrialSyncAndCloud(){ /* تجربة أوفلاين فقط بدون مزامنة. */ }
   function patchQuantityInputNoBlur(){
     document.addEventListener("input",function(e){
       const inp=e.target.closest("[data-change-cart-qty]"); if(!inp || !window.state?.cart) return;
@@ -12371,7 +12394,7 @@
   }
   function makeTrialLocalOnlyRuntime(){
     if(!trialActive()) return;
-    window.OSKAR_TRIAL_LOCAL_ONLY=false; window.OSKAR_TRIAL_ACTIVE=true; window.OSKAR_TRIAL_FIREBASE_ALLOWED=true;
+    window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true; window.OSKAR_TRIAL_FIREBASE_ALLOWED=false;
   }
   function init(){
     installFinalStyles(); patchQuantityInputNoBlur(); ensureScannerKeepsBehavior(); forceStableTrialSidebar();
@@ -12480,9 +12503,9 @@
   }
   function forceTrialLocalOnly(){
     if(!trialActive()) return;
-    window.OSKAR_TRIAL_LOCAL_ONLY=false; window.OSKAR_TRIAL_ACTIVE=true; window.OSKAR_TRIAL_FIREBASE_ALLOWED=true;
+    window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true; window.OSKAR_TRIAL_FIREBASE_ALLOWED=false;
   }
-  function patchSyncButton(){ /* مزامنة التجربة مسموحة على مسار Firebase مستقل. */ }
+  function patchSyncButton(){ /* تجربة أوفلاين فقط بدون مزامنة. */ }
   function init(){
     installStyles(); setDefaultLogo(); patchLoginWrongMessages(); patchQuantityNoKeyboardClose();
     function tick(){ setDefaultLogo(); stableTrialPill(); patchInventoryProductCount(); }
@@ -12546,7 +12569,7 @@
     el.style.overflow = "auto";
     el.style.webkitOverflowScrolling = "touch";
     el.style.touchAction = "pan-x pan-y";
-    el.style.overscrollBehavior = "contain";
+    el.style.overscrollBehavior = "auto"; el.style.overscrollBehaviorX = "contain"; el.style.overscrollBehaviorY = "auto";
     let drag = null;
     el.addEventListener("pointerdown", function(e){
       if(e.pointerType !== "mouse" || e.button !== 0) return;
@@ -12589,14 +12612,14 @@
   function keepTrialFirebaseMode(){
     if(!trialActive()) return;
     window.OSKAR_TRIAL_ACTIVE = true;
-    window.OSKAR_TRIAL_LOCAL_ONLY = false;
-    window.OSKAR_TRIAL_FIREBASE_ALLOWED = true;
+    window.OSKAR_TRIAL_LOCAL_ONLY = true;
+    window.OSKAR_TRIAL_FIREBASE_ALLOWED = false;
     if(localStorage.getItem(TRIAL_LOGGED_OUT_KEY)==="1") localStorage.setItem(TRIAL_MODE_KEY,"trial");
     const btn=$("trialLoginBtn"), note=$("trialLoginNote");
     if(btn && /30 دقيقة/.test(btn.textContent||"")) btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 12 ساعة';
-    if(note && note.style.display !== "none") note.textContent = "التجربة 12 ساعة وتعمل على مسار Firebase مستقل لهذا الجهاز. المتبقي " + leftText() + ".";
+    if(note && note.style.display !== "none") note.textContent = "التجربة 12 ساعة أوفلاين فقط بدون أي مزامنة. المتبقي " + leftText() + ".";
     const chip=$("oskarTrialSidebarMinutes"); if(chip) chip.textContent = leftText();
-    const ct=$("connectionText"); if(ct && /محلي فقط|بدون مزامنة/.test(ct.textContent||"")) ct.textContent = navigator.onLine ? "نسخة تجريبية - مزامنة مستقلة" : "نسخة تجريبية - أوفلاين";
+    const ct=$("connectionText"); if(ct && /محلي فقط|بدون مزامنة/.test(ct.textContent||"")) ct.textContent = "نسخة تجريبية - أوفلاين فقط بدون مزامنة";
   }
   function inPeriod(row, period, custom){
     if(period==="all") return true;
@@ -12699,7 +12722,7 @@
     patchNumericInputs();
     const side = $("sidebar");
     if(side){ side.style.overflowY = "auto"; side.style.maxHeight = "100dvh"; side.style.paddingBottom = "96px"; }
-    document.querySelectorAll(".table-wrap,.modal,.folder-tabs,.sync-operation-list").forEach(el=>{ el.style.webkitOverflowScrolling = "touch"; el.style.overscrollBehavior = "contain"; });
+    document.querySelectorAll(".table-wrap,.modal,.folder-tabs,.sync-operation-list").forEach(el=>{ el.style.webkitOverflowScrolling = "touch"; el.style.overscrollBehavior = "auto"; el.style.overscrollBehaviorX = "contain"; el.style.overscrollBehaviorY = "auto"; });
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", tick); else tick();
   setInterval(tick, 1500);
@@ -12722,7 +12745,8 @@
   }
   .oskar-sidebar-scroll-rail{
     position:absolute;
-    left:7px;
+    right:7px;
+    left:auto;
     top:112px;
     bottom:98px;
     width:34px;
@@ -12777,7 +12801,9 @@
   }
   .oskar-sidebar-scroll-hint{
     position:absolute;
-    left:39px;
+    display:none;
+    left:auto;
+    right:39px;
     top:50%;
     transform:translateY(-50%) rotate(-90deg);
     transform-origin:left center;
@@ -12788,13 +12814,14 @@
     opacity:.75;
     pointer-events:none;
   }
-  @media(max-width:900px){.oskar-sidebar-scroll-rail{left:6px;top:105px;bottom:95px;}}
+  @media(max-width:900px){.oskar-sidebar-scroll-rail{right:6px;left:auto;top:105px;bottom:95px;}}
   html body .table-wrap,
   html body .new-page-table-holder{
     overflow:auto!important;
     -webkit-overflow-scrolling:touch!important;
     touch-action:pan-x pan-y!important;
-    overscroll-behavior:contain!important;
+    overscroll-behavior-x:contain!important;
+    overscroll-behavior-y:auto!important;
     max-height:min(72dvh,720px)!important;
     will-change:scroll-position!important;
   }
@@ -12863,7 +12890,7 @@
     if(!side || side.querySelector(".oskar-sidebar-scroll-rail")) return;
     const rail=document.createElement("div");
     rail.className="oskar-sidebar-scroll-rail";
-    rail.innerHTML='<button class="oskar-sidebar-scroll-btn" type="button" data-side-scroll="up"><i class="fa-solid fa-chevron-up"></i></button><div class="oskar-sidebar-scroll-line"><div class="oskar-sidebar-scroll-thumb"><i class="fa-solid fa-chevron-down"></i></div></div><button class="oskar-sidebar-scroll-btn" type="button" data-side-scroll="down"><i class="fa-solid fa-chevron-down"></i></button><div class="oskar-sidebar-scroll-hint">اسحب للنزول</div>';
+    rail.innerHTML='<button class="oskar-sidebar-scroll-btn" type="button" data-side-scroll="up"><i class="fa-solid fa-chevron-up"></i></button><div class="oskar-sidebar-scroll-line"><div class="oskar-sidebar-scroll-thumb"><i class="fa-solid fa-chevron-down"></i></div></div><button class="oskar-sidebar-scroll-btn" type="button" data-side-scroll="down"><i class="fa-solid fa-chevron-down"></i></button>';
     side.appendChild(rail);
     const line=rail.querySelector(".oskar-sidebar-scroll-line"), thumb=rail.querySelector(".oskar-sidebar-scroll-thumb");
     const max=()=>Math.max(1, side.scrollHeight-side.clientHeight);
@@ -12905,6 +12932,208 @@
 })();
 </script>
 
+
+
+
+<!-- OSKAR_USER_FINAL_FIXES_2026_04_30_SCROLL_TRIAL_LOGO_SETTINGS -->
+<style id="oskarUserFinalFixes20260430Style">
+  html body .table-wrap,
+  html body .new-page-table-holder{
+    overscroll-behavior-x:contain!important;
+    overscroll-behavior-y:auto!important;
+    touch-action:pan-x pan-y!important;
+  }
+  html body .oskar-sidebar-scroll-rail{
+    right:7px!important;
+    left:auto!important;
+  }
+  @media(max-width:900px){
+    html body .oskar-sidebar-scroll-rail{right:6px!important;left:auto!important;}
+  }
+  html body .oskar-sidebar-scroll-hint{display:none!important;}
+  html body .invoice-header{
+    align-items:center!important;
+    padding:10px 12px!important;
+    gap:10px!important;
+  }
+  html body .invoice-logo{
+    width:46px!important;
+    height:46px!important;
+    max-width:46px!important;
+    max-height:46px!important;
+    min-width:46px!important;
+    min-height:46px!important;
+    object-fit:cover!important;
+    border-radius:14px!important;
+    flex:0 0 46px!important;
+    display:block!important;
+  }
+  html body .invoice-shop-title{font-size:15px!important;line-height:1.25!important;}
+  body.oskar-trial-mode #syncNowBtn{opacity:.7;}
+  body.oskar-trial-mode #syncNowBtn .sync-badge{display:none!important;}
+  .oskar-trial-settings-note{
+    background:#fff7ed;
+    border:1px solid #fed7aa;
+    color:#9a3412;
+    border-radius:18px;
+    padding:12px;
+    margin:0 0 14px;
+    font-weight:900;
+    line-height:1.8;
+  }
+  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card{
+    display:none!important;
+  }
+  body.oskar-trial-mode #page-settings .oskar-payment-settings-card{
+    display:block!important;
+  }
+</style>
+<script id="oskarUserFinalFixes20260430Script">
+(function(){
+  "use strict";
+  if(window.__OSKAR_USER_FINAL_FIXES_20260430__) return;
+  window.__OSKAR_USER_FINAL_FIXES_20260430__ = true;
+  const $ = id => document.getElementById(id);
+  const MODE_KEY = "oskar_storage_mode_v1";
+  const START_KEY = "oskar_trial_started_at_v1";
+  const DURATION = 12 * 60 * 60 * 1000;
+  function trialActive(){
+    const st = Number(localStorage.getItem(START_KEY) || 0);
+    return localStorage.getItem(MODE_KEY) === "trial" && st && Date.now() - st < DURATION;
+  }
+  function toast(msg){ if(typeof window.toast === "function") window.toast(msg); else console.log(msg); }
+  function forceTrialOffline(){
+    if(!trialActive()) return;
+    document.body.classList.add("oskar-trial-mode");
+    window.OSKAR_TRIAL_ACTIVE = true;
+    window.OSKAR_TRIAL_LOCAL_ONLY = true;
+    window.OSKAR_TRIAL_FIREBASE_ALLOWED = false;
+    const ct = $("connectionText");
+    if(ct){ ct.textContent = "نسخة تجريبية - أوفلاين فقط بدون مزامنة"; ct.style.color = "#d97706"; }
+    const badge = $("syncCountBadge");
+    if(badge) badge.style.display = "none";
+    if(typeof window.idbClear === "function") window.idbClear("syncQueue").catch(()=>{});
+  }
+  function markSettingsTrialLocks(){
+    const page = $("page-settings");
+    if(!page) return;
+    const paymentCard = $("paymentAccountsList")?.closest(".card");
+    if(paymentCard) paymentCard.classList.add("oskar-payment-settings-card");
+    page.querySelectorAll(":scope > .card").forEach(card => {
+      if(card !== paymentCard) card.classList.add("oskar-trial-locked-settings-card");
+    });
+    let note = $("oskarTrialSettingsNote");
+    if(!note){
+      note = document.createElement("div");
+      note.id = "oskarTrialSettingsNote";
+      note.className = "oskar-trial-settings-note";
+      note.innerHTML = '<i class="fa-solid fa-lock"></i> في النسخة التجريبية كل الإعدادات مقفلة، والمتاح فقط حسابات الدفع والتحويل.';
+      const h = page.querySelector("h1");
+      if(h) h.insertAdjacentElement("afterend", note); else page.prepend(note);
+    }
+    note.style.display = trialActive() ? "block" : "none";
+  }
+  function patchTableScrollChaining(){
+    document.querySelectorAll(".table-wrap,.new-page-table-holder").forEach(el => {
+      if(el.dataset.oskarScrollChain === "1") return;
+      el.dataset.oskarScrollChain = "1";
+      el.style.overscrollBehavior = "auto";
+      el.style.overscrollBehaviorX = "contain";
+      el.style.overscrollBehaviorY = "auto";
+      el.addEventListener("wheel", function(e){
+        const dy = e.deltaY || 0;
+        if(!dy) return;
+        const canScrollY = el.scrollHeight > el.clientHeight + 2;
+        const atTop = el.scrollTop <= 1;
+        const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+        if(!canScrollY || (dy < 0 && atTop) || (dy > 0 && atBottom)){
+          window.scrollBy({top: dy, left: 0, behavior: "auto"});
+          e.preventDefault();
+        }
+      }, {passive:false});
+    });
+  }
+  async function compressLogoFile(file){
+    return new Promise((resolve, reject)=>{
+      if(!file) return resolve("");
+      const reader = new FileReader();
+      reader.onload = () => {
+        const raw = String(reader.result || "");
+        const img = new Image();
+        img.onload = () => {
+          try{
+            const max = 720;
+            const ratio = Math.min(1, max / Math.max(img.width || max, img.height || max));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round((img.width || max) * ratio));
+            canvas.height = Math.max(1, Math.round((img.height || max) * ratio));
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            ctx.drawImage(img,0,0,canvas.width,canvas.height);
+            resolve(canvas.toDataURL("image/png"));
+          }catch{ resolve(raw); }
+        };
+        img.onerror = () => resolve(raw);
+        img.src = raw;
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+  function applyLogoSrc(src){
+    if(!src) return;
+    ["topShopLogo","sideShopLogo"].forEach(id=>{ const img=$(id); if(img) img.src=src; });
+    document.querySelectorAll(".invoice-logo").forEach(img=>{ img.src=src; });
+  }
+  function patchLogoUpload(){
+    const input = $("settingLogoFile");
+    if(!input || input.dataset.oskarLogoFix === "1") return;
+    input.dataset.oskarLogoFix = "1";
+    input.addEventListener("change", async ()=>{
+      const file = input.files && input.files[0];
+      if(!file) return;
+      try{
+        const dataUrl = await compressLogoFile(file);
+        if(!dataUrl) return;
+        window.state = window.state || {};
+        window.state.settings = {...(window.state.settings || {}), localLogo:dataUrl, logoMode:"local", updatedAt:Date.now()};
+        applyLogoSrc(dataUrl);
+        if($("settingLogoUrl")) $("settingLogoUrl").value = "";
+        if(typeof window.idbPut === "function") await window.idbPut("settings", {...window.state.settings, id:"main"});
+        toast("تم تحميل الشعار وظهوره محليًا");
+      }catch(e){ console.warn(e); toast("تعذر تحميل الشعار"); }
+    });
+    document.querySelectorAll("img.shop-logo,.invoice-logo").forEach(img=>{
+      if(img.dataset.oskarLogoErrorFix === "1") return;
+      img.dataset.oskarLogoErrorFix = "1";
+      img.addEventListener("error", ()=>{
+        const fallback = (window.state && window.state.settings && window.state.settings.localLogo) || "";
+        if(fallback && img.src !== fallback) img.src = fallback;
+      });
+    });
+  }
+  function patchPrecisionInputs(){
+    document.querySelectorAll('input[type="number"][inputmode="decimal"], input[type="number"]').forEach(inp=>{
+      if(inp.step === "0.01" || inp.step === "1" || !inp.step) inp.step = "0.001";
+      inp.inputMode = "decimal";
+    });
+  }
+  function tick(){
+    forceTrialOffline();
+    markSettingsTrialLocks();
+    patchTableScrollChaining();
+    patchLogoUpload();
+    patchPrecisionInputs();
+  }
+  document.addEventListener("click", function(e){
+    if(!trialActive()) return;
+    const syncBtn = e.target.closest && e.target.closest("#syncNowBtn");
+    if(syncBtn){ e.preventDefault(); e.stopImmediatePropagation(); forceTrialOffline(); toast("النسخة التجريبية أوفلاين فقط بدون مزامنة"); }
+  }, true);
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", tick); else tick();
+  setInterval(tick, 700);
+})();
+</script>
 </body>
 </html>
 <!-- legacy-disabled-patches-2026-04-29-base64: old duplicate scripts after </html> were disabled to prevent app startup errors. Do not execute. 
