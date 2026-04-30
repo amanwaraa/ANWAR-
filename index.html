@@ -1837,7 +1837,7 @@
             </div>
 
             <div class="clean-stat">
-              <div class="clean-stat-title"><span>عليه من الزبائن</span><i class="fa-solid fa-user-clock"></i></div>
+              <div class="clean-stat-title"><span>ديون الزبائن</span><i class="fa-solid fa-user-clock"></i></div>
               <div id="homeDebtOwed" class="clean-stat-value red">₪ 0.00</div>
             </div>
 
@@ -12392,173 +12392,231 @@
 })();
 </script>
 
-<!-- OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3 -->
-<style id="oskarTableTouchScrollFinalV3Style">
+<!-- OSKAR_TABLE_TOUCH_SCROLL_SMOOTH_V4 -->
+<style id="oskarTableTouchScrollSmoothV4Style">
   html body .table-wrap,
   html body .new-page-table-holder{
     overflow-x:auto!important;
     overflow-y:visible!important;
     -webkit-overflow-scrolling:touch!important;
-    touch-action:none!important;
-    overscroll-behavior:auto!important;
+    touch-action:pan-y pan-x!important;
+    overscroll-behavior-x:contain!important;
+    overscroll-behavior-y:auto!important;
+    scroll-behavior:auto!important;
     cursor:grab;
+    will-change:scroll-position;
   }
   html body .table-wrap:active,
   html body .new-page-table-holder:active{cursor:grabbing;}
   html body .table-wrap table,
-  html body .new-page-table-holder table{touch-action:none!important;}
+  html body .new-page-table-holder table{
+    touch-action:pan-y pan-x!important;
+  }
+  html body .table-wrap th,
+  html body .table-wrap td,
+  html body .new-page-table-holder th,
+  html body .new-page-table-holder td{
+    touch-action:pan-y pan-x!important;
+  }
   html body .table-wrap button,
   html body .table-wrap input,
   html body .table-wrap select,
   html body .table-wrap textarea,
+  html body .table-wrap a,
   html body .new-page-table-holder button,
   html body .new-page-table-holder input,
   html body .new-page-table-holder select,
-  html body .new-page-table-holder textarea{touch-action:manipulation!important;}
+  html body .new-page-table-holder textarea,
+  html body .new-page-table-holder a{
+    touch-action:manipulation!important;
+  }
+  html body .modal,
+  html body .sidebar,
+  html body .sync-operation-list,
+  html body .customer-suggest-list,
+  html body .smart-suggest-list,
+  html body .smart-supplier-list{
+    -webkit-overflow-scrolling:touch!important;
+    touch-action:pan-y!important;
+    scroll-behavior:auto!important;
+    overscroll-behavior:auto!important;
+  }
 </style>
-<script id="oskarTableTouchScrollFinalV3Script">
+<script id="oskarTableTouchScrollSmoothV4Script">
 (function(){
   "use strict";
-  if (window.__OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3__) return;
-  window.__OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3__ = true;
+  if (window.__OSKAR_TABLE_TOUCH_SCROLL_SMOOTH_V4__) return;
+  window.__OSKAR_TABLE_TOUCH_SCROLL_SMOOTH_V4__ = true;
 
   const TABLE_SELECTOR = ".table-wrap,.new-page-table-holder";
   const INTERACTIVE_SELECTOR = "input,textarea,select,option,button,a,label,[contenteditable='true']";
-  const THRESHOLD = 6;
-  let active = null;
+  const THRESHOLD = 5;
+  const HORIZONTAL_BIAS = 1.12;
+  let touchDrag = null;
+  let mouseDrag = null;
   let suppressClickUntil = 0;
 
-  function closestTableWrap(target){
+  function closestWrap(target){
     return target && target.closest ? target.closest(TABLE_SELECTOR) : null;
   }
-  function canScrollY(el){
-    if (!el || el === document.body || el === document.documentElement) return false;
-    const cs = window.getComputedStyle(el);
-    const oy = cs.overflowY || "";
-    return /(auto|scroll|overlay)/.test(oy) && el.scrollHeight > el.clientHeight + 2;
+
+  function isInteractive(target){
+    return !!(target && target.closest && target.closest(INTERACTIVE_SELECTOR));
   }
-  function verticalTarget(from){
-    let node = from;
-    while (node && node !== document.body && node !== document.documentElement) {
-      if (!node.matches || !node.matches(TABLE_SELECTOR)) {
-        if (canScrollY(node)) return node;
+
+  function canMoveHorizontally(wrap){
+    return !!wrap && (wrap.scrollWidth > wrap.clientWidth + 2);
+  }
+
+  function scheduleHorizontalScroll(state, delta){
+    if (!state || !state.wrap || !delta) return;
+    state.pending += delta;
+    if (state.raf) return;
+    state.raf = requestAnimationFrame(function(){
+      state.raf = 0;
+      const wrap = state.wrap;
+      const deltaNow = state.pending;
+      state.pending = 0;
+      if (!wrap || !deltaNow) return;
+      const before = wrap.scrollLeft || 0;
+      wrap.scrollLeft = before + deltaNow;
+      if ((wrap.scrollLeft || 0) === before && Math.abs(deltaNow) > 0) {
+        wrap.scrollLeft = before - deltaNow;
       }
-      node = node.parentElement;
-    }
-    return document.scrollingElement || document.documentElement;
+    });
   }
-  function maxScrollTop(el){
-    if (el === document.scrollingElement || el === document.documentElement || el === document.body) {
-      const doc = document.documentElement;
-      const body = document.body;
-      return Math.max(0, Math.max(doc.scrollHeight, body ? body.scrollHeight : 0) - window.innerHeight);
-    }
-    return Math.max(0, el.scrollHeight - el.clientHeight);
-  }
-  function getScrollTop(el){
-    if (el === document.scrollingElement || el === document.documentElement || el === document.body) {
-      return window.pageYOffset || document.documentElement.scrollTop || 0;
-    }
-    return el.scrollTop || 0;
-  }
-  function setScrollTop(el, value){
-    const next = Math.max(0, Math.min(maxScrollTop(el), value));
-    if (el === document.scrollingElement || el === document.documentElement || el === document.body) {
-      window.scrollTo(window.pageXOffset || document.documentElement.scrollLeft || 0, next);
-    } else {
-      el.scrollTop = next;
-    }
-  }
+
   function onTouchStart(e){
     if (!e.touches || e.touches.length !== 1) return;
-    const wrap = closestTableWrap(e.target);
-    if (!wrap) return;
+    const wrap = closestWrap(e.target);
+    if (!wrap || !canMoveHorizontally(wrap)) return;
     const t = e.touches[0];
-    active = {
-      wrap: wrap,
-      yTarget: verticalTarget(wrap.parentElement || wrap),
-      startX: t.clientX,
-      startY: t.clientY,
-      lastX: t.clientX,
-      lastY: t.clientY,
-      mode: ""
+    touchDrag = {
+      wrap,
+      startX:t.clientX,
+      startY:t.clientY,
+      lastX:t.clientX,
+      lastY:t.clientY,
+      mode:"",
+      pending:0,
+      raf:0
     };
   }
+
   function onTouchMove(e){
-    if (!active || !e.touches || e.touches.length !== 1) return;
+    if (!touchDrag || !e.touches || e.touches.length !== 1) return;
     const t = e.touches[0];
-    const dxTotal = t.clientX - active.startX;
-    const dyTotal = t.clientY - active.startY;
+    const dxTotal = t.clientX - touchDrag.startX;
+    const dyTotal = t.clientY - touchDrag.startY;
     const absX = Math.abs(dxTotal);
     const absY = Math.abs(dyTotal);
-    if (!active.mode) {
-      if (absX < THRESHOLD && absY < THRESHOLD) return;
-      active.mode = absY >= absX ? "vertical" : "horizontal";
+
+    if (!touchDrag.mode) {
+      if (Math.max(absX, absY) < THRESHOLD) return;
+      touchDrag.mode = absX > (absY * HORIZONTAL_BIAS) ? "horizontal" : "vertical";
     }
+
+    if (touchDrag.mode === "vertical") {
+      // لا نمنع اللمس العمودي نهائياً حتى يبقى نزول الصفحة/النافذة سريعاً وطبيعياً.
+      touchDrag.lastX = t.clientX;
+      touchDrag.lastY = t.clientY;
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
-    suppressClickUntil = Date.now() + 350;
-    if (active.mode === "vertical") {
-      const dy = active.lastY - t.clientY;
-      setScrollTop(active.yTarget, getScrollTop(active.yTarget) + dy);
-    } else {
-      const dx = t.clientX - active.lastX;
-      const before = active.wrap.scrollLeft || 0;
-      active.wrap.scrollLeft = before - dx;
-      if ((active.wrap.scrollLeft || 0) === before && Math.abs(dx) > 0) active.wrap.scrollLeft = before + dx;
-    }
-    active.lastX = t.clientX;
-    active.lastY = t.clientY;
+    suppressClickUntil = Date.now() + 260;
+    const delta = touchDrag.lastX - t.clientX;
+    scheduleHorizontalScroll(touchDrag, delta);
+    touchDrag.lastX = t.clientX;
+    touchDrag.lastY = t.clientY;
   }
-  function onTouchEnd(){ active = null; }
 
-  let mouseDrag = null;
-  document.addEventListener("mousedown", function(e){
-    const wrap = closestTableWrap(e.target);
-    if (!wrap || e.button !== 0) return;
-    if (e.target.closest && e.target.closest(INTERACTIVE_SELECTOR)) return;
-    mouseDrag = {wrap:wrap, x:e.clientX, y:e.clientY, left:wrap.scrollLeft || 0, down:false};
-  }, true);
-  document.addEventListener("mousemove", function(e){
+  function onTouchEnd(){
+    touchDrag = null;
+  }
+
+  function onMouseDown(e){
+    const wrap = closestWrap(e.target);
+    if (!wrap || e.button !== 0 || isInteractive(e.target) || !canMoveHorizontally(wrap)) return;
+    mouseDrag = {
+      wrap,
+      x:e.clientX,
+      y:e.clientY,
+      mode:"",
+      pending:0,
+      raf:0
+    };
+  }
+
+  function onMouseMove(e){
     if (!mouseDrag) return;
-    const dx = e.clientX - mouseDrag.x;
-    const dy = e.clientY - mouseDrag.y;
-    if (!mouseDrag.down && Math.max(Math.abs(dx), Math.abs(dy)) < THRESHOLD) return;
-    mouseDrag.down = true;
-    if (Math.abs(dx) >= Math.abs(dy)) {
-      e.preventDefault();
-      mouseDrag.wrap.scrollLeft = mouseDrag.left - dx;
-      suppressClickUntil = Date.now() + 350;
+    const dxTotal = e.clientX - mouseDrag.x;
+    const dyTotal = e.clientY - mouseDrag.y;
+    const absX = Math.abs(dxTotal);
+    const absY = Math.abs(dyTotal);
+    if (!mouseDrag.mode) {
+      if (Math.max(absX, absY) < THRESHOLD) return;
+      mouseDrag.mode = absX > absY * HORIZONTAL_BIAS ? "horizontal" : "vertical";
     }
-  }, true);
-  document.addEventListener("mouseup", function(){ mouseDrag = null; }, true);
-  document.addEventListener("click", function(e){
-    if (Date.now() < suppressClickUntil && closestTableWrap(e.target)) {
+    if (mouseDrag.mode !== "horizontal") return;
+    e.preventDefault();
+    suppressClickUntil = Date.now() + 260;
+    scheduleHorizontalScroll(mouseDrag, -e.movementX);
+  }
+
+  function onMouseUp(){
+    mouseDrag = null;
+  }
+
+  function onKeyDown(e){
+    const wrap = closestWrap(e.target);
+    if (!wrap || isInteractive(e.target)) return;
+    const step = Math.max(80, Math.floor(wrap.clientWidth * 0.28));
+    if (e.key === "ArrowLeft") { e.preventDefault(); scheduleHorizontalScroll({wrap, pending:0, raf:0}, step); }
+    if (e.key === "ArrowRight") { e.preventDefault(); scheduleHorizontalScroll({wrap, pending:0, raf:0}, -step); }
+  }
+
+  function onClick(e){
+    if (Date.now() < suppressClickUntil && closestWrap(e.target)) {
       e.preventDefault();
       e.stopPropagation();
     }
-  }, true);
-
-  document.addEventListener("touchstart", onTouchStart, {capture:true, passive:false});
-  document.addEventListener("touchmove", onTouchMove, {capture:true, passive:false});
-  document.addEventListener("touchend", onTouchEnd, {capture:true, passive:true});
-  document.addEventListener("touchcancel", onTouchEnd, {capture:true, passive:true});
+  }
 
   function refreshTableTouchCss(){
     document.querySelectorAll(TABLE_SELECTOR).forEach(function(el){
       el.style.overflowX = "auto";
       el.style.overflowY = "visible";
       el.style.webkitOverflowScrolling = "touch";
-      el.style.touchAction = "none";
-      el.style.overscrollBehavior = "auto";
+      el.style.touchAction = "pan-y pan-x";
+      el.style.overscrollBehaviorX = "contain";
+      el.style.overscrollBehaviorY = "auto";
+      el.style.scrollBehavior = "auto";
+      if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "0");
     });
   }
+
+  document.addEventListener("touchstart", onTouchStart, {capture:true, passive:true});
+  document.addEventListener("touchmove", onTouchMove, {capture:true, passive:false});
+  document.addEventListener("touchend", onTouchEnd, {capture:true, passive:true});
+  document.addEventListener("touchcancel", onTouchEnd, {capture:true, passive:true});
+  document.addEventListener("mousedown", onMouseDown, true);
+  document.addEventListener("mousemove", onMouseMove, true);
+  document.addEventListener("mouseup", onMouseUp, true);
+  document.addEventListener("keydown", onKeyDown, true);
+  document.addEventListener("click", onClick, true);
+
   refreshTableTouchCss();
-  document.addEventListener("DOMContentLoaded", refreshTableTouchCss);
-  setInterval(refreshTableTouchCss, 1200);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", refreshTableTouchCss);
+  else setTimeout(refreshTableTouchCss, 0);
+  try{
+    new MutationObserver(function(){ requestAnimationFrame(refreshTableTouchCss); })
+      .observe(document.body || document.documentElement, {childList:true, subtree:true});
+  }catch(e){}
 })();
 </script>
-<!-- /OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3 -->
+<!-- /OSKAR_TABLE_TOUCH_SCROLL_SMOOTH_V4 -->
 </body>
 </html>
 <!-- legacy-disabled-patches-2026-04-29-base64: old duplicate scripts after </html> were disabled to prevent app startup errors. Do not execute. 
