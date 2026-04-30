@@ -1727,7 +1727,7 @@
       </form>
 
       <button id="trialLoginBtn" class="auth-main-btn" type="button" style="background:linear-gradient(135deg,#f59e0b,#d97706);margin-top:10px">
-        <i class="fa-solid fa-flask"></i> فترة تجريبية 30 دقيقة
+        <i class="fa-solid fa-flask"></i> فترة تجريبية 12 ساعة
       </button>
 
       <div id="trialLoginNote" class="auth-note">
@@ -1837,7 +1837,7 @@
             </div>
 
             <div class="clean-stat">
-              <div class="clean-stat-title"><span>ديون الزبائن</span><i class="fa-solid fa-user-clock"></i></div>
+              <div class="clean-stat-title"><span>عليه من الزبائن</span><i class="fa-solid fa-user-clock"></i></div>
               <div id="homeDebtOwed" class="clean-stat-value red">₪ 0.00</div>
             </div>
 
@@ -2917,7 +2917,7 @@
   try{
     var MODE='oskar_storage_mode_v1', OUT='oskar_trial_logged_out_v1';
     if(localStorage.getItem(OUT)==='1' && localStorage.getItem(MODE)==='trial'){
-      localStorage.setItem(MODE,'main');
+      window.OSKAR_TRIAL_LOGGED_OUT_LOCAL_ONLY = true;
     }
   }catch(e){}
 })();
@@ -2925,17 +2925,15 @@
   <script id="oskar-trial-local-only-early-guard">
   (function(){
     "use strict";
-    var MODE_KEY="oskar_storage_mode_v1", START_KEY="oskar_trial_started_at_v1", DUR=30*60*1000;
+    var MODE_KEY="oskar_storage_mode_v1", START_KEY="oskar_trial_started_at_v1", DUR=12*60*60*1000;
     var st=Number(localStorage.getItem(START_KEY)||0);
     var active=localStorage.getItem(MODE_KEY)==="trial" && st && (Date.now()-st)<DUR;
     window.OSKAR_TRIAL_EARLY_ACTIVE=!!active;
-    if(!active) return;
-    window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true;
-    var firebasePattern=/(firebaseio\.com|firebasedatabase\.app|googleapis\.com\/.*database|firebaseinstallations|identitytoolkit|securetoken)/i;
-    var oldFetch=window.fetch;
-    if(oldFetch){ window.fetch=function(input, init){ try{ var url=String((input&&input.url)||input||""); if(firebasePattern.test(url)) return Promise.resolve(new Response("{}",{status:200,headers:{"Content-Type":"application/json"}})); }catch(e){} return oldFetch.apply(this, arguments); }; }
-    var OldWS=window.WebSocket;
-    if(OldWS){ window.WebSocket=function(url, protocols){ if(firebasePattern.test(String(url||""))){ throw new Error("trial-local-only"); } return new OldWS(url, protocols); }; window.WebSocket.prototype=OldWS.prototype; }
+    if(active){
+      window.OSKAR_TRIAL_ACTIVE=true;
+      window.OSKAR_TRIAL_LOCAL_ONLY=false;
+      window.OSKAR_TRIAL_FIREBASE_ALLOWED=true;
+    }
   })();
   </script>
 
@@ -2967,7 +2965,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const OSKAR_TRIAL_DURATION_MS = 30 * 60 * 1000;
+    const OSKAR_TRIAL_DURATION_MS = 12 * 60 * 60 * 1000;
     const OSKAR_TRIAL_USED_KEY = "oskar_trial_used_once_v1";
     const OSKAR_TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
     const OSKAR_TRIAL_MODE_KEY = "oskar_storage_mode_v1";
@@ -3002,12 +3000,15 @@
       .slice(0, 42) || "default";
 
     const BASE_FIREBASE_ROOT = externalFirebase.firebaseRoot || `cashier_units_pro_${DB_NAMESPACE}`;
-    const FIREBASE_ROOT = OSKAR_TRIAL_ACTIVE ? `${BASE_FIREBASE_ROOT}__trial__${OSKAR_DEVICE_ID}` : BASE_FIREBASE_ROOT;
+    const TRIAL_FIREBASE_ROOT = `${BASE_FIREBASE_ROOT}__trial__${OSKAR_DEVICE_ID}`;
+    const FIREBASE_ROOT = OSKAR_TRIAL_ACTIVE ? TRIAL_FIREBASE_ROOT : BASE_FIREBASE_ROOT;
     window.FIREBASE_ROOT = FIREBASE_ROOT;
     window.OSKAR_STORAGE_PROFILE = STORAGE_PROFILE;
+    window.OSKAR_TRIAL_FIREBASE_ROOT = OSKAR_TRIAL_ACTIVE ? FIREBASE_ROOT : "";
     window.OSKAR_TRIAL_ACTIVE = OSKAR_TRIAL_ACTIVE;
-    const OSKAR_TRIAL_LOCAL_ONLY = OSKAR_TRIAL_ACTIVE;
-    window.OSKAR_TRIAL_LOCAL_ONLY = OSKAR_TRIAL_LOCAL_ONLY;
+    const OSKAR_TRIAL_LOCAL_ONLY = false;
+    window.OSKAR_TRIAL_LOCAL_ONLY = false;
+    window.OSKAR_TRIAL_FIREBASE_ALLOWED = OSKAR_TRIAL_ACTIVE;
     const FALLBACK_ROOTS = OSKAR_TRIAL_ACTIVE ? [] : (Array.isArray(externalFirebase.fallbackRoots) ? externalFirebase.fallbackRoots : []);
     const DB_NAME = `cashier_units_pro_${DB_NAMESPACE}_db_v16`;
     const DB_VERSION = 15;
@@ -3972,7 +3973,7 @@
       if (OSKAR_TRIAL_LOCAL_ONLY) {
         try { await idbClear("syncQueue"); } catch {}
         const badge = $("syncCountBadge"); if (badge) badge.style.display = "none";
-        const ct = $("connectionText"); if (ct) { ct.textContent = "نسخة تجريبية - حفظ محلي فقط"; ct.style.color = "#d97706"; }
+        const ct = $("connectionText"); if (ct) { ct.textContent = "نسخة تجريبية - مزامنة مستقلة"; ct.style.color = "#d97706"; }
         return 0;
       }
       const queue = await idbGetAll("syncQueue");
@@ -4486,8 +4487,8 @@
       if (OSKAR_TRIAL_LOCAL_ONLY) {
         try { await idbClear("syncQueue"); } catch {}
         await refreshPendingCount();
-        updateSyncUi({ visible: !!showPopover, spin: false, title: "نسخة تجريبية", status: "النسخة التجريبية تحفظ على هذا الجهاز فقط ولا يوجد فيها مزامنة", progress: 100, operations: [] });
-        if (showPopover) toast("النسخة التجريبية لا يوجد فيها مزامنة");
+        updateSyncUi({ visible: !!showPopover, spin: false, title: "نسخة تجريبية", status: "النسخة التجريبية تستخدم مسار Firebase مستقلًا", progress: 100, operations: [] });
+        if (showPopover) toast("النسخة التجريبية لها مزامنة مستقلة");
         return;
       }
       if (state.syncing) return;
@@ -10498,7 +10499,7 @@
         overflow-y:visible!important;
         -webkit-overflow-scrolling:touch!important;
         touch-action:pan-x pan-y!important;
-        overscroll-behavior-x:auto!important;
+        overscroll-behavior-x:contain!important;
         display:block!important;
         position:relative!important;
         z-index:1!important;
@@ -11175,7 +11176,7 @@
   const HTML5_QRCODE_SRC = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
   const ADMIN_PERMISSION = "__admin__";
   const DEFAULT_ADMIN_PIN = "0000000000@@";
-  const TRIAL_DURATION_MS = 30 * 60 * 1000;
+  const TRIAL_DURATION_MS = 12 * 60 * 60 * 1000;
   const TRIAL_USED_KEY = "oskar_trial_used_once_v1";
   const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
   const TRIAL_MODE_KEY = "oskar_storage_mode_v1";
@@ -11397,7 +11398,7 @@
     if (localStorage.getItem("oskar_trial_logged_out_v1") !== "1") setTrialUserIfActive();
     const lock=$("authLock"); if(!lock) return;
     if(!$("trialLoginBtn")){
-      const btn=document.createElement("button"); btn.id="trialLoginBtn"; btn.type="button"; btn.className="auth-main-btn"; btn.style.cssText="background:linear-gradient(135deg,#f59e0b,#d97706);margin-top:10px"; btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 30 دقيقة';
+      const btn=document.createElement("button"); btn.id="trialLoginBtn"; btn.type="button"; btn.className="auth-main-btn"; btn.style.cssText="background:linear-gradient(135deg,#f59e0b,#d97706);margin-top:10px"; btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 12 ساعة';
       const note=document.createElement("div"); note.id="trialLoginNote"; note.className="auth-note"; note.textContent="التجربة تستخدم مرة واحدة فقط لكل جهاز، ويتم حفظها في مسار مستقل عن بيانات الموقع الأساسية.";
       const empForm=$("employeeLoginForm"); (empForm?.parentElement||lock.querySelector(".auth-card")||lock).insertBefore(btn, empForm?.nextSibling||null); btn.insertAdjacentElement("afterend",note);
     }
@@ -11417,7 +11418,21 @@
   }
 
   function patchReportsNet(){
-    const wages=(state()?.workerWages||[]).reduce((s,w)=>s+num(w.amount||w.bonus),0); const net=$("reportNet"); if(!net) return;
+    const net=$("reportNet"); if(!net) return;
+    const period=$("reportsPeriod")?.value||"today";
+    const custom=$("reportsCustomDate")?.value||"";
+    function inPeriod(row){
+      if(period==="all") return true;
+      const t=num(row?.createdAt||row?.paidAt||row?.date||0); if(!t) return false;
+      const now=new Date(), start=new Date(), end=new Date();
+      if(period==="today"){ start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+      else if(period==="week"){ start.setDate(now.getDate()-7); start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+      else if(period==="month"){ start.setMonth(now.getMonth()-1); start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+      else if(period==="year"){ start.setFullYear(now.getFullYear()-1); start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+      else if(period==="custom"){ if(!custom) return false; const d=new Date(custom); start.setTime(d.getTime()); start.setHours(0,0,0,0); end.setTime(d.getTime()); end.setHours(23,59,59,999); }
+      return t>=start.getTime() && t<=end.getTime();
+    }
+    const wages=(state()?.workerWages||[]).filter(inPeriod).reduce((s,w)=>s+num(w.amount||w.bonus),0);
     const profit=num($("reportProfit")?.textContent); const exp=num($("reportExpenses")?.textContent); net.textContent=money(profit-exp-wages);
     let wageEl=$("reportWorkersWages"); if(!wageEl){ const grid=$("reportsPrintArea")?.querySelector(".stat-grid"); if(grid){ const card=document.createElement("div"); card.className="stat red"; card.innerHTML='<div class="stat-title"><i class="fa-solid fa-users-gear"></i> أجور العمال</div><div id="reportWorkersWages" class="stat-value">₪ 0.00</div>'; const netCard=net.closest(".stat"); netCard?grid.insertBefore(card,netCard):grid.appendChild(card); wageEl=$("reportWorkersWages"); } }
     if(wageEl) wageEl.textContent=money(wages);
@@ -11440,7 +11455,7 @@
 (function(){
   "use strict";
   const $ = id => document.getElementById(id);
-  const TRIAL_DURATION_MS = 30 * 60 * 1000;
+  const TRIAL_DURATION_MS = 12 * 60 * 60 * 1000;
   const TRIAL_USED_KEY = "oskar_trial_used_once_v1";
   const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
   const TRIAL_MODE_KEY = "oskar_storage_mode_v1";
@@ -11461,10 +11476,10 @@
   function setTrialUser(){ if(!trialActive()) return false; localStorage.removeItem(TRIAL_LOGGED_OUT_KEY); const st=window.state||(window.state={}); st.auth=st.auth||{}; st.auth.user={id:"trial_admin_"+getDeviceId(),name:"تجربة oskar",role:"admin",permissions:["__admin__"],trial:true}; st.auth.ready=true; try{Object.keys(localStorage).filter(k=>k.startsWith("cashier_auth_session_")).forEach(k=>localStorage.removeItem(k));}catch{} authLock(false); const pill=$("authUserPill"); if(pill) pill.innerHTML='<i class="fa-solid fa-flask"></i> تجربة oskar'; document.querySelectorAll(".nav-btn.auth-hidden,.bottom-btn.auth-hidden").forEach(b=>b.classList.remove("auth-hidden")); return true; }
   function forceTrialLoggedOutUi(){ if(!(trialActive()&&localStorage.getItem(TRIAL_LOGGED_OUT_KEY)==="1")) return; clearAuthOnly(); authLock(true); const pill=$("authUserPill"); if(pill) pill.innerHTML='<i class="fa-solid fa-lock"></i> غير مسجل'; }
   function expireTrialIfNeeded(){ if(!trialExpired()) return false; localStorage.removeItem(TRIAL_MODE_KEY); localStorage.removeItem(TRIAL_LOGGED_OUT_KEY); clearAuthOnly(); authLock(true); const note=$("trialLoginNote"); if(note) note.textContent="انتهت الفترة التجريبية لهذا الجهاز. يمكنك شراء نسخة دائمة من الأسفل."; const btn=$("trialLoginBtn"); if(btn){btn.disabled=true; btn.style.opacity=".55"; btn.innerHTML='<i class="fa-solid fa-lock"></i> انتهت الفترة التجريبية';} const pill=$("oskarTrialPill"); if(pill) pill.remove(); return true; }
-  function ensureTrialButton(){ const card=document.querySelector("#authLock .auth-card"); if(!card) return; let btn=$("trialLoginBtn"); if(!btn){btn=document.createElement("button"); btn.id="trialLoginBtn"; btn.type="button"; btn.className="auth-main-btn"; card.appendChild(btn);} btn.style.cssText="background:linear-gradient(135deg,#f59e0b,#d97706);margin-top:10px"; btn.disabled=false; btn.style.opacity="1"; btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 30 دقيقة'; let note=$("trialLoginNote"); if(!note){note=document.createElement("div"); note.id="trialLoginNote"; note.className="auth-note"; btn.insertAdjacentElement("afterend",note);} btn.onclick=function(e){ e.preventDefault(); e.stopPropagation(); if(expireTrialIfNeeded()) return toast("انتهت الفترة التجريبية على هذا الجهاز"); const active=trialActive(); const used=localStorage.getItem(TRIAL_USED_KEY)==="1"; if(used&&!active) return toast("الفترة التجريبية استُخدمت على هذا الجهاز وانتهت"); if(!active){ getDeviceId(); localStorage.setItem(TRIAL_USED_KEY,"1"); localStorage.setItem(TRIAL_STARTED_KEY,String(now())); localStorage.setItem(TRIAL_MODE_KEY,"trial"); localStorage.removeItem(TRIAL_LOGGED_OUT_KEY); toast("تم إنشاء تجربة مستقلة لهذا الجهاز. سيتم فتح مسار بيانات خاص."); setTimeout(()=>location.reload(),450); return; } setTrialUser(); toast("تم الدخول للتجربة بنفس بيانات هذا الجهاز"); }; }
+  function ensureTrialButton(){ const card=document.querySelector("#authLock .auth-card"); if(!card) return; let btn=$("trialLoginBtn"); if(!btn){btn=document.createElement("button"); btn.id="trialLoginBtn"; btn.type="button"; btn.className="auth-main-btn"; card.appendChild(btn);} btn.style.cssText="background:linear-gradient(135deg,#f59e0b,#d97706);margin-top:10px"; btn.disabled=false; btn.style.opacity="1"; btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 12 ساعة'; let note=$("trialLoginNote"); if(!note){note=document.createElement("div"); note.id="trialLoginNote"; note.className="auth-note"; btn.insertAdjacentElement("afterend",note);} btn.onclick=function(e){ e.preventDefault(); e.stopPropagation(); if(expireTrialIfNeeded()) return toast("انتهت الفترة التجريبية على هذا الجهاز"); const active=trialActive(); const used=localStorage.getItem(TRIAL_USED_KEY)==="1"; if(used&&!active) return toast("الفترة التجريبية استُخدمت على هذا الجهاز وانتهت"); if(!active){ getDeviceId(); localStorage.setItem(TRIAL_USED_KEY,"1"); localStorage.setItem(TRIAL_STARTED_KEY,String(now())); localStorage.setItem(TRIAL_MODE_KEY,"trial"); localStorage.removeItem(TRIAL_LOGGED_OUT_KEY); toast("تم إنشاء تجربة مستقلة لهذا الجهاز. سيتم فتح مسار بيانات خاص."); setTimeout(()=>location.reload(),450); return; } setTrialUser(); toast("تم الدخول للتجربة بنفس بيانات هذا الجهاز"); }; }
   function ensurePurchaseCards(){ const card=document.querySelector("#authLock .auth-card"); if(!card) return; if(!$("oskarPurchaseBox")){ const box=document.createElement("div"); box.id="oskarPurchaseBox"; box.innerHTML=`<div class="oskar-buy-title"><i class="fa-brands fa-whatsapp"></i> شراء نسخة دائمة</div><div class="oskar-plans-row"><button class="oskar-plan-card" data-plan="30 يوم ب 49 شيكل"><b>30 يوم</b><span>49 شيكل</span></button><button class="oskar-plan-card" data-plan="90 يوم ب 99 شيكل"><b>90 يوم</b><span>99 شيكل</span></button><button class="oskar-plan-card best" data-plan="دائم مدى الحياة ب 149 شيكل"><b>مدى الحياة</b><span>149 شيكل</span></button></div><a class="oskar-wa-btn" target="_blank" rel="noopener" href="https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent('مرحبا، أريد شراء نسخة oskar دائمة')}"><i class="fa-brands fa-whatsapp"></i> تواصل واتساب للشراء</a>`; const note=$("trialLoginNote"); (note||$("employeeLoginForm")||card.lastElementChild).insertAdjacentElement("afterend",box); } document.querySelectorAll(".oskar-plan-card").forEach(btn=>{ if(btn.__bound) return; btn.__bound=true; btn.addEventListener("click",()=>{ const plan=btn.dataset.plan||"نسخة دائمة"; window.open(`https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent('مرحبا، أريد شراء خطة oskar: '+plan)}`,'_blank'); }); }); }
   function installStyles(){ if($("oskarTrialPurchaseStyles")) return; const style=document.createElement("style"); style.id="oskarTrialPurchaseStyles"; style.textContent=`#oskarPurchaseBox{margin-top:12px;background:linear-gradient(180deg,#f8fafc,#fff);border:1px solid #e2e8f0;border-radius:22px;padding:12px;box-shadow:0 16px 34px rgba(15,23,42,.07)}.oskar-buy-title{font-weight:900;color:#0f172a;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:7px}.oskar-buy-title i{color:#16a34a;font-size:20px}.oskar-plans-row{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;direction:rtl!important}.oskar-plan-card{border:1px solid #dbeafe;background:#fff;border-radius:18px;padding:10px 5px;min-height:74px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-family:Cairo,Arial,sans-serif;box-shadow:0 10px 22px rgba(37,99,235,.08);transition:.16s;white-space:nowrap}.oskar-plan-card b{font-size:13px;color:#0f172a}.oskar-plan-card span{font-size:12px;font-weight:900;color:#1d4ed8}.oskar-plan-card.best{background:linear-gradient(135deg,#fef3c7,#fff);border-color:#f59e0b}.oskar-plan-card:hover{transform:translateY(-2px)}.oskar-wa-btn{margin-top:10px;text-decoration:none;width:100%;border:0;border-radius:18px;padding:12px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 14px 28px rgba(22,163,74,.22)}.oskar-trial-pill{position:fixed;right:14px;bottom:92px;z-index:35000;background:#0f172a;color:#fff;border-radius:999px;padding:10px 13px;font-weight:900;font-size:12px;box-shadow:0 16px 38px rgba(15,23,42,.22)}@media(max-width:420px){.oskar-plan-card{padding:8px 2px;min-height:68px}.oskar-plan-card b{font-size:11px}.oskar-plan-card span{font-size:11px}.oskar-plans-row{gap:5px!important}}`; document.head.appendChild(style); }
-  function updateTrialUi(){ installStyles(); ensureTrialButton(); ensurePurchaseCards(); if(expireTrialIfNeeded()) return; const active=trialActive(), used=localStorage.getItem(TRIAL_USED_KEY)==="1", out=localStorage.getItem(TRIAL_LOGGED_OUT_KEY)==="1"; const note=$("trialLoginNote"), btn=$("trialLoginBtn"); if(active){ if(note) note.textContent=out?`التجربة فعالة لهذا الجهاز. اضغط زر التجربة للدخول مرة أخرى. المتبقي ${mmss(leftMs())}.`:`التجربة فعالة الآن. المتبقي ${mmss(leftMs())}. بياناتها محلية فقط على هذا الجهاز بدون مزامنة.`; if(btn){btn.disabled=false; btn.style.opacity="1"; btn.innerHTML='<i class="fa-solid fa-flask"></i> دخول التجربة المتبقية';} let pill=$("oskarTrialPill"); if(!pill){pill=document.createElement("div"); pill.id="oskarTrialPill"; pill.className="oskar-trial-pill"; document.body.appendChild(pill);} pill.textContent=`تجربة oskar: ${mmss(leftMs())}`; if(out) forceTrialLoggedOutUi(); } else { const pill=$("oskarTrialPill"); if(pill) pill.remove(); if(used){ if(note) note.textContent="تم استخدام الفترة التجريبية على هذا الجهاز وانتهت. اختر إحدى البطاقات بالأسفل للشراء."; if(btn){btn.disabled=true; btn.style.opacity=".55"; btn.innerHTML='<i class="fa-solid fa-lock"></i> انتهت الفترة التجريبية';} } else { if(note) note.textContent="التجربة تستخدم مرة واحدة لكل جهاز. عند تشغيلها يتم إنشاء تخزين محلي ومساحة بيانات محلية مستقلة لهذا الجهاز فقط."; } } }
+  function updateTrialUi(){ installStyles(); ensureTrialButton(); ensurePurchaseCards(); if(expireTrialIfNeeded()) return; const active=trialActive(), used=localStorage.getItem(TRIAL_USED_KEY)==="1", out=localStorage.getItem(TRIAL_LOGGED_OUT_KEY)==="1"; const note=$("trialLoginNote"), btn=$("trialLoginBtn"); if(active){ if(note) note.textContent=out?`التجربة فعالة لهذا الجهاز. اضغط زر التجربة للدخول مرة أخرى. المتبقي ${mmss(leftMs())}.`:`التجربة فعالة الآن. المتبقي ${mmss(leftMs())}. بياناتها محفوظة في مسار Firebase تجريبي مستقل.`; if(btn){btn.disabled=false; btn.style.opacity="1"; btn.innerHTML='<i class="fa-solid fa-flask"></i> دخول التجربة المتبقية';} let pill=$("oskarTrialPill"); if(!pill){pill=document.createElement("div"); pill.id="oskarTrialPill"; pill.className="oskar-trial-pill"; document.body.appendChild(pill);} pill.textContent=`تجربة oskar: ${mmss(leftMs())}`; if(out) forceTrialLoggedOutUi(); } else { const pill=$("oskarTrialPill"); if(pill) pill.remove(); if(used){ if(note) note.textContent="تم استخدام الفترة التجريبية على هذا الجهاز وانتهت. اختر إحدى البطاقات بالأسفل للشراء."; if(btn){btn.disabled=true; btn.style.opacity=".55"; btn.innerHTML='<i class="fa-solid fa-lock"></i> انتهت الفترة التجريبية';} } else { if(note) note.textContent="التجربة تستخدم مرة واحدة لكل جهاز. عند تشغيلها يتم إنشاء مسار Firebase وتجربة مستقلين لهذا الجهاز."; } } }
   function bindLogout(){ document.addEventListener("click", e=>{ const out=e.target.closest("#logoutBtn,#topLogoutBtn"); if(!out) return; if(trialActive()){ localStorage.setItem(TRIAL_LOGGED_OUT_KEY,"1"); setTimeout(()=>{clearAuthOnly(); authLock(true); updateTrialUi();},0); } }, true); }
   function init(){ getDeviceId(); installStyles(); bindLogout(); updateTrialUi(); setInterval(updateTrialUi,60000); window.OSKAR_FORCE_TRIAL_LOGIN=setTrialUser; window.OSKAR_TRIAL_INFO=()=>({active:trialActive(),deviceId:getDeviceId(),startedAt:startedAt(),leftMs:leftMs(),storageProfile:window.OSKAR_STORAGE_PROFILE,firebaseRoot:window.FIREBASE_ROOT}); }
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
@@ -11478,7 +11493,7 @@
   const TRIAL_MODE_KEY = "oskar_storage_mode_v1";
   const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
   const TRIAL_USED_KEY = "oskar_trial_used_once_v1";
-  const TRIAL_DURATION_MS = 30 * 60 * 1000;
+  const TRIAL_DURATION_MS = 12 * 60 * 60 * 1000;
   const WHATSAPP_PHONE = "972597603119";
   let lastLogoutAt = 0;
   function now(){ return Date.now(); }
@@ -11521,7 +11536,7 @@
     const card=document.querySelector("#authLock .auth-card"); if(!card) return;
     const box=ensurePurchaseBox(); if(!box) return;
     let btn=$("trialLoginBtn");
-    if(!btn){ btn=document.createElement("button"); btn.id="trialLoginBtn"; btn.type="button"; btn.className="auth-main-btn"; btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 30 دقيقة'; }
+    if(!btn){ btn=document.createElement("button"); btn.id="trialLoginBtn"; btn.type="button"; btn.className="auth-main-btn"; btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 12 ساعة'; }
     btn.classList.add("oskar-trial-inside-box");
     btn.style.cssText="background:linear-gradient(135deg,#f59e0b,#d97706);margin-top:10px;width:100%";
     const plans=box.querySelector(".oskar-plans-row");
@@ -11543,7 +11558,7 @@
       btn.disabled=true; btn.style.opacity=".55"; btn.innerHTML='<i class="fa-solid fa-lock"></i> انتهت الفترة التجريبية';
       if(note) note.textContent="تم استخدام الفترة التجريبية على هذا الجهاز وانتهت. اختر إحدى الباقات أو تواصل واتساب للشراء.";
     } else {
-      btn.disabled=false; btn.style.opacity="1"; btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 30 دقيقة';
+      btn.disabled=false; btn.style.opacity="1"; btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 12 ساعة';
       if(note) note.textContent="التجربة مرة واحدة لكل جهاز، وبتخزين محلي مستقل عن النسخة الأساسية.";
     }
   }
@@ -11595,7 +11610,7 @@
 
   const $ = (id) => document.getElementById(id);
   const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-  const TRIAL_DURATION_MS = 30 * 60 * 1000;
+  const TRIAL_DURATION_MS = 12 * 60 * 60 * 1000;
   const TRIAL_USED_KEY = "oskar_trial_used_once_v1";
   const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
   const TRIAL_MODE_KEY = "oskar_storage_mode_v1";
@@ -11675,7 +11690,7 @@
     clearAuthSessions();
     if(wasTrial || trialTimeValid()){
       localStorage.setItem(TRIAL_LOGGED_OUT_KEY, "1");
-      localStorage.setItem(TRIAL_MODE_KEY, MAIN_MODE_VALUE);
+      localStorage.setItem(TRIAL_MODE_KEY, "trial");
     }
     showLogin();
     toast("تم تسجيل الخروج");
@@ -11826,13 +11841,13 @@
         btn.innerHTML = '<i class="fa-solid fa-flask"></i> دخول التجربة المتبقية';
       } else {
         btn.disabled = false; btn.style.opacity = "1";
-        btn.innerHTML = '<i class="fa-solid fa-flask"></i> فترة تجريبية 30 دقيقة';
+        btn.innerHTML = '<i class="fa-solid fa-flask"></i> فترة تجريبية 12 ساعة';
       }
     }
     if(note){
       if(trialTimeValid()) note.textContent = "التجربة فعالة لهذا الجهاز. المتبقي " + leftMinutesText() + ". اضغط زر التجربة للدخول إلى بيانات التجربة المستقلة.";
       else if(trialUsed()) note.textContent = "تم استخدام الفترة التجريبية على هذا الجهاز وانتهت. اختر إحدى الباقات للشراء.";
-      else note.textContent = "التجربة مرة واحدة لكل جهاز. عند تشغيلها يتم إنشاء مساحة بيانات مستقلة لهذا الجهاز فقط.";
+      else note.textContent = "التجربة مرة واحدة لكل جهاز. عند تشغيلها يتم إنشاء مسار Firebase مستقل لهذا الجهاز.";
     }
   }
 
@@ -11893,7 +11908,7 @@
     ensureStyles();
     getDeviceId();
     if(localStorage.getItem(TRIAL_LOGGED_OUT_KEY) === "1" && localStorage.getItem(TRIAL_MODE_KEY) === "trial"){
-      localStorage.setItem(TRIAL_MODE_KEY, MAIN_MODE_VALUE);
+      window.OSKAR_TRIAL_LOGGED_OUT_LOCAL_ONLY = true;
     }
     replaceLogoutButtons();
     ensureGuidePage();
@@ -11926,7 +11941,7 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
-  const TRIAL_DURATION_MS = 30*60*1000;
+  const TRIAL_DURATION_MS = 12*60*60*1000;
   const TRIAL_USED_KEY = "oskar_trial_used_once_v1";
   const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
   const TRIAL_MODE_KEY = "oskar_storage_mode_v1";
@@ -12104,7 +12119,7 @@
     if(!btn) return;
     if(trialTimeValid() && trialMode()) { btn.innerHTML='<i class="fa-solid fa-flask"></i> دخول التجربة المتبقية'; if(note) note.textContent='التجربة فعالة لهذا الجهاز. المتبقي '+leftMinutes()+'. اضغط زر التجربة للدخول.'; }
     else if(localStorage.getItem(TRIAL_USED_KEY)==="1") { btn.innerHTML='<i class="fa-solid fa-lock"></i> انتهت الفترة التجريبية'; btn.disabled=true; btn.style.opacity='.55'; if(note) note.textContent='تم استخدام الفترة التجريبية على هذا الجهاز وانتهت. اختر إحدى الباقات أو تواصل واتساب للشراء.'; }
-    else { btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 30 دقيقة'; btn.disabled=false; btn.style.opacity='1'; if(note) note.textContent='التجربة مرة واحدة لكل جهاز، وبمساحة بيانات مستقلة عن النسخة الأساسية.'; }
+    else { btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 12 ساعة'; btn.disabled=false; btn.style.opacity='1'; if(note) note.textContent='التجربة مرة واحدة لكل جهاز، وبمسار بيانات مستقل عن النسخة الأساسية.'; }
   }
   function optimizeExternalScripts(){
     $$('script[src]').forEach(sc=>{ const src=sc.src||''; if(/zxing|JsBarcode|html2canvas|jspdf|xlsx|html5-qrcode/.test(src)){ sc.defer=true; sc.async=false; } });
@@ -12126,7 +12141,7 @@
   const $=id=>document.getElementById(id);
   const $$=(sel,root=document)=>Array.from(root.querySelectorAll(sel));
   const TRIAL_MODE_KEY='oskar_storage_mode_v1', TRIAL_STARTED_KEY='oskar_trial_started_at_v1', TRIAL_USED_KEY='oskar_trial_used_once_v1';
-  const TRIAL_DURATION_MS=30*60*1000;
+  const TRIAL_DURATION_MS=12*60*60*1000;
   function toast(msg,ms=2800){ if(typeof window.toast==='function') return window.toast(msg,ms); const el=$('toast'); if(el){ el.textContent=msg; el.classList.add('show'); clearTimeout(el.__t); el.__t=setTimeout(()=>el.classList.remove('show'),ms);} else alert(msg); }
   function isTrialActive(){ const st=Number(localStorage.getItem(TRIAL_STARTED_KEY)||0); return localStorage.getItem(TRIAL_MODE_KEY)==='trial' && st && Date.now()-st<TRIAL_DURATION_MS; }
   function leftMinutes(){ const st=Number(localStorage.getItem(TRIAL_STARTED_KEY)||0); const m=Math.max(0,Math.ceil((TRIAL_DURATION_MS-(Date.now()-st))/60000)); return m<=0?'انتهت':(m+' د'); }
@@ -12141,10 +12156,10 @@
     @media(min-width:901px){.cart-line{grid-template-columns:1fr 250px 100px 44px!important;min-height:82px!important}.oskar-cart-product-info{padding-left:0!important}.oskar-cart-controls{grid-column:auto!important}.line-total{position:static!important}.oskar-cart-remove{position:static!important}}
   `; document.head.appendChild(st); }
   function stabilizeTrialSidebar(){ const pill=$('authUserPill'); if(!pill) return; const user=window.state?.auth?.user; if(user && (user.trial || String(user.name||'').includes('تجربة oskar'))){ pill.innerHTML='<i class="fa-solid fa-flask"></i><span>تجربة oskar</span><span id="oskarTrialSidebarMinutes" class="oskar-side-minutes"><i class="fa-solid fa-clock"></i> '+leftMinutes()+'</span>'; } }
-  function patchSyncTrial(){ document.addEventListener('click',function(e){ const b=e.target.closest('#syncNowBtn'); if(!b || !isTrialActive()) return; e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast('النسخة التجريبية لا يوجد فيها مزامنة، البيانات تحفظ محليًا على هذا الجهاز فقط'); try{ if(window.updateSyncUi) window.updateSyncUi({visible:true,spin:false,title:'نسخة تجريبية',status:'لا يوجد مزامنة في النسخة التجريبية، الحفظ محلي فقط',progress:100}); }catch{} },true); }
+  function patchSyncTrial(){ /* مزامنة التجربة مسموحة على مسار Firebase مستقل. */ }
   function patchLoginErrors(){ document.addEventListener('submit',function(e){ const f=e.target; if(!f) return; if(f.id==='adminLoginForm'){ const v=($('adminPasswordInput')?.value||'').trim(); if(!v){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast('أدخل كلمة مرور المدير'); } } if(f.id==='employeeLoginForm'){ const n=($('employeeNameInput')?.value||'').trim(), p=($('employeePasswordInput')?.value||'').trim(); if(!n || !p){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast(!n?'أدخل اسم المستخدم':'أدخل كلمة المرور'); } } },true); }
-  function keepTrialLocalOnly(){ if(!isTrialActive()) return; window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true; try{ if(window.idbClear) window.idbClear('syncQueue'); }catch{} }
-  function init(){ installStyles(); patchSyncTrial(); patchLoginErrors(); keepTrialLocalOnly(); stabilizeTrialSidebar(); setInterval(()=>{ keepTrialLocalOnly(); stabilizeTrialSidebar(); },60000); setTimeout(stabilizeTrialSidebar,800); setTimeout(stabilizeTrialSidebar,2500); }
+  function keepTrialLocalOnly(){ if(!isTrialActive()) return; window.OSKAR_TRIAL_LOCAL_ONLY=false; window.OSKAR_TRIAL_ACTIVE=true; window.OSKAR_TRIAL_FIREBASE_ALLOWED=true; }
+  function init(){ installStyles(); patchLoginErrors(); stabilizeTrialSidebar(); setInterval(()=>{ stabilizeTrialSidebar(); },60000); setTimeout(stabilizeTrialSidebar,800); setTimeout(stabilizeTrialSidebar,2500); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
 </script>
@@ -12152,7 +12167,7 @@
 (function(){
   "use strict";
   const $ = id => document.getElementById(id);
-  const TRIAL_DURATION_MS = 30*60*1000;
+  const TRIAL_DURATION_MS = 12*60*60*1000;
   const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
   const TRIAL_MODE_KEY = "oskar_storage_mode_v1";
   const money = v => (typeof window.money === "function" ? window.money(v) : "₪ " + (Number(v||0).toFixed(2)));
@@ -12201,15 +12216,7 @@
       pill.innerHTML='<span class="oskar-side-title"><i class="fa-solid fa-flask"></i> تجربة oskar</span><span id="oskarTrialSidebarMinutes" class="oskar-side-minutes"><i class="fa-solid fa-clock"></i> '+min+'</span>';
     }
   }
-  function blockTrialSyncAndCloud(){
-    document.addEventListener("click",function(e){
-      const btn=e.target.closest("#syncNowBtn");
-      if(!btn || !trialActive()) return;
-      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-      toast("النسخة التجريبية محلية فقط ولا يوجد فيها مزامنة");
-      try{ if(window.updateSyncUi) window.updateSyncUi({visible:true,spin:false,title:"نسخة تجريبية",status:"لا يوجد مزامنة في النسخة التجريبية، البيانات تحفظ محليًا فقط",progress:100}); }catch{}
-    },true);
-  }
+  function blockTrialSyncAndCloud(){ /* مزامنة التجربة مسموحة على مسار Firebase مستقل. */ }
   function patchQuantityInputNoBlur(){
     document.addEventListener("input",function(e){
       const inp=e.target.closest("[data-change-cart-qty]"); if(!inp || !window.state?.cart) return;
@@ -12234,12 +12241,11 @@
   }
   function makeTrialLocalOnlyRuntime(){
     if(!trialActive()) return;
-    window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true;
-    if(typeof window.enqueueSync==="function" && !window.enqueueSync.__trialBlocked){ const f=function(){ toast("النسخة التجريبية محلية فقط ولا يوجد فيها مزامنة"); return Promise.resolve(); }; f.__trialBlocked=true; window.enqueueSync=f; }
+    window.OSKAR_TRIAL_LOCAL_ONLY=false; window.OSKAR_TRIAL_ACTIVE=true; window.OSKAR_TRIAL_FIREBASE_ALLOWED=true;
   }
   function init(){
-    installFinalStyles(); blockTrialSyncAndCloud(); patchQuantityInputNoBlur(); makeTrialLocalOnlyRuntime(); ensureScannerKeepsBehavior(); forceStableTrialSidebar();
-    setInterval(()=>{ makeTrialLocalOnlyRuntime(); ensureScannerKeepsBehavior(); forceStableTrialSidebar(); },60000);
+    installFinalStyles(); patchQuantityInputNoBlur(); ensureScannerKeepsBehavior(); forceStableTrialSidebar();
+    setInterval(()=>{ ensureScannerKeepsBehavior(); forceStableTrialSidebar(); },60000);
     const pill=$("authUserPill"); if(pill) new MutationObserver(()=>forceStableTrialSidebar()).observe(pill,{childList:true,subtree:true,characterData:true});
     window.addEventListener("barcode:scanned",()=>setTimeout(()=>{ try{ if(typeof window.renderCart==="function") window.renderCart(); }catch{} },50));
   }
@@ -12254,7 +12260,7 @@
   const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
   const TRIAL_MODE_KEY="oskar_storage_mode_v1";
   const TRIAL_STARTED_KEY="oskar_trial_started_at_v1";
-  const TRIAL_DURATION_MS=30*60*1000;
+  const TRIAL_DURATION_MS=12*60*60*1000;
   const LOGO_URL="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhc2-SIvoXM037iekfqFFgG9ScPFkd2OYmDCTxAsulO8-UYIByWI5H7pAhaNRr3OkT-WR5h-RrPQfjsWpv4RCPLDIauhevT3RdNQIAICh-ZgdTMWn8ZL8oabWZL-sttvTQ2EAk6LckmOIa2lEdSyjHW9_jrjbMpnItLw9TzulLth5MoEQxj3un_cLoqHL9C/s759/1000002395.jpg";
   const money = v => (typeof window.money==="function" ? window.money(v) : "₪ " + (Number(v||0).toFixed(2)));
   const clean = (v,f=0)=>{ const n=Number(String(v??"").replace(",",".")); return Number.isFinite(n)?n:f; };
@@ -12305,34 +12311,8 @@
     if(!pill.querySelector(".oskar-side-title") || !pill.querySelector("#oskarTrialSidebarMinutes")) pill.innerHTML=title+chip;
     const b=$("oskarTrialSidebarMinutes"); if(b && b.textContent.trim()!==min) b.textContent=min;
   }
-  function lockTrialSettings(){
-    if(!trialActive()) return;
-    const settings=$("page-settings"); if(!settings) return;
-    const logoUrl=$("settingLogoUrl"), phone=$("settingShopPhone"), low=$("settingLowStock");
-    if(logoUrl){ logoUrl.value=""; logoUrl.placeholder="غير متاح في النسخة التجريبية — استخدم رفع صورة من الجهاز"; logoUrl.disabled=true; logoUrl.classList.add("oskar-trial-disabled-input"); }
-    if(phone){ phone.disabled=true; phone.classList.add("oskar-trial-disabled-input"); }
-    if(low){ low.disabled=true; low.classList.add("oskar-trial-disabled-input"); }
-    const empBox=$("employeesSettingsBox"), secBox=$("adminSecurityBox");
-    const backupCard=$$("#page-settings .card").find(c=>/النسخ الاحتياطي/.test(c.textContent||""));
-    [empBox,secBox,backupCard].filter(Boolean).forEach(box=>{
-      if(!box.querySelector(".oskar-trial-locked-note")) box.insertAdjacentHTML("afterbegin",'<div class="oskar-trial-locked-note"><i class="fa-solid fa-lock"></i> هذا القسم غير متاح في النسخة التجريبية.</div>');
-      Array.from(box.querySelectorAll("input,select,textarea,button,label")).forEach(el=>{ el.classList.add("oskar-trial-locked"); if(el.tagName==="BUTTON"||el.tagName==="INPUT"||el.tagName==="SELECT"||el.tagName==="TEXTAREA") el.disabled=true; });
-    });
-    const note=$$("#page-settings .muted").find(x=>/Firebase|الشعار يتزامن/.test(x.textContent||""));
-    if(note) note.textContent="في النسخة التجريبية يمكنك تعديل اسم المحل، العملة، شعار محلي من الجهاز، وحسابات الدفع والتحويل فقط.";
-  }
-  function blockTrialEmployee(){
-    document.addEventListener("click",function(e){
-      if(!trialActive()) return;
-      const btn=e.target.closest("#addEmployeeBtn,[data-open-employee],#finalAddWorker,#finalAddEmployee");
-      if(btn){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast("إضافة الموظفين غير متاحة في النسخة التجريبية"); }
-    },true);
-    document.addEventListener("submit",function(e){
-      if(!trialActive()) return;
-      const f=e.target;
-      if(f && /employee/i.test(f.id||"")){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); toast("إضافة أو تعديل الموظفين غير متاح في النسخة التجريبية"); }
-    },true);
-  }
+  function lockTrialSettings(){ /* إعدادات وموظفو التجربة مسموحون داخل مسار التجربة المستقل. */ }
+  function blockTrialEmployee(){ /* مسموح بإضافة الموظفين في التجربة لأن مسارها مستقل. */ }
   function patchLoginWrongMessages(){
     document.addEventListener("submit",function(e){
       const f=e.target; if(!f) return;
@@ -12370,20 +12350,12 @@
   }
   function forceTrialLocalOnly(){
     if(!trialActive()) return;
-    window.OSKAR_TRIAL_LOCAL_ONLY=true; window.OSKAR_TRIAL_ACTIVE=true;
-    window.FIREBASE_ROOT="TRIAL_LOCAL_ONLY_NO_SYNC";
-    ["syncNow","syncFromFirebase","pushSyncQueue","startRealtimeListeners"].forEach(name=>{ if(typeof window[name]==="function" && !window[name].__trialNoop){ const fn=function(){ toast("النسخة التجريبية محلية فقط ولا يوجد فيها مزامنة"); return Promise.resolve(false); }; fn.__trialNoop=true; window[name]=fn; } });
+    window.OSKAR_TRIAL_LOCAL_ONLY=false; window.OSKAR_TRIAL_ACTIVE=true; window.OSKAR_TRIAL_FIREBASE_ALLOWED=true;
   }
-  function patchSyncButton(){
-    document.addEventListener("click",function(e){
-      const b=e.target.closest("#syncNowBtn"); if(!b || !trialActive()) return;
-      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-      toast("النسخة التجريبية محلية فقط ولا يوجد فيها مزامنة");
-    },true);
-  }
+  function patchSyncButton(){ /* مزامنة التجربة مسموحة على مسار Firebase مستقل. */ }
   function init(){
-    installStyles(); setDefaultLogo(); blockTrialEmployee(); patchLoginWrongMessages(); patchQuantityNoKeyboardClose(); patchSyncButton();
-    function tick(){ setDefaultLogo(); stableTrialPill(); lockTrialSettings(); patchInventoryProductCount(); forceTrialLocalOnly(); }
+    installStyles(); setDefaultLogo(); patchLoginWrongMessages(); patchQuantityNoKeyboardClose();
+    function tick(){ setDefaultLogo(); stableTrialPill(); patchInventoryProductCount(); }
     tick(); setTimeout(tick,500); setTimeout(tick,1800); setInterval(tick,60000);
     const pill=$("authUserPill"); if(pill){ try{ new MutationObserver(()=>setTimeout(stableTrialPill,0)).observe(pill,{childList:true,subtree:true,characterData:true}); }catch{} }
     window.addEventListener("barcode:scanned",()=>setTimeout(()=>{ try{ if(typeof window.renderCart==="function") window.renderCart(); }catch{} },60));
@@ -12392,225 +12364,249 @@
 })();
 </script>
 
-<!-- OSKAR_TABLE_TOUCH_SCROLL_FAST_HORIZONTAL_V5 -->
-<style id="oskarTableTouchScrollFastHorizontalV5Style">
+<!-- OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3 -->
+<style id="oskarTableTouchScrollFinalV3Style">
   html body .table-wrap,
   html body .new-page-table-holder{
     overflow-x:auto!important;
     overflow-y:visible!important;
     -webkit-overflow-scrolling:touch!important;
-    touch-action:pan-x pan-y!important;
-    overscroll-behavior-x:auto!important;
-    overscroll-behavior-y:auto!important;
-    scroll-behavior:auto!important;
+    touch-action:none!important;
+    overscroll-behavior:auto!important;
     cursor:grab;
-    will-change:scroll-position;
-    transform:translateZ(0);
-    contain:paint;
   }
   html body .table-wrap:active,
   html body .new-page-table-holder:active{cursor:grabbing;}
   html body .table-wrap table,
-  html body .new-page-table-holder table{
-    touch-action:pan-x pan-y!important;
-  }
-  html body .table-wrap th,
-  html body .table-wrap td,
-  html body .new-page-table-holder th,
-  html body .new-page-table-holder td{
-    touch-action:pan-x pan-y!important;
-  }
+  html body .new-page-table-holder table{touch-action:none!important;}
   html body .table-wrap button,
   html body .table-wrap input,
   html body .table-wrap select,
   html body .table-wrap textarea,
-  html body .table-wrap a,
   html body .new-page-table-holder button,
   html body .new-page-table-holder input,
   html body .new-page-table-holder select,
-  html body .new-page-table-holder textarea,
-  html body .new-page-table-holder a{
-    touch-action:manipulation!important;
-  }
-  html body .modal,
-  html body .sidebar,
-  html body .sync-operation-list,
-  html body .customer-suggest-list,
-  html body .smart-suggest-list,
-  html body .smart-supplier-list{
-    -webkit-overflow-scrolling:touch!important;
-    touch-action:pan-y!important;
-    scroll-behavior:auto!important;
-    overscroll-behavior:auto!important;
-  }
+  html body .new-page-table-holder textarea{touch-action:manipulation!important;}
 </style>
-<script id="oskarTableTouchScrollFastHorizontalV5Script">
+<script id="oskarTableTouchScrollFinalV3Script">
 (function(){
   "use strict";
-  if (window.__OSKAR_TABLE_TOUCH_SCROLL_FAST_HORIZONTAL_V5__) return;
-  window.__OSKAR_TABLE_TOUCH_SCROLL_FAST_HORIZONTAL_V5__ = true;
+  if (window.__OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3__) return;
+  window.__OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3__ = true;
 
   const TABLE_SELECTOR = ".table-wrap,.new-page-table-holder";
   const INTERACTIVE_SELECTOR = "input,textarea,select,option,button,a,label,[contenteditable='true']";
-  const THRESHOLD = 5;
-  const HORIZONTAL_BIAS = 1.12;
-  let touchDrag = null;
-  let mouseDrag = null;
+  const THRESHOLD = 6;
+  let active = null;
   let suppressClickUntil = 0;
 
-  function closestWrap(target){
+  function closestTableWrap(target){
     return target && target.closest ? target.closest(TABLE_SELECTOR) : null;
   }
-
-  function isInteractive(target){
-    return !!(target && target.closest && target.closest(INTERACTIVE_SELECTOR));
+  function canScrollY(el){
+    if (!el || el === document.body || el === document.documentElement) return false;
+    const cs = window.getComputedStyle(el);
+    const oy = cs.overflowY || "";
+    return /(auto|scroll|overlay)/.test(oy) && el.scrollHeight > el.clientHeight + 2;
   }
-
-  function canMoveHorizontally(wrap){
-    return !!wrap && (wrap.scrollWidth > wrap.clientWidth + 2);
-  }
-
-  function scheduleHorizontalScroll(state, delta){
-    if (!state || !state.wrap || !delta) return;
-    state.pending += delta;
-    if (state.raf) return;
-    state.raf = requestAnimationFrame(function(){
-      state.raf = 0;
-      const wrap = state.wrap;
-      const deltaNow = state.pending;
-      state.pending = 0;
-      if (!wrap || !deltaNow) return;
-      const before = wrap.scrollLeft || 0;
-      wrap.scrollLeft = before + deltaNow;
-      if ((wrap.scrollLeft || 0) === before && Math.abs(deltaNow) > 0) {
-        wrap.scrollLeft = before - deltaNow;
+  function verticalTarget(from){
+    let node = from;
+    while (node && node !== document.body && node !== document.documentElement) {
+      if (!node.matches || !node.matches(TABLE_SELECTOR)) {
+        if (canScrollY(node)) return node;
       }
-    });
+      node = node.parentElement;
+    }
+    return document.scrollingElement || document.documentElement;
   }
-
+  function maxScrollTop(el){
+    if (el === document.scrollingElement || el === document.documentElement || el === document.body) {
+      const doc = document.documentElement;
+      const body = document.body;
+      return Math.max(0, Math.max(doc.scrollHeight, body ? body.scrollHeight : 0) - window.innerHeight);
+    }
+    return Math.max(0, el.scrollHeight - el.clientHeight);
+  }
+  function getScrollTop(el){
+    if (el === document.scrollingElement || el === document.documentElement || el === document.body) {
+      return window.pageYOffset || document.documentElement.scrollTop || 0;
+    }
+    return el.scrollTop || 0;
+  }
+  function setScrollTop(el, value){
+    const next = Math.max(0, Math.min(maxScrollTop(el), value));
+    if (el === document.scrollingElement || el === document.documentElement || el === document.body) {
+      window.scrollTo(window.pageXOffset || document.documentElement.scrollLeft || 0, next);
+    } else {
+      el.scrollTop = next;
+    }
+  }
   function onTouchStart(e){
     if (!e.touches || e.touches.length !== 1) return;
-    const wrap = closestWrap(e.target);
-    if (!wrap || !canMoveHorizontally(wrap)) return;
+    const wrap = closestTableWrap(e.target);
+    if (!wrap) return;
     const t = e.touches[0];
-    touchDrag = {
-      wrap,
-      startX:t.clientX,
-      startY:t.clientY,
-      lastX:t.clientX,
-      lastY:t.clientY,
-      mode:"",
-      pending:0,
-      raf:0
+    active = {
+      wrap: wrap,
+      yTarget: verticalTarget(wrap.parentElement || wrap),
+      startX: t.clientX,
+      startY: t.clientY,
+      lastX: t.clientX,
+      lastY: t.clientY,
+      mode: ""
     };
   }
-
   function onTouchMove(e){
-    if (!touchDrag || !e.touches || e.touches.length !== 1) return;
+    if (!active || !e.touches || e.touches.length !== 1) return;
     const t = e.touches[0];
-    const dxTotal = t.clientX - touchDrag.startX;
-    const dyTotal = t.clientY - touchDrag.startY;
+    const dxTotal = t.clientX - active.startX;
+    const dyTotal = t.clientY - active.startY;
     const absX = Math.abs(dxTotal);
     const absY = Math.abs(dyTotal);
-
-    if (!touchDrag.mode) {
-      if (Math.max(absX, absY) < THRESHOLD) return;
-      touchDrag.mode = absX > (absY * HORIZONTAL_BIAS) ? "horizontal" : "vertical";
+    if (!active.mode) {
+      if (absX < THRESHOLD && absY < THRESHOLD) return;
+      active.mode = absY >= absX ? "vertical" : "horizontal";
     }
-
-    if (touchDrag.mode === "horizontal") {
-      suppressClickUntil = Date.now() + 160;
-    }
-
-    touchDrag.lastX = t.clientX;
-    touchDrag.lastY = t.clientY;
-  }
-
-  function onTouchEnd(){
-    touchDrag = null;
-  }
-
-  function onMouseDown(e){
-    const wrap = closestWrap(e.target);
-    if (!wrap || e.button !== 0 || isInteractive(e.target) || !canMoveHorizontally(wrap)) return;
-    mouseDrag = {
-      wrap,
-      x:e.clientX,
-      y:e.clientY,
-      mode:"",
-      pending:0,
-      raf:0
-    };
-  }
-
-  function onMouseMove(e){
-    if (!mouseDrag) return;
-    const dxTotal = e.clientX - mouseDrag.x;
-    const dyTotal = e.clientY - mouseDrag.y;
-    const absX = Math.abs(dxTotal);
-    const absY = Math.abs(dyTotal);
-    if (!mouseDrag.mode) {
-      if (Math.max(absX, absY) < THRESHOLD) return;
-      mouseDrag.mode = absX > absY * HORIZONTAL_BIAS ? "horizontal" : "vertical";
-    }
-    if (mouseDrag.mode !== "horizontal") return;
     e.preventDefault();
-    suppressClickUntil = Date.now() + 260;
-    scheduleHorizontalScroll(mouseDrag, -e.movementX);
+    e.stopPropagation();
+    suppressClickUntil = Date.now() + 350;
+    if (active.mode === "vertical") {
+      const dy = active.lastY - t.clientY;
+      setScrollTop(active.yTarget, getScrollTop(active.yTarget) + dy);
+    } else {
+      const dx = t.clientX - active.lastX;
+      const before = active.wrap.scrollLeft || 0;
+      active.wrap.scrollLeft = before - dx;
+      if ((active.wrap.scrollLeft || 0) === before && Math.abs(dx) > 0) active.wrap.scrollLeft = before + dx;
+    }
+    active.lastX = t.clientX;
+    active.lastY = t.clientY;
   }
+  function onTouchEnd(){ active = null; }
 
-  function onMouseUp(){
-    mouseDrag = null;
-  }
-
-  function onKeyDown(e){
-    const wrap = closestWrap(e.target);
-    if (!wrap || isInteractive(e.target)) return;
-    const step = Math.max(80, Math.floor(wrap.clientWidth * 0.28));
-    if (e.key === "ArrowLeft") { e.preventDefault(); scheduleHorizontalScroll({wrap, pending:0, raf:0}, step); }
-    if (e.key === "ArrowRight") { e.preventDefault(); scheduleHorizontalScroll({wrap, pending:0, raf:0}, -step); }
-  }
-
-  function onClick(e){
-    if (Date.now() < suppressClickUntil && closestWrap(e.target)) {
+  let mouseDrag = null;
+  document.addEventListener("mousedown", function(e){
+    const wrap = closestTableWrap(e.target);
+    if (!wrap || e.button !== 0) return;
+    if (e.target.closest && e.target.closest(INTERACTIVE_SELECTOR)) return;
+    mouseDrag = {wrap:wrap, x:e.clientX, y:e.clientY, left:wrap.scrollLeft || 0, down:false};
+  }, true);
+  document.addEventListener("mousemove", function(e){
+    if (!mouseDrag) return;
+    const dx = e.clientX - mouseDrag.x;
+    const dy = e.clientY - mouseDrag.y;
+    if (!mouseDrag.down && Math.max(Math.abs(dx), Math.abs(dy)) < THRESHOLD) return;
+    mouseDrag.down = true;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      e.preventDefault();
+      mouseDrag.wrap.scrollLeft = mouseDrag.left - dx;
+      suppressClickUntil = Date.now() + 350;
+    }
+  }, true);
+  document.addEventListener("mouseup", function(){ mouseDrag = null; }, true);
+  document.addEventListener("click", function(e){
+    if (Date.now() < suppressClickUntil && closestTableWrap(e.target)) {
       e.preventDefault();
       e.stopPropagation();
     }
-  }
+  }, true);
+
+  document.addEventListener("touchstart", onTouchStart, {capture:true, passive:false});
+  document.addEventListener("touchmove", onTouchMove, {capture:true, passive:false});
+  document.addEventListener("touchend", onTouchEnd, {capture:true, passive:true});
+  document.addEventListener("touchcancel", onTouchEnd, {capture:true, passive:true});
 
   function refreshTableTouchCss(){
     document.querySelectorAll(TABLE_SELECTOR).forEach(function(el){
       el.style.overflowX = "auto";
       el.style.overflowY = "visible";
       el.style.webkitOverflowScrolling = "touch";
-      el.style.touchAction = "pan-x pan-y";
-      el.style.overscrollBehaviorX = "auto";
-      el.style.overscrollBehaviorY = "auto";
-      el.style.scrollBehavior = "auto";
-      if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "0");
+      el.style.touchAction = "none";
+      el.style.overscrollBehavior = "auto";
     });
   }
-
-  document.addEventListener("touchstart", onTouchStart, {capture:true, passive:true});
-  document.addEventListener("touchmove", onTouchMove, {capture:true, passive:true});
-  document.addEventListener("touchend", onTouchEnd, {capture:true, passive:true});
-  document.addEventListener("touchcancel", onTouchEnd, {capture:true, passive:true});
-  document.addEventListener("mousedown", onMouseDown, true);
-  document.addEventListener("mousemove", onMouseMove, true);
-  document.addEventListener("mouseup", onMouseUp, true);
-  document.addEventListener("keydown", onKeyDown, true);
-  document.addEventListener("click", onClick, true);
-
   refreshTableTouchCss();
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", refreshTableTouchCss);
-  else setTimeout(refreshTableTouchCss, 0);
-  try{
-    new MutationObserver(function(){ requestAnimationFrame(refreshTableTouchCss); })
-      .observe(document.body || document.documentElement, {childList:true, subtree:true});
-  }catch(e){}
+  document.addEventListener("DOMContentLoaded", refreshTableTouchCss);
+  setInterval(refreshTableTouchCss, 1200);
 })();
 </script>
-<!-- /OSKAR_TABLE_TOUCH_SCROLL_FAST_HORIZONTAL_V5 -->
+<!-- /OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3 -->
+
+<script id="oskar-trial-12h-isolated-firebase-and-report-stability-2026-04-30">
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const TRIAL_MODE_KEY = "oskar_storage_mode_v1";
+  const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
+  const TRIAL_LOGGED_OUT_KEY = "oskar_trial_logged_out_v1";
+  const TRIAL_DURATION_MS = 12 * 60 * 60 * 1000;
+  const clean = v => { const n = Number(String(v ?? "0").replace(/[^\d.\-]/g,"")); return Number.isFinite(n) ? n : 0; };
+  const money = v => typeof window.money === "function" ? window.money(v) : ("₪ " + clean(v).toFixed(2));
+  function trialActive(){ const st=Number(localStorage.getItem(TRIAL_STARTED_KEY)||0); return localStorage.getItem(TRIAL_MODE_KEY)==="trial" && st && (Date.now()-st)<TRIAL_DURATION_MS; }
+  function leftText(){
+    const st=Number(localStorage.getItem(TRIAL_STARTED_KEY)||0);
+    const ms=Math.max(0,TRIAL_DURATION_MS-(Date.now()-st));
+    const h=Math.floor(ms/3600000), m=Math.ceil((ms%3600000)/60000);
+    if(h<=0) return m<=1 ? "دقيقة" : (m+" دقيقة");
+    return m ? (h+" ساعة و "+m+" دقيقة") : (h+" ساعة");
+  }
+  function keepTrialFirebaseMode(){
+    if(!trialActive()) return;
+    window.OSKAR_TRIAL_ACTIVE = true;
+    window.OSKAR_TRIAL_LOCAL_ONLY = false;
+    window.OSKAR_TRIAL_FIREBASE_ALLOWED = true;
+    if(localStorage.getItem(TRIAL_LOGGED_OUT_KEY)==="1") localStorage.setItem(TRIAL_MODE_KEY,"trial");
+    const btn=$("trialLoginBtn"), note=$("trialLoginNote");
+    if(btn && /30 دقيقة/.test(btn.textContent||"")) btn.innerHTML='<i class="fa-solid fa-flask"></i> فترة تجريبية 12 ساعة';
+    if(note && note.style.display !== "none") note.textContent = "التجربة 12 ساعة وتعمل على مسار Firebase مستقل لهذا الجهاز. المتبقي " + leftText() + ".";
+    const chip=$("oskarTrialSidebarMinutes"); if(chip) chip.textContent = leftText();
+    const ct=$("connectionText"); if(ct && /محلي فقط|بدون مزامنة/.test(ct.textContent||"")) ct.textContent = navigator.onLine ? "نسخة تجريبية - مزامنة مستقلة" : "نسخة تجريبية - أوفلاين";
+  }
+  function inPeriod(row, period, custom){
+    if(period==="all") return true;
+    const t=clean(row && (row.createdAt || row.paidAt || row.date || 0)); if(!t) return false;
+    const now=new Date(), start=new Date(), end=new Date();
+    if(period==="today"){ start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+    else if(period==="week"){ start.setDate(now.getDate()-7); start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+    else if(period==="month"){ start.setMonth(now.getMonth()-1); start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+    else if(period==="year"){ start.setFullYear(now.getFullYear()-1); start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+    else if(period==="custom"){ if(!custom) return false; const d=new Date(custom); start.setTime(d.getTime()); start.setHours(0,0,0,0); end.setTime(d.getTime()); end.setHours(23,59,59,999); }
+    return t>=start.getTime() && t<=end.getTime();
+  }
+  let lastStable = {};
+  function stabilizeReports(){
+    const area=$("reportsPrintArea"); if(!area || !window.state) return;
+    const period=$("reportsPeriod")?.value || "today";
+    const custom=$("reportsCustomDate")?.value || "";
+    const invoices=(window.state.invoices||[]).filter(x=>inPeriod(x,period,custom));
+    const expenses=(window.state.expenses||[]).filter(x=>inPeriod(x,period,custom));
+    const wages=(window.state.workerWages||[]).filter(x=>inPeriod(x,period,custom));
+    let profit=invoices.reduce((s,x)=>s+clean(x.profit),0);
+    const expenseTotal=expenses.reduce((s,x)=>s+clean(x.amount),0);
+    let wageTotal=wages.reduce((s,x)=>s+clean(x.amount||x.bonus),0);
+    const key=period+"|"+custom;
+    const prev=lastStable[key];
+    if(prev){
+      if(profit===0 && prev.profit!==0 && (window.state.invoices||[]).length) profit=prev.profit;
+      if(wageTotal===0 && prev.wageTotal!==0 && (window.state.workerWages||[]).length) wageTotal=prev.wageTotal;
+    }
+    const net=profit-expenseTotal-wageTotal;
+    if(profit!==0 || wageTotal!==0 || expenseTotal!==0) lastStable[key]={profit,wageTotal,expenseTotal,net};
+    if($("reportProfit")) $("reportProfit").textContent=money(profit);
+    let wageEl=$("reportWorkersWages");
+    if(!wageEl){
+      const grid=area.querySelector(".stat-grid"); const netEl=$("reportNet");
+      if(grid){ const card=document.createElement("div"); card.className="stat red"; card.innerHTML='<div class="stat-title"><i class="fa-solid fa-users-gear"></i> أجور العمال</div><div id="reportWorkersWages" class="stat-value">₪ 0.00</div>'; const netCard=netEl?.closest(".stat"); netCard?grid.insertBefore(card,netCard):grid.appendChild(card); wageEl=$("reportWorkersWages"); }
+    }
+    if(wageEl) wageEl.textContent=money(wageTotal);
+    if($("reportNet")) $("reportNet").textContent=money(net);
+  }
+  function tick(){ keepTrialFirebaseMode(); stabilizeReports(); }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", function(){ tick(); setInterval(tick, 700); });
+  else { tick(); setInterval(tick, 700); }
+})();
+</script>
+
 </body>
 </html>
 <!-- legacy-disabled-patches-2026-04-29-base64: old duplicate scripts after </html> were disabled to prevent app startup errors. Do not execute. 
