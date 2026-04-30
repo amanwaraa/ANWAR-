@@ -1725,6 +1725,18 @@
       }
     }
   </style>
+  <script id="oskar-no-login-flash-boot-2026-04-30">
+    (function(){
+      try{
+        var hasSession = Object.keys(localStorage).some(function(k){ return k.indexOf("cashier_auth_session_") === 0 && !!localStorage.getItem(k); });
+        var mode = localStorage.getItem("oskar_storage_mode_v1");
+        if(hasSession && mode !== "trial") document.documentElement.classList.add("oskar-saved-session-boot");
+      }catch(e){}
+    })();
+  </script>
+  <style id="oskar-no-login-flash-style-2026-04-30">
+    html.oskar-saved-session-boot #authLock{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+  </style>
 </head>
 <body>
   <div id="authLock" class="auth-lock">
@@ -4586,6 +4598,358 @@
       });
     }
 
+
+    const OSKAR_CLOUD_FIRST_SYNC_STORES = [
+      "products",
+      "invoices",
+      "customers",
+      "expenses",
+      "purchases",
+      "supplierPayments",
+      "paymentAccounts",
+      "employees",
+      "settings"
+    ];
+
+    function oskarCfClone(obj) {
+      try {
+        return JSON.parse(JSON.stringify(obj || {}));
+      } catch {
+        return { ...(obj || {}) };
+      }
+    }
+
+    function oskarCfItemTime(item) {
+      return Number(item?.updatedAt || item?.createdAt || 0);
+    }
+
+    function oskarCfStateKey(store) {
+      const map = {
+        products: "products",
+        invoices: "invoices",
+        customers: "customers",
+        expenses: "expenses",
+        purchases: "purchases",
+        supplierPayments: "supplierPayments",
+        paymentAccounts: "paymentAccounts",
+        employees: "employees"
+      };
+      return map[store] || store;
+    }
+
+    function oskarCfObjToMap(obj) {
+      const out = {};
+      if (!obj || typeof obj !== "object") return out;
+      Object.entries(obj).forEach(([key, value]) => {
+        if (!value || typeof value !== "object") return;
+        const item = { ...value, id: value.id || key };
+        out[item.id] = item;
+      });
+      return out;
+    }
+
+    function oskarCfNormalize(store, item) {
+      if (!item) return item;
+      if (store === "products") return normalizeProduct(item);
+      if (store === "customers") return normalizeCustomer(item);
+      if (store === "paymentAccounts") return normalizePaymentAccount(item);
+      if (store === "employees") return normalizeEmployee(item);
+      return { ...item, id: item.id || item.itemId || uid(store.slice(0, 3) || "row") };
+    }
+
+    function oskarCfArrayKey(item, index) {
+      if (!item || typeof item !== "object") return String(index);
+      return String(
+        item.id ||
+        item.paymentId ||
+        item.debtId ||
+        item.createdAt + "|" + item.amount + "|" + (item.type || item.method || item.note || item.notes || "") ||
+        index
+      );
+    }
+
+    function oskarCfMergeArrays(remoteArr, localArr) {
+      const map = new Map();
+      [...(Array.isArray(remoteArr) ? remoteArr : []), ...(Array.isArray(localArr) ? localArr : [])].forEach((item, index) => {
+        if (!item || typeof item !== "object") return;
+        const key = oskarCfArrayKey(item, index);
+        const old = map.get(key);
+        if (!old || oskarCfItemTime(item) >= oskarCfItemTime(old)) map.set(key, { ...old, ...item });
+      });
+      return Array.from(map.values()).sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+    }
+
+    function oskarCfMergeCustomer(remote, local) {
+      const r = remote || {};
+      const l = local || {};
+      const newest = oskarCfItemTime(l) >= oskarCfItemTime(r) ? l : r;
+      return normalizeCustomer({
+        ...r,
+        ...newest,
+        id: l.id || r.id,
+        name: newest.name || l.name || r.name || "زبون",
+        phone: newest.phone || l.phone || r.phone || "",
+        payments: oskarCfMergeArrays(r.payments, l.payments),
+        manualDebts: oskarCfMergeArrays(r.manualDebts, l.manualDebts),
+        updatedAt: Math.max(oskarCfItemTime(r), oskarCfItemTime(l), Date.now())
+      });
+    }
+
+    function oskarCfAddStockDelta(deltaMap, productId, amount) {
+      if (!productId) return;
+      const v = cleanNumber(amount || 0);
+      if (!v) return;
+      deltaMap.set(productId, cleanNumber(deltaMap.get(productId) || 0) + v);
+    }
+
+    function oskarCfInvoiceStockDelta(oldInvoice, newInvoice, deltaMap) {
+      if (oldInvoice && oldInvoice.source === "cart") {
+        (oldInvoice.items || []).forEach(item => {
+          oskarCfAddStockDelta(deltaMap, item.productId, cleanNumber(item.baseQty || item.qty || 0));
+        });
+      }
+      if (newInvoice && newInvoice.source === "cart") {
+        (newInvoice.items || []).forEach(item => {
+          oskarCfAddStockDelta(deltaMap, item.productId, -cleanNumber(item.baseQty || item.qty || 0));
+        });
+      }
+    }
+
+    function oskarCfPurchaseStockDelta(oldPurchase, newPurchase, deltaMap) {
+      if (oldPurchase && oldPurchase.productId) {
+        oskarCfAddStockDelta(deltaMap, oldPurchase.productId, -cleanNumber(oldPurchase.qtyBase || oldPurchase.qty || 0));
+      }
+      if (newPurchase && newPurchase.productId) {
+        oskarCfAddStockDelta(deltaMap, newPurchase.productId, cleanNumber(newPurchase.qtyBase || newPurchase.qty || 0));
+      }
+    }
+
+    function oskarCfEnsureUniqueInvoiceNumber(invoice, invoiceMap) {
+      const inv = { ...invoice };
+      const used = new Set();
+      Object.values(invoiceMap || {}).forEach(old => {
+        if (!old || old.id === inv.id) return;
+        const n = cleanNumber(old.number || 0);
+        if (n > 0) used.add(String(n));
+      });
+      let n = cleanNumber(inv.number || 0);
+      if (!n || used.has(String(n))) {
+        let max = 0;
+        used.forEach(v => { max = Math.max(max, Number(v) || 0); });
+        n = max + 1;
+        inv.number = n;
+        inv.updatedAt = Date.now();
+      }
+      return inv;
+    }
+
+    async function oskarCfFetchRemoteStore(store) {
+      const snap = await get(ref(db, FIREBASE_ROOT + "/" + store));
+      return oskarCfObjToMap(snap.exists() ? (snap.val() || {}) : {});
+    }
+
+    async function oskarCfCommitMapToLocal(store, map) {
+      if (!map) return;
+      if (store === "settings") {
+        const settings = { ...defaultSettings, ...(map.main || state.settings || {}), id: "main" };
+        await idbPut("settings", settings);
+        state.settings = settings;
+        applySettingsToUI();
+        return;
+      }
+
+      const stateKey = oskarCfStateKey(store);
+      const values = Object.values(map).filter(Boolean).map(item => oskarCfNormalize(store, item));
+      await idbClear(store);
+      for (const item of values) await idbPut(store, item);
+      if (Array.isArray(state[stateKey])) state[stateKey] = values;
+    }
+
+    async function oskarCfPrepareCloudFirstPlan(queue) {
+      const storesToFetch = new Set(OSKAR_CLOUD_FIRST_SYNC_STORES);
+      queue.forEach(q => { if (q?.store) storesToFetch.add(q.store); });
+
+      const maps = {};
+      let fetched = 0;
+      for (const store of storesToFetch) {
+        maps[store] = await oskarCfFetchRemoteStore(store);
+        fetched++;
+        updateSyncUi({
+          spin: true,
+          title: "مزامنة آمنة",
+          status: "سحب بيانات السحابة أولاً قبل رفع بيانات الجهاز... " + fetched + " / " + storesToFetch.size,
+          progress: Math.min(35, 5 + (fetched / Math.max(1, storesToFetch.size)) * 30)
+        });
+      }
+
+      const initialRemoteProductIds = new Set(Object.keys(maps.products || {}));
+      const touchedStores = new Set();
+      const removals = [];
+      const latestProductLocal = new Map();
+      const removedProducts = new Set();
+      const stockDelta = new Map();
+
+      const sortedQueue = queue.slice().sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+
+      for (const q of sortedQueue) {
+        if (!q || !q.store || !q.itemId) continue;
+        const store = q.store;
+        const itemId = q.itemId;
+        if (!maps[store]) maps[store] = {};
+
+        if (q.type === "remove") {
+          if (store === "invoices") {
+            oskarCfInvoiceStockDelta(maps.invoices?.[itemId], null, stockDelta);
+            touchedStores.add("products");
+            touchedStores.add("customers");
+          }
+          if (store === "purchases") {
+            oskarCfPurchaseStockDelta(maps.purchases?.[itemId], null, stockDelta);
+            touchedStores.add("products");
+          }
+          if (store === "products") removedProducts.add(itemId);
+          delete maps[store][itemId];
+          removals.push({ store, itemId });
+          touchedStores.add(store);
+          continue;
+        }
+
+        let data = oskarCfNormalize(store, { ...(q.data || {}), id: itemId });
+
+        if (store === "products") {
+          latestProductLocal.set(itemId, data);
+          touchedStores.add("products");
+          continue;
+        }
+
+        if (store === "customers") {
+          maps.customers[itemId] = oskarCfMergeCustomer(maps.customers?.[itemId], data);
+          touchedStores.add("customers");
+          continue;
+        }
+
+        if (store === "invoices") {
+          data = oskarCfEnsureUniqueInvoiceNumber(data, maps.invoices || {});
+          oskarCfInvoiceStockDelta(maps.invoices?.[itemId], data, stockDelta);
+          maps.invoices[itemId] = data;
+          touchedStores.add("invoices");
+          touchedStores.add("products");
+          touchedStores.add("customers");
+          continue;
+        }
+
+        if (store === "purchases") {
+          oskarCfPurchaseStockDelta(maps.purchases?.[itemId], data, stockDelta);
+          maps.purchases[itemId] = data;
+          touchedStores.add("purchases");
+          touchedStores.add("products");
+          continue;
+        }
+
+        if (store === "settings") {
+          maps.settings[itemId] = stripLocalOnlySettings({ ...(maps.settings[itemId] || {}), ...data, id: itemId });
+          touchedStores.add("settings");
+          continue;
+        }
+
+        maps[store][itemId] = data;
+        touchedStores.add(store);
+      }
+
+      latestProductLocal.forEach((localProduct, productId) => {
+        if (removedProducts.has(productId)) {
+          delete maps.products[productId];
+          return;
+        }
+        const remoteProduct = maps.products?.[productId];
+        if (initialRemoteProductIds.has(productId) && remoteProduct) {
+          const cloudStock = cleanNumber(remoteProduct.stock || 0);
+          maps.products[productId] = normalizeProduct({ ...remoteProduct, ...localProduct, stock: cloudStock, updatedAt: Math.max(oskarCfItemTime(remoteProduct), oskarCfItemTime(localProduct), Date.now()) });
+        } else {
+          maps.products[productId] = normalizeProduct(localProduct);
+        }
+      });
+
+      stockDelta.forEach((delta, productId) => {
+        if (!maps.products || !maps.products[productId] || removedProducts.has(productId)) return;
+        if (initialRemoteProductIds.has(productId)) {
+          maps.products[productId] = normalizeProduct({
+            ...maps.products[productId],
+            stock: cleanNumber(maps.products[productId].stock || 0) + cleanNumber(delta || 0),
+            updatedAt: Date.now()
+          });
+        }
+      });
+
+      for (const store of storesToFetch) {
+        if (maps[store]) await oskarCfCommitMapToLocal(store, maps[store]);
+      }
+
+      if (typeof rebuildCustomerBalances === "function") {
+        rebuildCustomerBalances(false);
+        maps.customers = {};
+        for (const customer of state.customers || []) {
+          const normalized = normalizeCustomer(customer);
+          maps.customers[normalized.id] = normalized;
+          await idbPut("customers", normalized);
+        }
+        touchedStores.add("customers");
+      }
+
+      return { maps, touchedStores, removals };
+    }
+
+    async function oskarCfUploadPlan(plan, queue) {
+      const uploadJobs = [];
+      const touched = Array.from(plan.touchedStores || []).filter(store => !["syncQueue", "localMeta"].includes(store));
+
+      (plan.removals || []).forEach(r => {
+        if (r.store && r.itemId && !["syncQueue", "localMeta"].includes(r.store)) {
+          uploadJobs.push({ kind: "remove", store: r.store, itemId: r.itemId });
+        }
+      });
+
+      touched.forEach(store => {
+        const map = plan.maps?.[store];
+        if (!map) return;
+        Object.values(map).forEach(item => {
+          if (!item || !item.id) return;
+          let data = oskarCfNormalize(store, item);
+          if (store === "settings") data = stripLocalOnlySettings(data);
+          uploadJobs.push({ kind: "set", store, itemId: data.id, data });
+        });
+      });
+
+      let done = 0;
+      const total = Math.max(1, uploadJobs.length);
+
+      for (const job of uploadJobs) {
+        const label = syncStoreLabel(job.store);
+        updateSyncUi({
+          spin: true,
+          title: "مزامنة آمنة",
+          status: "دمج ورفع " + label + "... " + (done + 1) + " / " + total,
+          progress: 35 + (done / total) * 60,
+          operation: { store: label, text: job.kind === "remove" ? "حذف بعد الدمج" : "رفع بعد الدمج", done: false }
+        });
+
+        if (job.kind === "remove") {
+          await remove(ref(db, firebasePath(job.store, job.itemId)));
+        } else {
+          await set(ref(db, firebasePath(job.store, job.itemId)), job.data);
+        }
+
+        done++;
+        updateSyncUi({
+          progress: 35 + (done / total) * 60,
+          operation: { store: label, text: job.kind === "remove" ? "حذف بعد الدمج" : "رفع بعد الدمج", done: true }
+        });
+      }
+
+      for (const q of queue) await idbDelete("syncQueue", q.id);
+      await refreshPendingCount();
+    }
+
     async function syncNow(showPopover = false) {
       if (OSKAR_TRIAL_LOCAL_ONLY) {
         try { await idbClear("syncQueue"); } catch {}
@@ -4594,134 +4958,56 @@
         if (showPopover) toast("النسخة التجريبية أوفلاين فقط ولا تزامن أي بيانات");
         return;
       }
+
       if (state.syncing) return;
 
       if (!navigator.onLine) {
         await refreshPendingCount();
-
         if (showPopover) {
-          updateSyncUi({
-            visible: true,
-            spin: false,
-            title: "لا يوجد اتصال",
-            status: "العمليات محفوظة محليًا وستُرفع عند عودة الإنترنت",
-            progress: 0
-          });
+          updateSyncUi({ visible: true, spin: false, title: "لا يوجد اتصال", status: "العمليات محفوظة محليًا وستُرفع بعد سحب بيانات السحابة أولاً عند عودة الإنترنت", progress: 0 });
         }
-
         return;
       }
 
       const queue = await idbGetAll("syncQueue");
-
       if (!queue.length) {
         await refreshPendingCount();
-
         if (showPopover) {
-          updateSyncUi({
-            visible: true,
-            spin: false,
-            title: "المزامنة",
-            status: "كل البيانات مرفوعة ولا توجد عمليات معلقة",
-            progress: 100,
-            operations: []
-          });
+          updateSyncUi({ visible: true, spin: false, title: "المزامنة", status: "كل البيانات مرفوعة ولا توجد عمليات معلقة", progress: 100, operations: [] });
           hideSyncPopoverLater(900);
         }
-
         return;
       }
 
       state.syncing = true;
-
       updateSyncUi({
         visible: showPopover || state.syncUi.visible,
         spin: true,
-        title: "جاري المزامنة",
-        status: `يوجد ${queue.length} عملية تنتظر الرفع`,
+        title: "مزامنة آمنة",
+        status: "سيتم أولاً سحب بيانات السحابة ثم دمج بيانات الجهاز قبل الرفع",
         progress: 1,
         operations: []
       });
 
-      let done = 0;
-      const total = queue.length;
-
-      for (const q of queue) {
-        try {
-          const label = syncStoreLabel(q.store);
-
-          updateSyncUi({
-            spin: true,
-            status: `رفع ${label}... ${done + 1} من ${total}`,
-            progress: Math.max(2, (done / total) * 100),
-            operation: {
-              store: label,
-              text: q.type === "remove" ? "حذف" : "رفع",
-              done: false
-            }
-          });
-
-          if (q.type === "set") {
-            const dataToSave = q.store === "settings" ? stripLocalOnlySettings(q.data) : q.data;
-            await set(ref(db, firebasePath(q.store, q.itemId)), dataToSave);
-          } else if (q.type === "remove") {
-            await remove(ref(db, firebasePath(q.store, q.itemId)));
-          }
-
-          await idbDelete("syncQueue", q.id);
-          done++;
-
-          updateSyncUi({
-            status: `تم رفع ${done} من ${total}`,
-            progress: (done / total) * 100,
-            operation: {
-              store: label,
-              text: q.type === "remove" ? "حذف" : "رفع",
-              done: true
-            }
-          });
-
-          await refreshPendingCount();
-        } catch (e) {
-          q.tries = Number(q.tries || 0) + 1;
-          q.lastError = String(e?.message || e);
-          await idbPut("syncQueue", q);
-
-          console.error("Sync failed", e);
-
-          updateSyncUi({
-            status: "توقفت المزامنة مؤقتًا بسبب ضعف الاتصال، سيتم إعادة المحاولة تلقائيًا",
-            progress: Math.max(8, (done / total) * 100),
-            spin: false,
-            operation: {
-              store: syncStoreLabel(q.store),
-              text: "ينتظر اتصال أفضل",
-              done: false
-            }
-          });
-
-          break;
-        }
-      }
-
-      state.syncing = false;
-      const left = await refreshPendingCount();
-
-      if (left === 0) {
+      try {
+        const plan = await oskarCfPrepareCloudFirstPlan(queue);
+        await oskarCfUploadPlan(plan, queue);
+        if (typeof validateCurrentEmployeeSession === "function") await validateCurrentEmployeeSession();
+        renderAll();
+        updateSyncUi({ progress: 100, status: "اكتملت المزامنة الآمنة بدون استبدال بيانات الأجهزة الأخرى", spin: false });
+        hideSyncPopoverLater(showPopover ? 1200 : 600);
+      } catch (e) {
+        console.error("Cloud-first sync failed", e);
         updateSyncUi({
-          progress: 100,
-          status: "اكتملت المزامنة بنجاح",
-          spin: false
+          status: "توقفت المزامنة مؤقتًا قبل حذف العمليات المحلية. سيتم إعادة المحاولة عند تحسن الاتصال.",
+          progress: 10,
+          spin: false,
+          operation: { store: "المزامنة", text: "فشل الدمج الآمن", done: false }
         });
-
-        hideSyncPopoverLater(showPopover ? 1000 : 450);
-      } else {
-        updateSyncUi({
-          status: `بقي ${left} عمليات معلقة وستُرفع تلقائيًا`,
-          spin: false
-        });
-
-        setTimeout(() => syncNow(false), 6000);
+        setTimeout(() => syncNow(false), 8000);
+      } finally {
+        state.syncing = false;
+        await refreshPendingCount();
       }
     }
 
@@ -4744,7 +5030,7 @@
           spin: true,
           visible: false,
           title: OSKAR_TRIAL_ACTIVE ? "تجربة أوفلاين" : "المزامنة",
-          status: "رفع العمليات المحلية أولاً بعد تسجيل الدخول",
+          status: "سحب بيانات السحابة ثم دمج العمليات المحلية بعد تسجيل الدخول",
           progress: 20,
           operations: []
         });
@@ -8188,13 +8474,14 @@
       const s = state.settings || defaultSettings;
       const acc = state.paymentAccounts.find(a => a.id === invoice.paymentAccountId);
       const visibleLogo = document.getElementById("topShopLogo")?.src || document.getElementById("sideShopLogo")?.src || "";
-      const logo = s.localLogo || s.logo || visibleLogo || makeLogoDataUrl(s.shopName);
+      const logo = s.localLogo || s.logo || visibleLogo || makeLogoDataUrl(s.shopName || "oskar");
+      const logoFallback = makeLogoDataUrl(s.shopName || "oskar");
 
       return `
         <div class="invoice-paper" style="direction:rtl;font-family:Cairo,Arial,sans-serif">
           <div class="invoice-header">
             <div style="display:flex;align-items:center;gap:10px;min-width:0">
-              <img class="invoice-logo" src="${logo}" alt="" crossorigin="anonymous">
+              <img class="invoice-logo" src="${logo}" alt="" onerror="this.onerror=null;this.src='${logoFallback}'">
               <div style="min-width:0">
                 <h2 class="invoice-shop-title">${escapeHtml(s.shopName || "oskar")}</h2>
                 <div style="color:#64748b;font-size:11px">${escapeHtml(s.shopPhone || "")}</div>
@@ -8515,13 +8802,14 @@
     function reportShell(title, bodyHtml) {
       const s = state.settings || defaultSettings;
       const visibleLogo = document.getElementById("topShopLogo")?.src || document.getElementById("sideShopLogo")?.src || "";
-      const logo = s.localLogo || s.logo || visibleLogo || makeLogoDataUrl(s.shopName);
+      const logo = s.localLogo || s.logo || visibleLogo || makeLogoDataUrl(s.shopName || "oskar");
+      const logoFallback = makeLogoDataUrl(s.shopName || "oskar");
 
       return `
         <div class="invoice-paper" style="direction:rtl;font-family:Cairo,Arial,sans-serif">
           <div class="invoice-header">
             <div style="display:flex;align-items:center;gap:10px">
-              <img class="invoice-logo" src="${logo}" crossorigin="anonymous">
+              <img class="invoice-logo" src="${logo}" onerror="this.onerror=null;this.src='${logoFallback}'">
               <div>
                 <h2 class="invoice-shop-title">${escapeHtml(s.shopName || "oskar")}</h2>
                 <div style="font-size:11px;color:#64748b">${escapeHtml(title)}</div>
@@ -13213,7 +13501,7 @@
     const note=$("oskarTrialSettingsNote"); if(note) note.style.display=isTrial()?"block":"none";
   }
   function getBestLogoSrc(){ const st=window.state?.settings||{}; const candidates=[st.localLogo,st.logo,$("topShopLogo")?.src,$("sideShopLogo")?.src].filter(Boolean); return candidates.find(src=>src&&!/undefined|null/.test(src))||""; }
-  function applyLogoToInvoices(){ const src=getBestLogoSrc(); if(!src) return; if(window.state){ window.state.settings=window.state.settings||{}; if(!window.state.settings.localLogo && /^data:image\//.test(src)) window.state.settings.localLogo=src; } document.querySelectorAll(".invoice-logo").forEach(img=>{ if(img.src!==src) img.src=src; img.crossOrigin="anonymous"; img.style.objectFit="cover"; }); }
+  function applyLogoToInvoices(){ const src=getBestLogoSrc(); if(!src) return; if(window.state){ window.state.settings=window.state.settings||{}; if(!window.state.settings.localLogo && /^data:image\//.test(src)) window.state.settings.localLogo=src; } document.querySelectorAll(".invoice-logo").forEach(img=>{ if(img.src!==src) img.src=src; img.style.objectFit="cover"; }); }
   function patchLogoUploadImmediate(){ const input=$("settingLogoFile"); if(!input || input.dataset.oskarLogoV2==="1") return; input.dataset.oskarLogoV2="1"; input.addEventListener("change",()=>setTimeout(applyLogoToInvoices,80)); }
   function patchInvoiceSearchPlaceholder(){ const inp=$("invoiceSearch"); if(inp) inp.placeholder="بحث برقم الفاتورة أو اسم الزبون أو الهاتف أو باركود الفاتورة..."; }
   function tick(){ patchUnitRuntime(); patchAddToCart(); betterSidebarRail(); trialSettingsLocksVisible(); applyLogoToInvoices(); patchLogoUploadImmediate(); patchInvoiceSearchPlaceholder(); }
@@ -13224,341 +13512,554 @@
 </script>
 
 
-<script id="oskar-login-hard-final-fix-2026-04-30">
+<!-- disabled oskar-login-hard-final-fix-2026-04-30 by final login guard -->
+<!-- disabled oskar-auth-strict-default-reset-link-2026-04-30 by final login guard -->
+
+<!-- disabled oskar-direct-email-password-reset-final-2026-04-30 by final login guard -->
+
+<script id="oskar-final-session-sync-reset-fix-2026-04-30">
 (function(){
   "use strict";
-  if (window.__OSKAR_LOGIN_HARD_FINAL_FIX_20260430__) return;
-  window.__OSKAR_LOGIN_HARD_FINAL_FIX_20260430__ = true;
+  if(window.__OSKAR_FINAL_SESSION_SYNC_RESET_FIX_20260430__) return;
+  window.__OSKAR_FINAL_SESSION_SYNC_RESET_FIX_20260430__ = true;
 
   const DEFAULT_ADMIN_PIN = "0000000000@@";
-  const OLD_DEFAULT_PIN = "0000";
   const ADMIN_PERMISSION = "__admin__";
   const MODE_KEY = "oskar_storage_mode_v1";
   const START_KEY = "oskar_trial_started_at_v1";
-  const DURATION = 12 * 60 * 60 * 1000;
-  const PENDING_ADMIN_LOGIN = "oskar_pending_admin_login_after_mode_switch_v1";
-
+  const TRIAL_DURATION = 12 * 60 * 60 * 1000;
   const $ = (id) => document.getElementById(id);
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
-  function toast(msg, ms = 2800) {
-    if (typeof window.toast === "function") return window.toast(msg, ms);
-    const el = $("toast");
-    if (el) {
-      el.textContent = msg;
-      el.classList.add("show");
-      clearTimeout(el._t);
-      el._t = setTimeout(() => el.classList.remove("show"), ms);
-    } else {
-      alert(msg);
-    }
+  function toast(msg, ms){
+    if(typeof window.toast === "function") return window.toast(msg, ms || 3200);
+    alert(msg);
   }
 
-  function simpleHash(str) {
+  function hash(str){
     const text = String(str || "");
     let h = 2166136261;
-    for (let i = 0; i < text.length; i++) {
+    for(let i=0;i<text.length;i++){
       h ^= text.charCodeAt(i);
-      h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+      h += (h<<1) + (h<<4) + (h<<7) + (h<<8) + (h<<24);
     }
     return String(h >>> 0);
   }
 
-  function normalizePassword(pass) {
-    return String(pass || "")
+  function normPass(v){
+    return String(v || "")
       .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d))
       .replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))
       .trim();
   }
 
-  function isTrialActive() {
+  function isTrialActive(){
     const started = Number(localStorage.getItem(START_KEY) || 0);
-    return localStorage.getItem(MODE_KEY) === "trial" && started && Date.now() - started < DURATION;
+    return localStorage.getItem(MODE_KEY) === "trial" && started && (Date.now() - started) < TRIAL_DURATION;
   }
 
-  function getStorageProfile() {
-    if (isTrialActive()) {
-      const id = localStorage.getItem("oskar_device_id_v1") || "device";
-      return "trial_" + id;
-    }
-    return "main";
+  function root(){
+    return window.FIREBASE_ROOT || window.CASHIER_FIREBASE_CONFIG?.firebaseRoot || "cashier_units_pro_default";
   }
 
-  function namespaceFor(profile = getStorageProfile()) {
-    const cfg = window.CASHIER_FIREBASE_CONFIG?.firebaseConfig || {};
-    const projectId = cfg.projectId || "default_project";
-    const databaseURL = cfg.databaseURL || "default_database";
-    const raw = `${projectId}_${databaseURL}_${profile}`;
-    try {
-      return btoa(unescape(encodeURIComponent(raw))).replace(/[^a-zA-Z0-9]/g, "").slice(0, 42) || "default";
-    } catch {
-      return "default";
-    }
+  function fbReady(){
+    return !!(navigator.onLine && window.db && window.ref && window.get && window.set);
   }
 
-  function sessionKeys() {
-    const keys = [];
-    try {
-      Object.keys(localStorage).forEach(k => {
-        if (k.startsWith("cashier_auth_session_") && k.endsWith("_v1")) keys.push(k);
-      });
-    } catch {}
-    const computed = `cashier_auth_session_${namespaceFor()}_v1`;
-    if (!keys.includes(computed)) keys.push(computed);
-    return keys;
-  }
-
-  function clearSessions() {
-    try {
-      Object.keys(localStorage).forEach(k => {
-        if (k.startsWith("cashier_auth_session_")) localStorage.removeItem(k);
-      });
-      Object.keys(sessionStorage).forEach(k => {
-        if (k.startsWith("cashier_auth_session_")) sessionStorage.removeItem(k);
-      });
-    } catch {}
-  }
-
-  function saveAdminSession(user) {
-    const payload = JSON.stringify({
-      id: user.id,
-      name: user.name,
-      role: user.role,
-      permissions: user.permissions || [ADMIN_PERMISSION],
-      loginAt: Date.now()
-    });
-    try {
-      clearSessions();
-      sessionKeys().forEach(k => localStorage.setItem(k, payload));
-    } catch {}
-  }
-
-  function setLoading(btn, on, text) {
-    if (!btn) return;
-    if (on) {
-      if (!btn.dataset.oskarOldHtml) btn.dataset.oskarOldHtml = btn.innerHTML;
+  function loading(btn, on, text){
+    if(!btn) return;
+    if(on){
+      if(!btn.dataset.oskarFinalOldHtml) btn.dataset.oskarFinalOldHtml = btn.innerHTML;
       btn.disabled = true;
-      btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${text || "جاري الدخول..."}`;
+      btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + (text || 'جاري التنفيذ...');
     } else {
       btn.disabled = false;
-      if (btn.dataset.oskarOldHtml) btn.innerHTML = btn.dataset.oskarOldHtml;
-      delete btn.dataset.oskarOldHtml;
+      if(btn.dataset.oskarFinalOldHtml) btn.innerHTML = btn.dataset.oskarFinalOldHtml;
+      delete btn.dataset.oskarFinalOldHtml;
     }
   }
 
-  function showLock(show) {
+  function mainSessionKey(){
+    let ns = "main";
+    try{
+      const cfg = window.CASHIER_FIREBASE_CONFIG?.firebaseConfig || {};
+      const raw = (cfg.projectId || "project") + "_" + (cfg.databaseURL || "database") + "_main";
+      ns = btoa(unescape(encodeURIComponent(raw))).replace(/[^a-zA-Z0-9]/g, "").slice(0, 42) || "main";
+    }catch{}
+    return "cashier_auth_session_" + ns + "_v1";
+  }
+
+  function getAnySavedSession(){
+    try{
+      const preferred = localStorage.getItem(mainSessionKey());
+      if(preferred) return JSON.parse(preferred);
+      const key = Object.keys(localStorage).find(k => k.startsWith("cashier_auth_session_") && localStorage.getItem(k));
+      return key ? JSON.parse(localStorage.getItem(key) || "null") : null;
+    }catch{
+      return null;
+    }
+  }
+
+  function clearSessions(){
+    try{
+      Object.keys(localStorage).forEach(k => { if(k.startsWith("cashier_auth_session_")) localStorage.removeItem(k); });
+      Object.keys(sessionStorage).forEach(k => { if(k.startsWith("cashier_auth_session_")) sessionStorage.removeItem(k); });
+    }catch{}
+  }
+
+  function saveSession(user){
+    try{
+      clearSessions();
+      localStorage.setItem(mainSessionKey(), JSON.stringify({
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        permissions: user.permissions || [],
+        loginAt: Date.now(),
+        persistent: true
+      }));
+    }catch{}
+  }
+
+  function showLock(show){
+    document.documentElement.classList.remove("oskar-saved-session-boot");
     const lock = $("authLock");
-    if (!lock) return;
+    if(!lock) return;
     lock.classList.toggle("hide", !show);
     lock.style.display = show ? "flex" : "none";
   }
 
-  function isAdminUser(u) {
-    return !!u && (u.role === "admin" || (u.permissions || []).includes(ADMIN_PERMISSION));
-  }
-
-  function applyAuthUi(user) {
+  function applyAuthUi(user){
     const pill = $("authUserPill");
-    if (pill) {
+    const isAdmin = !!user && (user.role === "admin" || (user.permissions || []).includes(ADMIN_PERMISSION));
+    if(pill){
       pill.innerHTML = user
-        ? `<i class="fa-solid fa-user-shield"></i> ${user.name || "المدير"}`
-        : `<i class="fa-solid fa-lock"></i> غير مسجل`;
+        ? `<i class="fa-solid ${isAdmin ? "fa-user-shield" : "fa-user"}"></i> ${String(user.name || "مستخدم")}`
+        : '<i class="fa-solid fa-lock"></i> غير مسجل';
     }
     document.querySelectorAll(".nav-btn[data-page], .bottom-btn[data-page]").forEach(btn => {
       const page = btn.dataset.page;
-      const allowed = !!user && (isAdminUser(user) || (user.permissions || []).includes(page));
-      btn.classList.toggle("auth-hidden", !allowed);
+      const ok = !!user && (isAdmin || (user.permissions || []).includes(page));
+      btn.classList.toggle("auth-hidden", !ok);
     });
     const sec = $("adminSecurityBox");
-    if (sec) sec.style.display = user ? "block" : "none";
+    if(sec) sec.style.display = isAdmin ? "block" : "none";
     const emp = $("employeesSettingsBox");
-    if (emp) emp.style.display = user ? "block" : "none";
+    if(emp) emp.style.display = isAdmin ? "block" : "none";
   }
 
-  async function tryFetchSettingsSoft() {
-    if (isTrialActive()) return;
-    try {
-      if (navigator.onLine && window.db && window.ref && window.get && window.FIREBASE_ROOT) {
-        const snap = await window.get(window.ref(window.db, window.FIREBASE_ROOT + "/settings/main"));
-        if (snap && snap.exists && snap.exists()) {
-          window.state = window.state || {};
-          window.state.settings = {
-            ...(window.state.settings || {}),
-            ...(snap.val() || {}),
-            id: "main"
-          };
-          if (typeof window.idbPut === "function") await window.idbPut("settings", window.state.settings);
-        }
-      }
-    } catch (err) {
-      console.warn("login settings soft fetch failed", err);
-    }
-  }
-
-  function storedAdminHash() {
-    const h = window.state?.settings?.adminPasswordHash || "";
-    if (!h || h === simpleHash(OLD_DEFAULT_PIN)) return simpleHash(DEFAULT_ADMIN_PIN);
-    return String(h);
-  }
-
-  function adminPasswordOk(pass) {
-    const p = normalizePassword(pass);
-    const h = simpleHash(p);
-    const stored = storedAdminHash();
-    return (
-      h === stored ||
-      p === DEFAULT_ADMIN_PIN ||
-      h === simpleHash(DEFAULT_ADMIN_PIN) ||
-      (stored === simpleHash(OLD_DEFAULT_PIN) && p === DEFAULT_ADMIN_PIN)
-    );
-  }
-
-  async function persistDefaultHashIfNeeded() {
+  async function fetchSettingsForLogin(){
     window.state = window.state || {};
-    window.state.settings = {
-      ...(window.state.settings || {}),
-      id: "main",
-      adminPasswordHash: simpleHash(DEFAULT_ADMIN_PIN),
-      updatedAt: Date.now()
-    };
-    try {
-      if (typeof window.idbPut === "function") await window.idbPut("settings", window.state.settings);
-    } catch {}
+    window.state.settings = window.state.settings || { id:"main" };
+    let remoteChecked = false;
+    let remoteHasHash = null;
+    window.__OSKAR_LOGIN_LAST_FIREBASE_ERROR = null;
+    if(fbReady() && !isTrialActive()){
+      try{
+        const snap = await window.get(window.ref(window.db, root() + "/settings/main"));
+        remoteChecked = true;
+        if(snap && snap.exists && snap.exists()){
+          const remote = snap.val() || {};
+          remoteHasHash = !!String(remote.adminPasswordHash || "").trim();
+          window.state.settings = { ...(window.state.settings || {}), ...remote, id:"main" };
+          if(window.idbPut) await window.idbPut("settings", window.state.settings);
+        } else {
+          remoteHasHash = false;
+        }
+      }catch(err){
+        window.__OSKAR_LOGIN_LAST_FIREBASE_ERROR = err;
+        console.warn("final login settings fetch failed", err);
+      }
+    }
+    const localHash = String(window.state?.settings?.adminPasswordHash || "").trim();
+    return { settings: window.state.settings, remoteChecked, remoteHasHash, localHash };
   }
 
-  async function finishAdminLogin() {
-    const user = { id: "admin", name: "المدير", role: "admin", permissions: [ADMIN_PERMISSION] };
+  function passwordInfo(fetchResult){
+    const def = hash(DEFAULT_ADMIN_PIN);
+    const old = hash("0000");
+    const h = String(fetchResult?.localHash || "").trim();
+    if(fetchResult?.remoteChecked && fetchResult.remoteHasHash === false){
+      return { storedHash: def, mustForceChange: true };
+    }
+    if(!h || h === old || h === "3052262101"){
+      return { storedHash: def, mustForceChange: true };
+    }
+    return { storedHash: h, mustForceChange: h === def || !!window.state?.settings?.__needsInitialAdminPasswordChange };
+  }
+
+  async function saveSettingsDirect(){
+    window.state = window.state || {};
+    window.state.settings = { ...(window.state.settings || {}), id:"main", updatedAt:Date.now() };
+    if(window.idbPut) await window.idbPut("settings", window.state.settings);
+    const safe = { ...window.state.settings, localLogo:"", logoMode: window.state.settings.logo ? "url" : "default" };
+    if(fbReady()) await window.set(window.ref(window.db, root() + "/settings/main"), safe);
+    else if(window.enqueueSync) await window.enqueueSync({ type:"set", store:"settings", itemId:"main", data:safe });
+  }
+
+  async function finishUserLogin(user, opts = {}){
     window.state = window.state || {};
     window.state.auth = window.state.auth || {};
     window.state.auth.user = user;
     window.state.auth.ready = true;
-    saveAdminSession(user);
+    saveSession(user);
     showLock(false);
     applyAuthUi(user);
-    try { if (typeof window.loadLocalData === "function") await window.loadLocalData(true); } catch (e) { console.warn(e); }
-    try { if (typeof window.renderAll === "function") window.renderAll(); } catch (e) { console.warn(e); }
-    try { if (!isTrialActive() && typeof window.runAfterLoginSync === "function") setTimeout(() => window.runAfterLoginSync("admin-login-hard-fix"), 120); } catch {}
+    try{ if(typeof window.loadLocalData === "function") await window.loadLocalData(true); }catch(err){ console.warn(err); }
+    try{ if(typeof window.renderAll === "function") window.renderAll(); }catch(err){ console.warn(err); }
+    if(!isTrialActive() && typeof window.runAfterLoginSync === "function"){
+      setTimeout(() => window.runAfterLoginSync(opts.reason || "persistent-login"), 120);
+    }
+    if(opts.forceChange) setTimeout(openForcePasswordModal, 250);
   }
 
-  async function handleAdminSubmit(e) {
-    const form = e.target;
-    if (!form || form.id !== "adminLoginForm") return;
+  function openForcePasswordModal(){
+    const title = $("modalTitle"), body = $("modalBody"), back = $("modalBackdrop"), box = $("modalBox");
+    if(!title || !body || !back) return;
+    title.textContent = "حماية الحساب: تغيير كلمة المرور";
+    if(box) box.classList.remove("large");
+    body.innerHTML = `
+      <div class="card" style="box-shadow:none">
+        <div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:18px;padding:12px;margin-bottom:14px;font-weight:900;line-height:1.9">
+          هذا تشغيل جديد ولم يتم حفظ كلمة مرور مدير في Firebase، لذلك يجب تغيير كلمة المرور الافتراضية الآن.
+        </div>
+        <form id="oskarFinalForcePasswordForm">
+          <div class="form-grid-compact">
+            <div><label class="field-label">كلمة المرور الجديدة</label><input id="oskarFinalForcePass1" type="password" class="input" required></div>
+            <div><label class="field-label">تأكيد كلمة المرور</label><input id="oskarFinalForcePass2" type="password" class="input" required></div>
+          </div>
+          <button id="oskarFinalForceSaveBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-shield-halved"></i> حفظ كلمة المرور الجديدة</button>
+        </form>
+      </div>`;
+    back.classList.add("show");
+    const close = $("modalCloseBtn");
+    if(close) close.style.display = "none";
+    const form = $("oskarFinalForcePasswordForm");
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = $("oskarFinalForceSaveBtn");
+      const p1 = normPass($("oskarFinalForcePass1")?.value);
+      const p2 = normPass($("oskarFinalForcePass2")?.value);
+      if(p1.length < 6) return toast("كلمة المرور الجديدة يجب أن تكون 6 خانات على الأقل");
+      if(p1 === DEFAULT_ADMIN_PIN) return toast("لا يمكن استخدام كلمة المرور الافتراضية مرة أخرى");
+      if(p1 !== p2) return toast("كلمتا المرور غير متطابقتين");
+      loading(btn, true, "جاري حفظ كلمة المرور...");
+      try{
+        window.state.settings = { ...(window.state?.settings || {}), id:"main", adminPasswordHash:hash(p1), updatedAt:Date.now() };
+        delete window.state.settings.__needsInitialAdminPasswordChange;
+        await saveSettingsDirect();
+        if(close) close.style.display = "";
+        back.classList.remove("show");
+        toast("تم حفظ كلمة مرور المدير بنجاح");
+      }catch(err){
+        console.error(err);
+        toast("فشل حفظ كلمة المرور، تأكد من الاتصال ثم حاول مرة أخرى");
+      }finally{
+        loading(btn, false);
+      }
+    };
+  }
 
+  async function handleAdminSubmit(e){
+    const form = e.target;
+    if(!form || form.id !== "adminLoginForm") return;
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
 
     const input = $("adminPasswordInput");
-    const pass = normalizePassword(input?.value || "");
+    const pass = normPass(input?.value);
     const btn = e.submitter || form.querySelector("button[type='submit']") || form.querySelector("button");
-
-    if (!pass) return toast("أدخل كلمة مرور المدير");
-    setLoading(btn, true, "جاري الدخول...");
-
-    try {
-      if (isTrialActive()) {
-        if (!adminPasswordOk(pass)) return toast("كلمة مرور المدير غير صحيحة");
-        localStorage.setItem(PENDING_ADMIN_LOGIN, simpleHash(DEFAULT_ADMIN_PIN));
+    if(!pass) return toast("أدخل كلمة مرور المدير");
+    loading(btn, true, "جاري فحص كلمة المرور...");
+    try{
+      if(isTrialActive()){
         localStorage.setItem(MODE_KEY, "main");
         localStorage.removeItem("oskar_trial_logged_out_v1");
         clearSessions();
-        toast("تم التحويل إلى نسخة المدير، جاري الدخول...");
+        toast("سيتم فتح النسخة الدائمة الآن");
         setTimeout(() => location.reload(), 250);
         return;
       }
-
-      await tryFetchSettingsSoft();
-      if (!adminPasswordOk(pass)) return toast("كلمة مرور المدير غير صحيحة");
-      if (pass === DEFAULT_ADMIN_PIN) await persistDefaultHashIfNeeded();
-      if (input) input.value = "";
-      await finishAdminLogin();
+      const fetched = await fetchSettingsForLogin();
+      const info = passwordInfo(fetched);
+      if(hash(pass) !== info.storedHash){
+        const fbErr = window.__OSKAR_LOGIN_LAST_FIREBASE_ERROR;
+        if(fbErr && !fetched.remoteChecked && !String(fetched.localHash || "").trim()){
+          toast("تعذر فحص كلمة المرور من Firebase بسبب الاتصال أو صلاحيات قاعدة البيانات، ولا توجد كلمة محفوظة محليًا على هذا الجهاز");
+        } else {
+          toast("كلمة مرور المدير غير صحيحة");
+        }
+        return;
+      }
+      if(input) input.value = "";
+      await finishUserLogin({ id:"admin", name:"المدير", role:"admin", permissions:[ADMIN_PERMISSION] }, { forceChange: info.mustForceChange, reason:"admin-login-cloud-first" });
       toast("تم دخول المدير بنجاح");
-    } catch (err) {
+    }catch(err){
       console.error(err);
-      toast("حدث خطأ أثناء تسجيل الدخول");
-    } finally {
-      setLoading(btn, false);
+      toast("حدث خطأ أثناء تسجيل الدخول، افحص الاتصال أو صلاحيات Firebase ثم حاول مرة أخرى");
+    }finally{
+      loading(btn, false);
     }
   }
 
-  async function autoLoginAfterModeSwitch() {
-    const pending = localStorage.getItem(PENDING_ADMIN_LOGIN);
-    if (!pending || pending !== simpleHash(DEFAULT_ADMIN_PIN) || isTrialActive()) return;
-    localStorage.removeItem(PENDING_ADMIN_LOGIN);
-    await persistDefaultHashIfNeeded();
-    await finishAdminLogin();
-    toast("تم دخول المدير بنجاح");
+  async function openDirectReset(){
+    const title = $("modalTitle"), body = $("modalBody"), back = $("modalBackdrop"), box = $("modalBox");
+    if(!title || !body || !back) return;
+    title.textContent = "استرداد كلمة مرور المدير";
+    if(box) box.classList.remove("large");
+    body.innerHTML = `
+      <form id="oskarFinalDirectResetForm">
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:18px;padding:12px;margin-bottom:14px;font-weight:900;line-height:1.8">
+          اكتب البريد المسجل داخل الإعدادات، ثم أدخل كلمة المرور الجديدة. لا يوجد رابط إعادة تعيين.
+        </div>
+        <div class="form-grid-compact">
+          <div class="full-row"><label class="field-label">البريد المسجل في الإعدادات</label><input id="oskarFinalResetEmail" type="email" class="input" required placeholder="example@email.com"></div>
+          <div><label class="field-label">كلمة المرور الجديدة</label><input id="oskarFinalResetPass1" type="password" class="input" required></div>
+          <div><label class="field-label">تأكيد كلمة المرور</label><input id="oskarFinalResetPass2" type="password" class="input" required></div>
+        </div>
+        <button id="oskarFinalResetBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-key"></i> تغيير كلمة المرور</button>
+      </form>`;
+    back.classList.add("show");
+    $("oskarFinalDirectResetForm").onsubmit = async (ev) => {
+      ev.preventDefault();
+      const btn = $("oskarFinalResetBtn");
+      const email = String($("oskarFinalResetEmail")?.value || "").trim().toLowerCase();
+      const p1 = normPass($("oskarFinalResetPass1")?.value);
+      const p2 = normPass($("oskarFinalResetPass2")?.value);
+      if(p1.length < 6) return toast("كلمة المرور الجديدة يجب أن تكون 6 خانات على الأقل");
+      if(p1 === DEFAULT_ADMIN_PIN) return toast("لا يمكن استخدام كلمة المرور الافتراضية مرة أخرى");
+      if(p1 !== p2) return toast("كلمتا المرور غير متطابقتين");
+      loading(btn, true, "جاري التحقق...");
+      try{
+        await fetchSettingsForLogin();
+        const saved = String(window.state?.settings?.recoveryEmail || "").trim().toLowerCase();
+        if(!saved) return toast("لا يوجد بريد استرداد محفوظ داخل الإعدادات");
+        if(email !== saved) return toast("البريد غير مطابق للبريد المسجل في الإعدادات");
+        loading(btn, true, "جاري حفظ كلمة المرور...");
+        window.state.settings = { ...(window.state?.settings || {}), id:"main", adminPasswordHash:hash(p1), updatedAt:Date.now() };
+        delete window.state.settings.__needsInitialAdminPasswordChange;
+        await saveSettingsDirect();
+        back.classList.remove("show");
+        toast("تم تغيير كلمة مرور المدير بنجاح");
+      }catch(err){
+        console.error(err);
+        toast("فشل تغيير كلمة المرور، تأكد من الاتصال أو البريد المسجل");
+      }finally{
+        loading(btn, false);
+      }
+    };
   }
 
-  function suppressForcedDefaultPasswordModal() {
+  function ensureRecoveryUi(){
+    const btn = $("forgotAdminPasswordBtn");
+    if(btn) btn.innerHTML = '<i class="fa-solid fa-key"></i> استرداد كلمة المرور بالبريد';
+    const box = $("adminSecurityBox");
+    if(box && !$("settingRecoveryEmail")){
+      const grid = box.querySelector(".form-grid") || box;
+      grid.insertAdjacentHTML("beforeend", '<div class="full-row"><label class="field-label">بريد استرداد كلمة مرور المدير</label><input id="settingRecoveryEmail" type="email" class="input" placeholder="example@email.com"></div>');
+    }
+    if(window.state?.settings?.recoveryEmail && $("settingRecoveryEmail") && !$("settingRecoveryEmail").value){
+      $("settingRecoveryEmail").value = window.state.settings.recoveryEmail;
+    }
+  }
+
+  function suppressWrongForcedModal(){
     const title = $("modalTitle");
-    const backdrop = $("modalBackdrop");
-    if (title && backdrop && /تغيير كلمة مرور المدير إجباري/.test(title.textContent || "")) {
-      backdrop.classList.remove("show");
+    const back = $("modalBackdrop");
+    if(!title || !back || !back.classList.contains("show")) return;
+    const h = String(window.state?.settings?.adminPasswordHash || "").trim();
+    if(h && h !== hash(DEFAULT_ADMIN_PIN) && /تغيير كلمة مرور المدير إجباري|حماية الحساب/.test(title.textContent || "")){
       const close = $("modalCloseBtn");
-      if (close) close.style.display = "";
+      if(close) close.style.display = "";
+      back.classList.remove("show");
     }
   }
 
-  function bind() {
-    document.addEventListener("submit", handleAdminSubmit, true);
-    setTimeout(autoLoginAfterModeSwitch, 350);
-    setTimeout(suppressForcedDefaultPasswordModal, 500);
-    setTimeout(suppressForcedDefaultPasswordModal, 1200);
-    setInterval(suppressForcedDefaultPasswordModal, 2000);
+  async function restoreSavedSessionNoFlash(){
+    if(isTrialActive()) return;
+    const saved = getAnySavedSession();
+    if(!saved || !saved.id){
+      document.documentElement.classList.remove("oskar-saved-session-boot");
+      return;
+    }
+    showLock(false);
+    const user = {
+      id: saved.id,
+      name: saved.name || (saved.role === "admin" ? "المدير" : "مستخدم"),
+      role: saved.role || "admin",
+      permissions: saved.permissions || (saved.role === "admin" ? [ADMIN_PERMISSION] : [])
+    };
+    window.state = window.state || {};
+    window.state.auth = window.state.auth || {};
+    window.state.auth.user = user;
+    window.state.auth.ready = true;
+    applyAuthUi(user);
+    try{ if(typeof window.renderAll === "function") window.renderAll(); }catch{}
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind);
-  else bind();
+  function bindFinalGuards(){
+    window.addEventListener("submit", handleAdminSubmit, true);
+    window.addEventListener("click", function(e){
+      const forgot = e.target.closest && e.target.closest("#forgotAdminPasswordBtn");
+      if(forgot){
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        openDirectReset();
+      }
+    }, true);
+    window.addEventListener("storage", restoreSavedSessionNoFlash);
+    setInterval(() => { ensureRecoveryUi(); suppressWrongForcedModal(); }, 1500);
+  }
+
+  async function init(){
+    bindFinalGuards();
+    await restoreSavedSessionNoFlash();
+    for(let i=0;i<80;i++){
+      if(window.state && (window.idbGetAll || typeof window.renderAll === "function")) break;
+      await wait(80);
+    }
+    ensureRecoveryUi();
+    await restoreSavedSessionNoFlash();
+    suppressWrongForcedModal();
+  }
+
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 })();
 </script>
-<script id="oskar-auth-strict-default-reset-link-2026-04-30">
+
+
+<style id="oskar-prime-purchase-and-logo-fix-2026-04-30-style">
+  :root{--prime:#7c3aed;--prime2:#2563eb;--primeGold:#f59e0b}
+  .oskar-prime-open-btn{
+    width:100%;border:0;border-radius:20px;padding:13px 14px;margin-top:10px;
+    background:linear-gradient(135deg,#7c3aed,#2563eb 58%,#0891b2);color:#fff;font-weight:900;
+    display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 16px 36px rgba(37,99,235,.25);
+  }
+  .oskar-prime-home-card{margin:0 0 16px;background:linear-gradient(135deg,#111827,#1e1b4b 55%,#2563eb);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:28px;padding:18px;box-shadow:0 20px 48px rgba(17,24,39,.2);display:none;position:relative;overflow:hidden}
+  .oskar-prime-home-card:before{content:"";position:absolute;inset:-40% auto auto -20%;width:260px;height:260px;background:rgba(245,158,11,.22);filter:blur(10px);border-radius:999px}
+  .oskar-prime-home-card h3{margin:0;font-size:20px;font-weight:900}.oskar-prime-home-card p{margin:8px 0 0;color:#dbeafe;line-height:1.8;font-weight:800;font-size:13px}
+  .oskar-prime-home-card .oskar-prime-open-btn{max-width:260px;background:linear-gradient(135deg,#f59e0b,#f97316);box-shadow:0 16px 32px rgba(245,158,11,.22)}
+  .oskar-prime-overlay{position:fixed;inset:0;z-index:12000;background:radial-gradient(circle at top right,rgba(124,58,237,.24),transparent 34%),radial-gradient(circle at bottom left,rgba(245,158,11,.2),transparent 34%),linear-gradient(135deg,#eff6ff,#f8fafc);display:none;align-items:center;justify-content:center;padding:18px;direction:rtl;font-family:Cairo,Arial,sans-serif}
+  .oskar-prime-overlay.show{display:flex}.oskar-prime-shell{width:min(1050px,100%);max-height:94vh;overflow:auto;background:rgba(255,255,255,.96);backdrop-filter:blur(22px);border:1px solid rgba(226,232,240,.95);border-radius:34px;box-shadow:0 36px 90px rgba(15,23,42,.25);padding:18px}
+  .oskar-prime-top{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #e2e8f0;padding-bottom:14px;margin-bottom:14px}.oskar-prime-title{display:flex;align-items:center;gap:10px;font-size:21px;font-weight:900;color:#0f172a}.oskar-prime-title i{color:#7c3aed}.oskar-prime-nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.oskar-prime-small-btn{border:1px solid #e2e8f0;background:#fff;border-radius:15px;padding:10px 12px;font-weight:900;display:inline-flex;align-items:center;gap:7px;color:#0f172a}.oskar-prime-stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}.oskar-prime-step{background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:9px 8px;text-align:center;font-weight:900;font-size:12px;color:#64748b}.oskar-prime-step.active{background:#ede9fe;color:#6d28d9;border-color:#c4b5fd}.oskar-prime-page{display:none;animation:primeFade .18s ease}.oskar-prime-page.active{display:block}@keyframes primeFade{from{opacity:.3;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .oskar-prime-plan-grid,.oskar-prime-method-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.oskar-prime-plan,.oskar-prime-method{border:1px solid #e2e8f0;background:linear-gradient(180deg,#fff,#f8fbff);border-radius:24px;padding:16px;cursor:pointer;box-shadow:0 12px 30px rgba(15,23,42,.05);transition:.18s;position:relative;overflow:hidden}.oskar-prime-plan:hover,.oskar-prime-method:hover,.oskar-prime-plan.selected,.oskar-prime-method.selected{transform:translateY(-2px);border-color:#7c3aed;box-shadow:0 16px 34px rgba(124,58,237,.16)}.oskar-prime-plan.best:before{content:"الأفضل";position:absolute;top:10px;left:10px;background:#f59e0b;color:#fff;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:900}.oskar-prime-plan b{display:block;font-size:20px;color:#0f172a}.oskar-prime-price{font-size:28px;font-weight:900;color:#2563eb;margin-top:10px}.oskar-prime-sub{font-size:12px;color:#64748b;line-height:1.8;margin-top:8px;font-weight:800}.oskar-prime-method{display:flex;align-items:center;gap:12px}.oskar-prime-method img{width:62px;height:62px;border-radius:18px;object-fit:cover;background:#f1f5f9;border:1px solid #e2e8f0}.oskar-prime-method b{font-size:17px}.oskar-dotted-box{border:2px dashed #cbd5e1;border-radius:24px;padding:18px 14px 14px;position:relative;background:#fff;margin-top:14px}.oskar-dotted-title{position:absolute;top:-14px;left:18px;background:#fff;padding:2px 9px;border-radius:999px;font-size:12px;color:#7c3aed;font-weight:900;border:1px solid #ddd6fe}.oskar-pay-line{display:grid;grid-template-columns:140px 1fr;gap:8px;padding:9px 0;border-bottom:1px dashed #e2e8f0;font-size:14px}.oskar-pay-line:last-child{border-bottom:0}.oskar-pay-line span{color:#64748b;font-weight:900}.oskar-pay-line b{color:#0f172a;font-weight:900;direction:ltr;text-align:right}.oskar-prime-summary{background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-weight:900;color:#0f172a}.oskar-prime-summary strong{color:#2563eb}.oskar-prime-action{border:0;border-radius:18px;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;padding:13px 16px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 15px 32px rgba(37,99,235,.22)}.oskar-prime-action.gold{background:linear-gradient(135deg,#f59e0b,#f97316)}.oskar-prime-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}.oskar-prime-input{width:100%;border:1px solid transparent;background:#f8fafc;border-radius:17px;padding:13px 14px;font-family:inherit;font-weight:800;outline:none}.oskar-prime-input:focus{background:#fff;border-color:#7c3aed;box-shadow:0 0 0 4px rgba(124,58,237,.08)}.oskar-prime-code{font-size:28px;font-weight:900;letter-spacing:2px;direction:ltr;text-align:center;background:#0f172a;color:#fff;border-radius:22px;padding:16px;margin:12px 0}.oskar-prime-whatsapp{background:#dcfce7!important;color:#15803d!important;border:1px solid #bbf7d0!important;box-shadow:none!important}.invoice-logo{background:#dbeafe!important;object-fit:cover!important;object-position:center!important}.oskar-wa-btn{display:none!important}
+  @media(max-width:720px){.oskar-prime-shell{padding:14px;border-radius:26px}.oskar-prime-top{align-items:flex-start}.oskar-prime-title{font-size:18px}.oskar-prime-stepper{grid-template-columns:repeat(2,1fr)}.oskar-prime-plan-grid,.oskar-prime-method-grid{grid-template-columns:1fr}.oskar-prime-form{grid-template-columns:1fr}.oskar-prime-home-card .oskar-prime-open-btn{max-width:none}.oskar-pay-line{grid-template-columns:1fr}.oskar-pay-line b{text-align:right}.oskar-prime-nav{justify-content:flex-start}}
+</style>
+<script id="oskar-prime-purchase-and-logo-fix-2026-04-30-script">
 (function(){
   "use strict";
-  if (window.__OSKAR_AUTH_STRICT_DEFAULT_RESET_LINK_20260430__) return;
-  window.__OSKAR_AUTH_STRICT_DEFAULT_RESET_LINK_20260430__ = true;
-
-  const DEFAULT_ADMIN_PIN = "0000000000@@";
-  const OLD_DEFAULT_PIN = "0000";
-  const ADMIN_PERMISSION = "__admin__";
-  const MODE_KEY = "oskar_storage_mode_v1";
-  const START_KEY = "oskar_trial_started_at_v1";
-  const DURATION = 12 * 60 * 60 * 1000;
-  const PENDING_LOGIN_KEY = "oskar_strict_pending_admin_login_hash_v1";
-  const FORCE_AFTER_LOGIN_KEY = "oskar_force_password_change_after_login_v1";
-  const RESET_PARAM = "adminResetToken";
-  const RESET_PATH = "adminPasswordResetTokens";
+  if(window.__OSKAR_PRIME_PURCHASE_AND_LOGO_FIX_20260430__) return;
+  window.__OSKAR_PRIME_PURCHASE_AND_LOGO_FIX_20260430__ = true;
   const $ = id => document.getElementById(id);
-  const toast = (m, ms=3200) => window.toast ? window.toast(m, ms) : alert(m);
-  const loading = (b,on,t) => { if(!b)return; if(on){ if(!b.dataset.oskarStrictOldHtml)b.dataset.oskarStrictOldHtml=b.innerHTML; b.disabled=true; b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> '+(t||'جاري التنفيذ...'); } else { b.disabled=false; if(b.dataset.oskarStrictOldHtml)b.innerHTML=b.dataset.oskarStrictOldHtml; delete b.dataset.oskarStrictOldHtml; } };
-  function hash(s){ s=String(s||""); let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h+=(h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24); } return String(h>>>0); }
-  function norm(p){ return String(p||"").replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).trim(); }
-  function root(){ return window.FIREBASE_ROOT || window.CASHIER_FIREBASE_CONFIG?.firebaseRoot || "cashier_units_pro_default"; }
-  function fb(){ return !!(navigator.onLine && window.db && window.ref && window.get && window.set); }
-  function trial(){ const s=Number(localStorage.getItem(START_KEY)||0); return localStorage.getItem(MODE_KEY)==="trial" && s && Date.now()-s<DURATION; }
-  function clearSessions(){ try{ Object.keys(localStorage).forEach(k=>{if(k.startsWith("cashier_auth_session_"))localStorage.removeItem(k)}); Object.keys(sessionStorage).forEach(k=>{if(k.startsWith("cashier_auth_session_"))sessionStorage.removeItem(k)}); }catch{} }
-  function sessionKey(){ let ns="main"; try{ const cfg=window.CASHIER_FIREBASE_CONFIG?.firebaseConfig||{}; const raw=(cfg.projectId||"project")+"_"+(cfg.databaseURL||"database")+"_main"; ns=btoa(unescape(encodeURIComponent(raw))).replace(/[^a-zA-Z0-9]/g,"").slice(0,42)||"main"; }catch{} return "cashier_auth_session_"+ns+"_v1"; }
-  function saveSession(u){ try{ clearSessions(); localStorage.setItem(sessionKey(),JSON.stringify({id:u.id,name:u.name,role:u.role,permissions:u.permissions||[ADMIN_PERMISSION],loginAt:Date.now()})); }catch{} }
-  async function fetchSettings(){ window.state=window.state||{}; window.state.settings=window.state.settings||{id:"main"}; if(fb()){ try{ const snap=await window.get(window.ref(window.db,root()+"/settings/main")); if(snap&&snap.exists&&snap.exists()){ window.state.settings={...(window.state.settings||{}),...(snap.val()||{}),id:"main"}; if(window.idbPut) await window.idbPut("settings",window.state.settings); } }catch(e){ console.warn("auth settings fetch failed",e); } } return window.state.settings; }
-  async function saveSettings(){ window.state=window.state||{}; window.state.settings={...(window.state.settings||{}),id:"main",updatedAt:Date.now()}; if(window.idbPut) await window.idbPut("settings",window.state.settings); const safe={...window.state.settings,localLogo:""}; if(fb()) await window.set(window.ref(window.db,root()+"/settings/main"),safe); else if(window.enqueueSync) await window.enqueueSync({type:"set",store:"settings",itemId:"main",data:safe}); }
-  function storedHash(){ const h=String(window.state?.settings?.adminPasswordHash||""); const old=hash(OLD_DEFAULT_PIN), def=hash(DEFAULT_ADMIN_PIN); return (!h || h==="3052262101" || h===old) ? def : h; }
-  function defaultActive(){ return storedHash()===hash(DEFAULT_ADMIN_PIN); }
-  function showLock(show){ const l=$("authLock"); if(l){ l.classList.toggle("hide",!show); l.style.display=show?"flex":"none"; } }
-  function applyUi(u){ const pill=$("authUserPill"); if(pill) pill.innerHTML=u?`<i class="fa-solid fa-user-shield"></i> ${u.name||"المدير"}`:`<i class="fa-solid fa-lock"></i> غير مسجل`; document.querySelectorAll(".nav-btn[data-page],.bottom-btn[data-page]").forEach(b=>{ const p=b.dataset.page; b.classList.toggle("auth-hidden",!(u&&(u.role==="admin"||(u.permissions||[]).includes(ADMIN_PERMISSION)||(u.permissions||[]).includes(p)))); }); const sec=$("adminSecurityBox"); if(sec) sec.style.display=u?"block":"none"; const emp=$("employeesSettingsBox"); if(emp) emp.style.display=u?"block":"none"; }
-  async function finishLogin(force){ const u={id:"admin",name:"المدير",role:"admin",permissions:[ADMIN_PERMISSION]}; window.state=window.state||{}; window.state.auth=window.state.auth||{}; window.state.auth.user=u; window.state.auth.ready=true; saveSession(u); showLock(false); applyUi(u); try{ if(window.loadLocalData) await window.loadLocalData(true); }catch(e){} try{ if(window.renderAll) window.renderAll(); }catch(e){} try{ if(!trial()&&window.runAfterLoginSync) setTimeout(()=>window.runAfterLoginSync("admin-login-strict"),120); }catch(e){} if(force) setTimeout(forceModal,250); }
-  function closeModal(){ const b=$("modalBackdrop"), c=$("modalCloseBtn"); if(c)c.style.display=""; if(b)b.classList.remove("show"); }
-  function openModal(title,html){ const t=$("modalTitle"), body=$("modalBody"), b=$("modalBackdrop"), box=$("modalBox"); if(!t||!body||!b)return false; t.textContent=title; if(box)box.classList.remove("large"); body.innerHTML=html; b.classList.add("show"); return true; }
-  function forceModal(){ if(!openModal("حماية الحساب: كلمة مرور جديدة",`<div class="card" style="box-shadow:none"><div style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:18px;padding:12px;margin-bottom:14px;font-weight:900;line-height:1.9">تم الدخول بكلمة المرور الافتراضية، ويجب تغييرها الآن قبل متابعة الاستخدام.</div><form id="oskarForcePasswordForm"><div class="form-grid-compact"><div><label class="field-label">كلمة المرور الجديدة</label><input id="oskarForcePass1" type="password" class="input" required></div><div><label class="field-label">تأكيد كلمة المرور</label><input id="oskarForcePass2" type="password" class="input" required></div></div><button id="oskarForceSaveBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-shield-halved"></i> حفظ كلمة المرور الجديدة</button></form></div>`)) return; const c=$("modalCloseBtn"); if(c)c.style.display="none"; $("oskarForcePasswordForm").onsubmit=async e=>{ e.preventDefault(); const btn=$("oskarForceSaveBtn"), p1=norm($("oskarForcePass1")?.value), p2=norm($("oskarForcePass2")?.value); if(p1.length<6)return toast("كلمة المرور الجديدة يجب أن تكون 6 خانات على الأقل"); if(p1===DEFAULT_ADMIN_PIN)return toast("لا يمكن استخدام كلمة المرور الافتراضية مرة أخرى"); if(p1!==p2)return toast("كلمتا المرور غير متطابقتين"); loading(btn,true,"جاري الحفظ..."); try{ window.state.settings={...(window.state?.settings||{}),id:"main",adminPasswordHash:hash(p1),updatedAt:Date.now()}; await saveSettings(); localStorage.removeItem(FORCE_AFTER_LOGIN_KEY); closeModal(); toast("تم تغيير كلمة مرور المدير بنجاح"); }catch(err){ console.error(err); toast("فشل حفظ كلمة المرور الجديدة"); }finally{ loading(btn,false); } } }
-  async function adminSubmit(e){ const f=e.target; if(!f||f.id!=="adminLoginForm")return; e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); const input=$("adminPasswordInput"), pass=norm(input?.value), btn=e.submitter||f.querySelector("button[type='submit']")||f.querySelector("button"); if(!pass)return toast("أدخل كلمة مرور المدير"); loading(btn,true,"جاري فحص كلمة المرور..."); try{ await fetchSettings(); if(hash(pass)!==storedHash()) return toast("كلمة مرور المدير غير صحيحة"); const force=defaultActive(); if(trial()){ sessionStorage.setItem(PENDING_LOGIN_KEY,hash(pass)); if(force)localStorage.setItem(FORCE_AFTER_LOGIN_KEY,"1"); localStorage.setItem(MODE_KEY,"main"); localStorage.removeItem("oskar_trial_logged_out_v1"); clearSessions(); toast("تم التحويل إلى نسخة المدير، جاري الدخول..."); setTimeout(()=>location.reload(),260); return; } if(input)input.value=""; await finishLogin(force); toast("تم دخول المدير بنجاح"); }catch(err){ console.error(err); toast("حدث خطأ أثناء تسجيل الدخول"); }finally{ loading(btn,false); } }
-  async function autoLogin(){ const p=sessionStorage.getItem(PENDING_LOGIN_KEY); if(!p||trial())return; sessionStorage.removeItem(PENDING_LOGIN_KEY); await fetchSettings(); if(p!==storedHash())return; await finishLogin(localStorage.getItem(FORCE_AFTER_LOGIN_KEY)==="1"||defaultActive()); toast("تم دخول المدير بنجاح"); }
-  function ensureRecovery(){ const b=$("forgotAdminPasswordBtn"); if(b)b.innerHTML='<i class="fa-solid fa-envelope-circle-check"></i> إرسال رابط إعادة التعيين للبريد'; const box=$("adminSecurityBox"); if(box&&!$("settingRecoveryEmail")){ const g=box.querySelector(".form-grid")||box; g.insertAdjacentHTML("beforeend",'<div class="full-row"><label class="field-label">بريد استرداد كلمة مرور المدير</label><input id="settingRecoveryEmail" type="email" class="input" placeholder="example@email.com"></div>'); } if(window.state?.settings?.recoveryEmail&&$("settingRecoveryEmail")&&!$("settingRecoveryEmail").value)$("settingRecoveryEmail").value=window.state.settings.recoveryEmail; }
-  function token(){ if(crypto?.randomUUID)return crypto.randomUUID().replace(/-/g,""); const a=new Uint8Array(24); if(crypto?.getRandomValues)crypto.getRandomValues(a); return Array.from(a,b=>b.toString(16).padStart(2,"0")).join("")||Date.now()+Math.random().toString(16).slice(2); }
-  async function sendReset(){ await fetchSettings(); const email=String(window.state?.settings?.recoveryEmail||"").trim().toLowerCase(); if(!email)return toast("لا يوجد بريد استرداد محفوظ في الإعدادات"); if(!fb())return toast("يلزم اتصال إنترنت لإرسال رابط إعادة التعيين"); const tok=token(); const url=new URL(location.href); url.searchParams.set(RESET_PARAM,tok); url.hash=""; await window.set(window.ref(window.db,root()+"/"+RESET_PATH+"/"+tok),{email,createdAt:Date.now(),expiresAt:Date.now()+30*60*1000,used:false}); try{ await navigator.clipboard?.writeText(url.toString()); }catch{} location.href=`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent("رابط إعادة تعيين كلمة مرور المدير")}&body=${encodeURIComponent("اضغط على الرابط التالي لإعادة تعيين كلمة مرور المدير. الرابط صالح لمدة 30 دقيقة:\n\n"+url.toString())}`; toast("تم تجهيز رابط إعادة التعيين ونسخه وفتح البريد المسجل للإرسال",5200); }
-  function forgotClick(e){ const b=e.target?.closest?.("#forgotAdminPasswordBtn"); if(!b)return; e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); loading(b,true,"جاري تجهيز الرابط..."); sendReset().catch(err=>{console.error(err);toast("فشل تجهيز رابط إعادة التعيين")}).finally(()=>loading(b,false)); }
-  async function resetModal(tok){ if(!tok)return; if(!fb())return toast("يلزم اتصال إنترنت لفتح رابط إعادة التعيين"); if(!openModal("إعادة تعيين كلمة مرور المدير",`<form id="oskarResetTokenForm"><div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:18px;padding:12px;margin-bottom:14px;font-weight:900;line-height:1.8">أدخل كلمة مرور جديدة. سيتم إلغاء الرابط بعد الاستخدام.</div><div class="form-grid-compact"><div><label class="field-label">كلمة المرور الجديدة</label><input id="oskarResetPass1" type="password" class="input" required></div><div><label class="field-label">تأكيد كلمة المرور</label><input id="oskarResetPass2" type="password" class="input" required></div></div><button id="oskarResetSaveBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-key"></i> حفظ كلمة المرور الجديدة</button></form>`))return; $("oskarResetTokenForm").onsubmit=async e=>{ e.preventDefault(); const btn=$("oskarResetSaveBtn"), p1=norm($("oskarResetPass1")?.value), p2=norm($("oskarResetPass2")?.value); if(p1.length<6)return toast("كلمة المرور الجديدة يجب أن تكون 6 خانات على الأقل"); if(p1===DEFAULT_ADMIN_PIN)return toast("لا يمكن استخدام كلمة المرور الافتراضية مرة أخرى"); if(p1!==p2)return toast("كلمتا المرور غير متطابقتين"); loading(btn,true,"جاري التحقق والحفظ..."); try{ const r=window.ref(window.db,root()+"/"+RESET_PATH+"/"+tok), snap=await window.get(r); if(!snap||!snap.exists||!snap.exists())return toast("رابط إعادة التعيين غير صالح"); const data=snap.val()||{}; if(data.used)return toast("تم استخدام هذا الرابط مسبقاً"); if(Number(data.expiresAt||0)<Date.now())return toast("انتهت صلاحية رابط إعادة التعيين"); await fetchSettings(); window.state.settings={...(window.state?.settings||{}),id:"main",adminPasswordHash:hash(p1),updatedAt:Date.now()}; await saveSettings(); await window.set(r,{...data,used:true,usedAt:Date.now()}); const url=new URL(location.href); url.searchParams.delete(RESET_PARAM); history.replaceState({},"",url.toString()); closeModal(); toast("تم تغيير كلمة مرور المدير من رابط إعادة التعيين"); }catch(err){ console.error(err); toast("فشل تغيير كلمة المرور من الرابط"); }finally{ loading(btn,false); } }; }
-  function bind(){ ensureRecovery(); window.addEventListener("submit",adminSubmit,true); window.addEventListener("click",forgotClick,true); setTimeout(ensureRecovery,500); setInterval(ensureRecovery,3000); setTimeout(autoLogin,350); try{ const tok=new URL(location.href).searchParams.get(RESET_PARAM); if(tok)setTimeout(()=>resetModal(tok),900); }catch{} }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind); else bind();
+  const MODE_KEY="oskar_storage_mode_v1", START_KEY="oskar_trial_started_at_v1", DURATION=12*60*60*1000;
+  const DEFAULT_LOGO_TEXT = "OSKAR";
+  const WHATSAPP="972515948259";
+  const PLANS=[
+    {id:"month", title:"شهر", amount:49, label:"خطة شهر", desc:"تفعيل Prime لمدة شهر كامل"},
+    {id:"3months", title:"3 شهور", amount:99, label:"خطة 3 شهور", desc:"تفعيل Prime لمدة 90 يوم", best:true},
+    {id:"lifetime", title:"مدى الحياة", amount:149, label:"خطة مدى الحياة", desc:"دفعة واحدة وتفعيل دائم"}
+  ];
+  const METHODS={
+    bank:{id:"bank", title:"بنك فلسطين", image:"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS4zWThetSPpBwUBzFSBYzU4g1HSTdqdSXGnyh7PyOHhQ&s=10", info:[['الاسم','انور احمد الندا'],['رقم الجوال','0597603119'],['رقم الحساب','2143732']]},
+    palpay:{id:"palpay", title:"محفظة بال باي", image:"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSgCBX8yJGaKvVWmuiUX36B5K8OaY5Fj8dfYortV5w3GA&s&ec=121643259", info:[['الاسم','انور احمد الندا'],['رقم الهاتف','0597603119']]}
+  };
+  const vm={step:1,plan:null,method:null,accountName:"",phone:"",code:"",saved:false,lastRequest:null};
+  function trialActive(){ const s=Number(localStorage.getItem(START_KEY)||0); return localStorage.getItem(MODE_KEY)==="trial" && s && Date.now()-s<DURATION; }
+  function toast(m,ms){ if(typeof window.toast==="function") window.toast(m,ms||3200); else alert(m); }
+  function esc(v){ return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
+  function uid(prefix="prime"){ return prefix+"_"+Date.now()+"_"+Math.random().toString(16).slice(2); }
+  function genCode(){ const abc="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let out=""; const arr=new Uint32Array(10); try{ crypto.getRandomValues(arr); }catch{} for(let i=0;i<10;i++){ const n=arr[i] || Math.floor(Math.random()*999999); out+=abc[n%abc.length]; } return out; }
+  function makeLogoDataUrl(text){ const t=esc(String(text||DEFAULT_LOGO_TEXT).trim().slice(0,1)||"O"); const svg='<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#2563eb"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><rect width="160" height="160" rx="42" fill="url(#g)"/><text x="50%" y="58%" text-anchor="middle" font-size="72" font-family="Arial" font-weight="bold" fill="white">'+t+'</text></svg>'; return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg); }
+  function getLogoFallback(){ const name=window.state?.settings?.shopName || $('topShopName')?.textContent || 'oskar'; return makeLogoDataUrl(name); }
+  function isBadSrc(src){ return !src || /undefined|null|about:blank/i.test(String(src)); }
+  function fixLogos(){ const st=window.state?.settings||{}; const fallback=getLogoFallback(); const top=$('topShopLogo'), side=$('sideShopLogo'); [top,side].forEach(img=>{ if(img && isBadSrc(img.getAttribute('src'))) img.src=fallback; }); document.querySelectorAll('img.invoice-logo').forEach(img=>{ img.removeAttribute('crossorigin'); img.referrerPolicy='no-referrer'; img.onerror=function(){ this.onerror=null; this.src=fallback; }; if(isBadSrc(img.getAttribute('src')) || isBadSrc(img.src)) img.src=st.localLogo || st.logo || top?.src || side?.src || fallback; setTimeout(()=>{ if(!img.complete || img.naturalWidth===0) img.src=fallback; },900); }); }
+  function installLogoGuards(){ fixLogos(); document.addEventListener('click',()=>setTimeout(fixLogos,80),true); document.addEventListener('error',e=>{ const img=e.target; if(img && img.matches && img.matches('img.invoice-logo,img.shop-logo')){ img.removeAttribute('crossorigin'); img.src=getLogoFallback(); } },true); setInterval(fixLogos,1200); }
+  function root(){ return window.CASHIER_FIREBASE_CONFIG?.firebaseRoot || window.FIREBASE_ROOT || 'cashier_units_pro_default'; }
+  function pendingKey(){ return 'oskar_prime_purchase_pending_v1'; }
+  function loadPending(){ try{return JSON.parse(localStorage.getItem(pendingKey())||'[]')||[]}catch{return[]} }
+  function savePending(arr){ try{localStorage.setItem(pendingKey(),JSON.stringify(arr||[]))}catch{} }
+  async function pushRequest(req){
+    const path=root()+"/primePurchaseRequests/"+req.id;
+    if(navigator.onLine && window.db && window.ref && window.set){ await window.set(window.ref(window.db,path),req); return true; }
+    return false;
+  }
+  async function saveRequest(req){
+    let sent=false;
+    try{ sent=await pushRequest(req); }catch(e){ console.warn('prime request firebase save failed',e); }
+    if(!sent){ const arr=loadPending(); if(!arr.some(x=>x.id===req.id)) arr.push(req); savePending(arr); }
+    return sent;
+  }
+  async function flushPending(){ const arr=loadPending(); if(!arr.length) return; const left=[]; for(const r of arr){ try{ if(!(await pushRequest(r))) left.push(r); }catch{ left.push(r); } } savePending(left); }
+  function ensureButtons(){
+    const authCard=document.querySelector('#authLock .auth-card');
+    if(authCard && !$('oskarPrimeBuyLoginBtn')){
+      const btn=document.createElement('button'); btn.id='oskarPrimeBuyLoginBtn'; btn.type='button'; btn.className='oskar-prime-open-btn'; btn.innerHTML='<i class="fa-solid fa-crown"></i> شراء النسخة Prime إلكترونيًا';
+      const plans=document.querySelector('#oskarPurchaseBox .oskar-plans-row') || $('trialLoginNote') || authCard.lastElementChild;
+      plans.insertAdjacentElement('afterend',btn);
+    }
+    const home=$('page-home');
+    if(home && !$('oskarPrimeHomeCard')){
+      home.insertAdjacentHTML('afterbegin','<div id="oskarPrimeHomeCard" class="oskar-prime-home-card"><div style="position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h3><i class="fa-solid fa-crown"></i> فعل Prime الآن</h3><p>أكمل الشراء إلكترونيًا، وبعد الموافقة على الدفعة يتم تفعيل مفتاح الدخول تلقائيًا.</p></div><button id="oskarPrimeBuyHomeBtn" class="oskar-prime-open-btn" type="button"><i class="fa-solid fa-bolt"></i> شراء Prime</button></div></div>');
+    }
+    const card=$('oskarPrimeHomeCard'); if(card) card.style.display=trialActive()?'block':'none';
+  }
+  function ensureOverlay(){
+    if($('oskarPrimeOverlay')) return;
+    document.body.insertAdjacentHTML('beforeend','<div id="oskarPrimeOverlay" class="oskar-prime-overlay"><div class="oskar-prime-shell"><div class="oskar-prime-top"><div class="oskar-prime-title"><i class="fa-solid fa-crown"></i><span>اشتراك Prime</span></div><div class="oskar-prime-nav"><button id="oskarPrimePrev" class="oskar-prime-small-btn" type="button"><i class="fa-solid fa-arrow-right"></i> رجوع</button><button id="oskarPrimeClose" class="oskar-prime-small-btn" type="button"><i class="fa-solid fa-xmark"></i> إغلاق</button></div></div><div id="oskarPrimeStepper" class="oskar-prime-stepper"></div><div id="oskarPrimeContent"></div></div></div>');
+  }
+  function stepName(n){ return ['اختيار الخطة','طريقة الدفع','بيانات التحويل','المفتاح'][n-1]||''; }
+  function renderStepper(){ const box=$('oskarPrimeStepper'); if(!box)return; box.innerHTML=[1,2,3,4].map(n=>'<div class="oskar-prime-step '+(vm.step===n?'active':'')+'">'+n+' - '+stepName(n)+'</div>').join(''); }
+  function render(){
+    ensureOverlay(); renderStepper(); const box=$('oskarPrimeContent'); if(!box) return;
+    const plan=vm.plan, method=vm.method?METHODS[vm.method]:null;
+    if(vm.step===1){
+      box.innerHTML='<div class="oskar-prime-plan-grid">'+PLANS.map(p=>'<button type="button" class="oskar-prime-plan '+(p.best?'best ':'')+(plan?.id===p.id?'selected':'')+'" data-prime-plan="'+p.id+'"><b>'+p.title+'</b><div class="oskar-prime-price">₪ '+p.amount+'</div><div class="oskar-prime-sub">'+p.desc+'</div></button>').join('')+'</div>';
+    } else if(vm.step===2){
+      box.innerHTML='<div class="oskar-prime-summary"><span>الخطة: <strong>'+esc(plan?.label||'')+'</strong></span><span>السعر المطلوب: <strong>₪ '+esc(plan?.amount||0)+'</strong></span></div><div class="oskar-prime-method-grid">'+Object.values(METHODS).map(m=>'<button type="button" class="oskar-prime-method '+(vm.method===m.id?'selected':'')+'" data-prime-method="'+m.id+'"><img src="'+m.image+'" alt=""><div><b>'+m.title+'</b><div class="oskar-prime-sub">اضغط لاختيار طريقة الدفع</div></div></button>').join('')+'</div>';
+    } else if(vm.step===3){
+      const info=(method?.info||[]).map(([k,v])=>'<div class="oskar-pay-line"><span>'+esc(k)+'</span><b>'+esc(v)+'</b></div>').join('');
+      box.innerHTML='<div class="oskar-prime-summary"><span>الخطة: <strong>'+esc(plan?.label||'')+'</strong></span><span>طريقة الدفع: <strong>'+esc(method?.title||'')+'</strong></span><span>المبلغ: <strong>₪ '+esc(plan?.amount||0)+'</strong></span></div><div class="oskar-dotted-box"><span class="oskar-dotted-title">بيانات '+esc(method?.title||'الدفع')+'</span>'+info+'</div><div style="display:flex;justify-content:flex-end;margin-top:14px"><button id="oskarPrimePaidBtn" class="oskar-prime-action gold" type="button"><i class="fa-solid fa-check"></i> لقد دفعت ₪ '+esc(plan?.amount||0)+'</button></div>';
+    } else if(vm.step===4){
+      const done=!!vm.saved;
+      box.innerHTML='<div class="oskar-prime-summary"><span>الخطة: <strong>'+esc(plan?.label||'')+'</strong></span><span>طريقة الدفع: <strong>'+esc(method?.title||'')+'</strong></span><span>المبلغ: <strong>₪ '+esc(plan?.amount||0)+'</strong></span></div>'+(!done?'<form id="oskarPrimeConfirmForm"><div class="oskar-prime-form"><div><label class="field-label">اسم الحساب الذي حولت منه</label><input id="oskarPrimeAccountName" class="oskar-prime-input" required placeholder="مثال: محمد أحمد" value="'+esc(vm.accountName)+'"></div><div><label class="field-label">رقم جوالك / واتساب للتواصل</label><input id="oskarPrimePhone" class="oskar-prime-input" required inputmode="tel" placeholder="05xxxxxxxx" value="'+esc(vm.phone)+'"></div></div><button id="oskarPrimeSaveRequestBtn" class="oskar-prime-action" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-paper-plane"></i> إرسال بيانات الدفعة وإنشاء المفتاح</button></form>':'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:24px;padding:16px;text-align:center"><div style="font-weight:900;color:#0f172a;font-size:17px">هذا مفتاح دخولك بعد الموافقة على الدفعة</div><div class="oskar-prime-code">'+esc(vm.code)+'</div><div style="color:#64748b;font-weight:900;line-height:1.9">سيتم معالجة الدفعة خلال 3 - 10 دقائق. بمجرد الموافقة على الدفعة سيتم تفعيل هذا المفتاح للدخول تلقائيًا.</div><button id="oskarPrimeFastWhatsapp" class="oskar-prime-action oskar-prime-whatsapp" type="button" style="width:100%;margin-top:14px"><i class="fa-brands fa-whatsapp"></i> تسريع عملية القبول عبر واتساب</button></div>');
+      const form=$('oskarPrimeConfirmForm'); if(form) form.onsubmit=submitConfirm;
+    }
+  }
+  function open(planId){ ensureButtons(); ensureOverlay(); vm.step=1; vm.saved=false; vm.lastRequest=null; if(planId){ vm.plan=PLANS.find(p=>p.id===planId)||null; vm.step=vm.plan?2:1; } $('oskarPrimeOverlay')?.classList.add('show'); render(); }
+  function close(){ $('oskarPrimeOverlay')?.classList.remove('show'); }
+  function prev(){ if(vm.step>1){ vm.step--; render(); } else close(); }
+  async function submitConfirm(e){
+    e.preventDefault(); vm.accountName=String($('oskarPrimeAccountName')?.value||'').trim(); vm.phone=String($('oskarPrimePhone')?.value||'').trim(); if(vm.accountName.length<2) return toast('اكتب اسم الحساب الذي حولت منه'); if(vm.phone.length<6) return toast('اكتب رقم جوالك أو واتساب للتواصل');
+    const btn=$('oskarPrimeSaveRequestBtn'); if(btn){ btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> جاري الحفظ...'; }
+    vm.code=genCode();
+    const method=METHODS[vm.method];
+    const req={id:uid('prime'),code:vm.code,status:'pending',planId:vm.plan.id,planTitle:vm.plan.label,amount:vm.plan.amount,currency:'ILS',paymentMethod:method.id,paymentMethodTitle:method.title,transferAccountName:vm.accountName,contactPhone:vm.phone,createdAt:Date.now(),source:'trial-prime-purchase',deviceId:localStorage.getItem('oskar_device_id_v1')||'',userAgent:navigator.userAgent||'',appUrl:location.href};
+    vm.lastRequest=req;
+    const sent=await saveRequest(req);
+    vm.saved=true; render(); toast(sent?'تم إرسال بيانات الدفعة إلى النظام':'تم حفظ الطلب محليًا وسيتم إرساله تلقائيًا عند توفر الإنترنت',5200);
+  }
+  function whatsappText(){ const m=METHODS[vm.method]; return 'مرحبا، اشتركت في نظام oskar Prime%0Aالخطة: '+encodeURIComponent(vm.plan?.label||'')+'%0Aالمبلغ: '+encodeURIComponent('₪ '+(vm.plan?.amount||0))+'%0Aطريقة الدفع: '+encodeURIComponent(m?.title||'')+'%0Aاسم الحساب المحول منه: '+encodeURIComponent(vm.accountName||'')+'%0Aرقم التواصل: '+encodeURIComponent(vm.phone||'')+'%0Aكود الدخول: '+encodeURIComponent(vm.code||'')+'%0Aأرجو تسريع قبول الدفعة.'; }
+  function bind(){
+    document.addEventListener('click',function(e){
+      const prime=e.target.closest && e.target.closest('#oskarPrimeBuyLoginBtn,#oskarPrimeBuyHomeBtn'); if(prime){ e.preventDefault(); e.stopPropagation(); open(); return; }
+      const old=e.target.closest && e.target.closest('.oskar-plan-card'); if(old){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); const txt=old.dataset.plan||old.textContent||''; const id=/90|3/.test(txt)?'3months':(/149|مدى/.test(txt)?'lifetime':'month'); open(id); return; }
+      const planBtn=e.target.closest && e.target.closest('[data-prime-plan]'); if(planBtn){ vm.plan=PLANS.find(p=>p.id===planBtn.dataset.primePlan); vm.step=2; render(); return; }
+      const methodBtn=e.target.closest && e.target.closest('[data-prime-method]'); if(methodBtn){ vm.method=methodBtn.dataset.primeMethod; vm.step=3; render(); return; }
+      if(e.target.closest && e.target.closest('#oskarPrimePaidBtn')){ vm.step=4; render(); return; }
+      if(e.target.closest && e.target.closest('#oskarPrimeClose')){ close(); return; }
+      if(e.target.closest && e.target.closest('#oskarPrimePrev')){ prev(); return; }
+      if(e.target.closest && e.target.closest('#oskarPrimeFastWhatsapp')){ window.open('https://wa.me/'+WHATSAPP+'?text='+whatsappText(),'_blank'); return; }
+    },true);
+    window.addEventListener('online',flushPending);
+  }
+  function init(){ ensureButtons(); ensureOverlay(); installLogoGuards(); bind(); setInterval(()=>{ensureButtons();flushPending();},2500); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
 </script>
+
 </body>
 </html>
 <!-- legacy-disabled-patches-2026-04-29-base64: old duplicate scripts after </html> were disabled to prevent app startup errors. Do not execute. 
