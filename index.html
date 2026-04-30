@@ -1837,7 +1837,7 @@
             </div>
 
             <div class="clean-stat">
-              <div class="clean-stat-title"><span>الديون</span><i class="fa-solid fa-user-clock"></i></div>
+              <div class="clean-stat-title"><span>عليه من الزبائن</span><i class="fa-solid fa-user-clock"></i></div>
               <div id="homeDebtOwed" class="clean-stat-value red">₪ 0.00</div>
             </div>
 
@@ -12392,273 +12392,173 @@
 })();
 </script>
 
-
-
-<!-- oskar-scroll-fix-2026-04-29: desktop/sidebar/modal/table scrolling -->
-<style id="oskarScrollFixStyle">
-  /* تمرير عام بدون تغيير التصميم */
-  .sidebar,
-  #sidebar,
-  .modal,
-  #modalBox,
-  .oskar-emp-card,
-  .sync-popover,
-  .sync-operation-list,
-  .guide-modal-wrap,
-  .floating-scanner-card,
-  .customer-suggest-list,
-  .smart-suggest-list,
-  .new-page-table-holder,
-  .table-wrap,
-  .folder-tabs,
-  #finalSimpleModal .card,
-  #finalModal .card{
-    overscroll-behavior:contain!important;
-    -webkit-overflow-scrolling:touch!important;
-    touch-action:pan-x pan-y!important;
-    scrollbar-width:thin;
-    scrollbar-color:rgba(37,99,235,.45) rgba(226,232,240,.75);
-  }
-
-  .sidebar::-webkit-scrollbar,
-  .modal::-webkit-scrollbar,
-  .oskar-emp-card::-webkit-scrollbar,
-  .table-wrap::-webkit-scrollbar,
-  .new-page-table-holder::-webkit-scrollbar,
-  .folder-tabs::-webkit-scrollbar,
-  .guide-modal-wrap::-webkit-scrollbar{
-    width:9px;
-    height:9px;
-  }
-
-  .sidebar::-webkit-scrollbar-thumb,
-  .modal::-webkit-scrollbar-thumb,
-  .oskar-emp-card::-webkit-scrollbar-thumb,
-  .table-wrap::-webkit-scrollbar-thumb,
-  .new-page-table-holder::-webkit-scrollbar-thumb,
-  .folder-tabs::-webkit-scrollbar-thumb,
-  .guide-modal-wrap::-webkit-scrollbar-thumb{
-    background:rgba(37,99,235,.38);
-    border-radius:999px;
-    border:2px solid rgba(255,255,255,.9);
-  }
-
-  .sidebar::-webkit-scrollbar-track,
-  .modal::-webkit-scrollbar-track,
-  .oskar-emp-card::-webkit-scrollbar-track,
-  .table-wrap::-webkit-scrollbar-track,
-  .new-page-table-holder::-webkit-scrollbar-track,
-  .folder-tabs::-webkit-scrollbar-track,
-  .guide-modal-wrap::-webkit-scrollbar-track{
-    background:rgba(226,232,240,.55);
-    border-radius:999px;
-  }
-
-  #sidebar,
-  .sidebar{
-    height:100vh!important;
-    max-height:100vh!important;
-    overflow-y:auto!important;
-    overflow-x:hidden!important;
-    padding-bottom:135px!important;
-    scroll-behavior:smooth;
-  }
-
-  @media(min-width:901px){
-    #sidebar,
-    .sidebar{
-      top:0!important;
-      bottom:0!important;
-      transform:none;
-    }
-  }
-
-  .modal,
-  #modalBox,
-  .oskar-emp-card,
-  .floating-scanner-card,
-  #finalSimpleModal .card,
-  #finalModal .card{
-    max-height:92vh!important;
-    overflow:auto!important;
-    scroll-behavior:smooth;
-  }
-
-  .guide-modal-wrap{
-    max-height:72vh!important;
-    overflow:auto!important;
-  }
-
-  .table-wrap,
-  .new-page-table-holder{
-    overflow:auto!important;
-    cursor:grab;
-    user-select:auto;
-  }
-
-  .folder-tabs{
+<!-- OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3 -->
+<style id="oskarTableTouchScrollFinalV3Style">
+  html body .table-wrap,
+  html body .new-page-table-holder{
     overflow-x:auto!important;
-    overflow-y:hidden!important;
+    overflow-y:visible!important;
+    -webkit-overflow-scrolling:touch!important;
+    touch-action:none!important;
+    overscroll-behavior:auto!important;
     cursor:grab;
   }
-
-  .sync-operation-list,
-  .customer-suggest-list,
-  .smart-suggest-list{
-    overflow:auto!important;
-  }
-
-  .oskar-scroll-dragging{
-    cursor:grabbing!important;
-    scroll-behavior:auto!important;
-  }
-
-  body.oskar-scroll-noselect,
-  body.oskar-scroll-noselect *{
-    user-select:none!important;
-  }
+  html body .table-wrap:active,
+  html body .new-page-table-holder:active{cursor:grabbing;}
+  html body .table-wrap table,
+  html body .new-page-table-holder table{touch-action:none!important;}
+  html body .table-wrap button,
+  html body .table-wrap input,
+  html body .table-wrap select,
+  html body .table-wrap textarea,
+  html body .new-page-table-holder button,
+  html body .new-page-table-holder input,
+  html body .new-page-table-holder select,
+  html body .new-page-table-holder textarea{touch-action:manipulation!important;}
 </style>
-<script id="oskarScrollFixScript">
+<script id="oskarTableTouchScrollFinalV3Script">
 (function(){
   "use strict";
-  const PATCH_VERSION = "2026-04-29-scroll-fix-v1";
-  const SELECTOR = [
-    "#sidebar",
-    ".sidebar",
-    ".modal",
-    "#modalBox",
-    ".oskar-emp-card",
-    ".sync-popover",
-    ".sync-operation-list",
-    ".guide-modal-wrap",
-    ".floating-scanner-card",
-    ".customer-suggest-list",
-    ".smart-suggest-list",
-    ".new-page-table-holder",
-    ".table-wrap",
-    ".folder-tabs",
-    "#finalSimpleModal .card",
-    "#finalModal .card",
-    "[style*='overflow:auto']",
-    "[style*='overflow: auto']"
-  ].join(",");
+  if (window.__OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3__) return;
+  window.__OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3__ = true;
 
-  const isTextControl = (el) => !!(el && el.closest && el.closest("input,textarea,select,button,a,[contenteditable='true'],[contenteditable='']"));
+  const TABLE_SELECTOR = ".table-wrap,.new-page-table-holder";
+  const INTERACTIVE_SELECTOR = "input,textarea,select,option,button,a,label,[contenteditable='true']";
+  const THRESHOLD = 6;
+  let active = null;
+  let suppressClickUntil = 0;
 
-  function canScroll(el){
-    if(!el) return false;
-    return (el.scrollHeight - el.clientHeight > 2) || (el.scrollWidth - el.clientWidth > 2);
+  function closestTableWrap(target){
+    return target && target.closest ? target.closest(TABLE_SELECTOR) : null;
   }
-
-  function ensureFocusable(el){
-    if(!el || el.dataset.oskarScrollReady === "1") return;
-    el.dataset.oskarScrollReady = "1";
-    if(!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "0");
-    el.addEventListener("mouseenter", () => {
-      try{ el.focus({preventScroll:true}); }catch{ try{ el.focus(); }catch{} }
-    }, {passive:true});
-    el.addEventListener("keydown", (e) => {
-      if(isTextControl(document.activeElement)) return;
-      if(!canScroll(el)) return;
-      const page = Math.max(90, Math.floor(el.clientHeight * 0.85));
-      let used = true;
-      switch(e.key){
-        case "ArrowDown": el.scrollTop += 48; break;
-        case "ArrowUp": el.scrollTop -= 48; break;
-        case "PageDown": el.scrollTop += page; break;
-        case "PageUp": el.scrollTop -= page; break;
-        case "End": el.scrollTop = el.scrollHeight; break;
-        case "Home": el.scrollTop = 0; break;
-        case "ArrowRight": el.scrollLeft += 58; break;
-        case "ArrowLeft": el.scrollLeft -= 58; break;
-        default: used = false;
-      }
-      if(used){
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    });
-
-    let startX = 0, startY = 0, startLeft = 0, startTop = 0, dragging = false, moved = false, downTarget = null;
-    el.addEventListener("mousedown", (e) => {
-      if(e.button !== 0) return;
-      if(isTextControl(e.target)) return;
-      if(!canScroll(el)) return;
-      downTarget = e.target;
-      startX = e.clientX;
-      startY = e.clientY;
-      startLeft = el.scrollLeft;
-      startTop = el.scrollTop;
-      dragging = true;
-      moved = false;
-      el.classList.add("oskar-scroll-dragging");
-      document.body.classList.add("oskar-scroll-noselect");
-      try{ el.focus({preventScroll:true}); }catch{}
-    });
-
-    document.addEventListener("mousemove", (e) => {
-      if(!dragging) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      if(Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
-      if(moved){
-        el.scrollLeft = startLeft - dx;
-        el.scrollTop = startTop - dy;
-        e.preventDefault();
-      }
-    }, {passive:false});
-
-    document.addEventListener("mouseup", (e) => {
-      if(!dragging) return;
-      dragging = false;
-      el.classList.remove("oskar-scroll-dragging");
-      document.body.classList.remove("oskar-scroll-noselect");
-      if(moved && downTarget){
-        const blockClick = (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          document.removeEventListener("click", blockClick, true);
-        };
-        document.addEventListener("click", blockClick, true);
-        setTimeout(() => document.removeEventListener("click", blockClick, true), 120);
-      }
-      downTarget = null;
-    });
+  function canScrollY(el){
+    if (!el || el === document.body || el === document.documentElement) return false;
+    const cs = window.getComputedStyle(el);
+    const oy = cs.overflowY || "";
+    return /(auto|scroll|overlay)/.test(oy) && el.scrollHeight > el.clientHeight + 2;
   }
-
-  function enhanceAll(){
-    document.querySelectorAll(SELECTOR).forEach(ensureFocusable);
+  function verticalTarget(from){
+    let node = from;
+    while (node && node !== document.body && node !== document.documentElement) {
+      if (!node.matches || !node.matches(TABLE_SELECTOR)) {
+        if (canScrollY(node)) return node;
+      }
+      node = node.parentElement;
+    }
+    return document.scrollingElement || document.documentElement;
   }
-
-  function keepSidebarScrollable(){
-    const sidebar = document.getElementById("sidebar") || document.querySelector(".sidebar");
-    if(sidebar){
-      sidebar.style.overflowY = "auto";
-      sidebar.style.overflowX = "hidden";
-      sidebar.style.maxHeight = "100vh";
-      sidebar.style.height = "100vh";
-      sidebar.style.paddingBottom = sidebar.style.paddingBottom || "135px";
-      ensureFocusable(sidebar);
+  function maxScrollTop(el){
+    if (el === document.scrollingElement || el === document.documentElement || el === document.body) {
+      const doc = document.documentElement;
+      const body = document.body;
+      return Math.max(0, Math.max(doc.scrollHeight, body ? body.scrollHeight : 0) - window.innerHeight);
+    }
+    return Math.max(0, el.scrollHeight - el.clientHeight);
+  }
+  function getScrollTop(el){
+    if (el === document.scrollingElement || el === document.documentElement || el === document.body) {
+      return window.pageYOffset || document.documentElement.scrollTop || 0;
+    }
+    return el.scrollTop || 0;
+  }
+  function setScrollTop(el, value){
+    const next = Math.max(0, Math.min(maxScrollTop(el), value));
+    if (el === document.scrollingElement || el === document.documentElement || el === document.body) {
+      window.scrollTo(window.pageXOffset || document.documentElement.scrollLeft || 0, next);
+    } else {
+      el.scrollTop = next;
     }
   }
-
-  function init(){
-    keepSidebarScrollable();
-    enhanceAll();
-    try{
-      new MutationObserver(() => {
-        keepSidebarScrollable();
-        enhanceAll();
-      }).observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:["class","style"]});
-    }catch{}
-    setInterval(() => { keepSidebarScrollable(); enhanceAll(); }, 1500);
-    window.__OSKAR_SCROLL_FIX__ = PATCH_VERSION;
+  function onTouchStart(e){
+    if (!e.touches || e.touches.length !== 1) return;
+    const wrap = closestTableWrap(e.target);
+    if (!wrap) return;
+    const t = e.touches[0];
+    active = {
+      wrap: wrap,
+      yTarget: verticalTarget(wrap.parentElement || wrap),
+      startX: t.clientX,
+      startY: t.clientY,
+      lastX: t.clientX,
+      lastY: t.clientY,
+      mode: ""
+    };
   }
+  function onTouchMove(e){
+    if (!active || !e.touches || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dxTotal = t.clientX - active.startX;
+    const dyTotal = t.clientY - active.startY;
+    const absX = Math.abs(dxTotal);
+    const absY = Math.abs(dyTotal);
+    if (!active.mode) {
+      if (absX < THRESHOLD && absY < THRESHOLD) return;
+      active.mode = absY >= absX ? "vertical" : "horizontal";
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    suppressClickUntil = Date.now() + 350;
+    if (active.mode === "vertical") {
+      const dy = active.lastY - t.clientY;
+      setScrollTop(active.yTarget, getScrollTop(active.yTarget) + dy);
+    } else {
+      const dx = t.clientX - active.lastX;
+      const before = active.wrap.scrollLeft || 0;
+      active.wrap.scrollLeft = before - dx;
+      if ((active.wrap.scrollLeft || 0) === before && Math.abs(dx) > 0) active.wrap.scrollLeft = before + dx;
+    }
+    active.lastX = t.clientX;
+    active.lastY = t.clientY;
+  }
+  function onTouchEnd(){ active = null; }
 
-  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-  else init();
+  let mouseDrag = null;
+  document.addEventListener("mousedown", function(e){
+    const wrap = closestTableWrap(e.target);
+    if (!wrap || e.button !== 0) return;
+    if (e.target.closest && e.target.closest(INTERACTIVE_SELECTOR)) return;
+    mouseDrag = {wrap:wrap, x:e.clientX, y:e.clientY, left:wrap.scrollLeft || 0, down:false};
+  }, true);
+  document.addEventListener("mousemove", function(e){
+    if (!mouseDrag) return;
+    const dx = e.clientX - mouseDrag.x;
+    const dy = e.clientY - mouseDrag.y;
+    if (!mouseDrag.down && Math.max(Math.abs(dx), Math.abs(dy)) < THRESHOLD) return;
+    mouseDrag.down = true;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      e.preventDefault();
+      mouseDrag.wrap.scrollLeft = mouseDrag.left - dx;
+      suppressClickUntil = Date.now() + 350;
+    }
+  }, true);
+  document.addEventListener("mouseup", function(){ mouseDrag = null; }, true);
+  document.addEventListener("click", function(e){
+    if (Date.now() < suppressClickUntil && closestTableWrap(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+
+  document.addEventListener("touchstart", onTouchStart, {capture:true, passive:false});
+  document.addEventListener("touchmove", onTouchMove, {capture:true, passive:false});
+  document.addEventListener("touchend", onTouchEnd, {capture:true, passive:true});
+  document.addEventListener("touchcancel", onTouchEnd, {capture:true, passive:true});
+
+  function refreshTableTouchCss(){
+    document.querySelectorAll(TABLE_SELECTOR).forEach(function(el){
+      el.style.overflowX = "auto";
+      el.style.overflowY = "visible";
+      el.style.webkitOverflowScrolling = "touch";
+      el.style.touchAction = "none";
+      el.style.overscrollBehavior = "auto";
+    });
+  }
+  refreshTableTouchCss();
+  document.addEventListener("DOMContentLoaded", refreshTableTouchCss);
+  setInterval(refreshTableTouchCss, 1200);
 })();
 </script>
+<!-- /OSKAR_TABLE_TOUCH_SCROLL_FINAL_V3 -->
 </body>
 </html>
 <!-- legacy-disabled-patches-2026-04-29-base64: old duplicate scripts after </html> were disabled to prevent app startup errors. Do not execute. 
