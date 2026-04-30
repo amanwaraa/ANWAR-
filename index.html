@@ -1426,6 +1426,54 @@
       font-weight:900;
     }
 
+    /* oskar-2026-04-30 smooth scroll + laptop sidebar fix */
+    .sidebar{
+      overflow-y:auto;
+      overflow-x:hidden;
+      max-height:100dvh;
+      overscroll-behavior:contain;
+      -webkit-overflow-scrolling:touch;
+      scrollbar-gutter:stable;
+      padding-bottom:96px;
+    }
+
+    .table-wrap,
+    .modal,
+    .sync-operation-list,
+    .folder-tabs,
+    .customer-suggest-list,
+    .smart-suggest-list,
+    #cartLines{
+      -webkit-overflow-scrolling:touch;
+      overscroll-behavior:contain;
+      touch-action:pan-x pan-y;
+      will-change:scroll-position;
+      scroll-behavior:auto;
+    }
+
+    .table-wrap{
+      overflow:auto;
+      max-width:100%;
+      transform:translateZ(0);
+      contain:paint;
+    }
+
+    .table-wrap table{
+      transform:translateZ(0);
+      backface-visibility:hidden;
+    }
+
+    .modal-backdrop.show,
+    .auth-lock{
+      overflow:auto;
+      -webkit-overflow-scrolling:touch;
+      overscroll-behavior:contain;
+    }
+
+    @media(min-width:901px){
+      .sidebar{display:flex;flex-direction:column;}
+    }
+
     @media print{
       body *{
         visibility:hidden!important;
@@ -1978,9 +2026,9 @@
                   <th>الوحدة الأساسية</th>
                   <th>التحويل</th>
                   <th>المخزون الأساسي</th>
-                  <th>سعر الجملة الأساسي</th>
-                  <th>سعر البيع الأساسي</th>
-                  <th>سعر الوحدة المختارة</th>
+                  <th>سعر الجملة للوحدة</th>
+                  <th>سعر البيع للوحدة</th>
+                  <th>ملاحظات الوحدة</th>
                   <th>باركود</th>
                   <th>الإجراءات</th>
                 </tr>
@@ -2623,13 +2671,8 @@
           <label class="field-label">نوع الوحدة</label>
           <select id="productUnitType" class="select">
             <option value="piece">قطعة</option>
-            <option value="carton">كرتونة</option>
             <option value="kg">كيلو</option>
-            <option value="g">جرام</option>
             <option value="liter">لتر</option>
-            <option value="minutes">دقائق / رصيد</option>
-            <option value="ml">مل</option>
-            <option value="custom">وحدة مخصصة</option>
           </select>
         </div>
 
@@ -2654,22 +2697,22 @@
         </div>
 
         <div>
-          <label class="field-label">سعر الجملة للوحدة</label>
+          <label class="field-label">سعر الجملة للوحدة المختارة</label>
           <input id="productCostPrice" type="number" inputmode="decimal" class="input" value="0" min="0" step="0.01">
         </div>
 
         <div>
-          <label class="field-label">سعر البيع للوحدة</label>
+          <label class="field-label">سعر البيع للوحدة المختارة</label>
           <input id="productSalePrice" type="number" inputmode="decimal" class="input" value="0" min="0" step="0.01">
         </div>
 
         <div>
-          <label class="field-label">الحفظ الداخلي</label>
+          <label class="field-label">الحفظ الداخلي الدقيق</label>
           <input id="basePreviewText" class="input" disabled value="">
         </div>
 
         <div>
-          <label class="field-label">السعر الأساسي</label>
+          <label class="field-label">السعر المحسوب بدون تقريب</label>
           <input id="piecePricePreview" class="input" disabled value="">
         </div>
       </div>
@@ -3421,6 +3464,10 @@
       }
 
       applyPermissionsUI();
+
+      if (user) {
+        setTimeout(() => runAfterLoginSync("login"), 80);
+      }
     }
 
     function logout() {
@@ -3512,6 +3559,17 @@
     }
 
     async function tryRestoreAuthSession() {
+      if (OSKAR_TRIAL_ACTIVE && localStorage.getItem("oskar_trial_logged_out_v1") !== "1") {
+        setAuthUser({
+          id: "trial_admin",
+          name: "تجربة oskar",
+          role: "admin",
+          permissions: [ADMIN_PERMISSION],
+          trial: true
+        });
+        return;
+      }
+
       const saved = readAuthSession();
 
       if (!saved) {
@@ -3566,6 +3624,16 @@
         e.preventDefault();
         const btn = e.submitter || $("adminLoginForm").querySelector("button[type='submit']");
         const pass = $("adminPasswordInput").value.trim();
+        if (OSKAR_TRIAL_ACTIVE) {
+          try {
+            localStorage.setItem(OSKAR_TRIAL_MODE_KEY, "main");
+            localStorage.removeItem("oskar_trial_logged_out_v1");
+            Object.keys(localStorage).filter(k => k.startsWith("cashier_auth_session_")).forEach(k => localStorage.removeItem(k));
+          } catch {}
+          toast("سيتم فتح نسخة المدير ببياناتها المستقلة الآن");
+          setTimeout(() => location.reload(), 350);
+          return;
+        }
         setButtonLoading(btn, true, "جاري فحص كلمة المرور...");
         try {
           await fetchFreshSettingsFromFirebase();
@@ -3590,6 +3658,16 @@
         const btn = e.submitter || $("employeeLoginForm").querySelector("button[type='submit']");
         const name = $("employeeNameInput").value.trim();
         const pass = $("employeePasswordInput").value.trim();
+        if (OSKAR_TRIAL_ACTIVE) {
+          try {
+            localStorage.setItem(OSKAR_TRIAL_MODE_KEY, "main");
+            localStorage.removeItem("oskar_trial_logged_out_v1");
+            Object.keys(localStorage).filter(k => k.startsWith("cashier_auth_session_")).forEach(k => localStorage.removeItem(k));
+          } catch {}
+          toast("سيتم فتح نسخة الموظفين/المدير ببياناتها المستقلة الآن");
+          setTimeout(() => location.reload(), 350);
+          return;
+        }
         setButtonLoading(btn, true, "جاري تسجيل الدخول...");
         try {
           if (navigator.onLine) {
@@ -3628,42 +3706,51 @@
     }
 
     function baseUnitForType(unitType) {
-      if (unitType === "carton") return "piece";
       if (unitType === "kg") return "g";
       if (unitType === "liter") return "ml";
-      return unitType || "piece";
+      return "piece";
     }
 
     function factorForUnitType(unitType, cartonUnits = 1) {
-      if (unitType === "carton") return Math.max(1, cleanNumber(cartonUnits, 1));
       if (unitType === "kg") return 1000;
       if (unitType === "liter") return 1000;
       return 1;
     }
 
     function normalizeProduct(p = {}) {
-      const unitType = p.unitType || p.baseUnit || "piece";
-      const cartonUnits = Math.max(1, cleanNumber(p.cartonUnits || p.unitFactor || 1, 1));
-      const factor = factorForUnitType(unitType, cartonUnits);
+      const rawUnitType = p.unitType || p.baseUnit || "piece";
+      let unitType = rawUnitType;
+      if (unitType === "g") unitType = "kg";
+      if (unitType === "ml") unitType = "liter";
+      const convertedUnsupportedToPiece = !["piece", "kg", "liter", "g", "ml"].includes(rawUnitType);
+      if (!["piece", "kg", "liter"].includes(unitType)) unitType = "piece";
 
+      const cartonUnits = 1;
+      const factor = factorForUnitType(unitType, cartonUnits);
       const stock = cleanNumber(p.stock || 0);
       const costPrice = cleanNumber(p.costPrice || 0);
       const salePrice = cleanNumber(p.salePrice || 0);
+      const displayCostPrice = cleanNumber(
+        !convertedUnsupportedToPiece && p.displayCostPrice !== undefined && p.displayCostPrice !== "" ? p.displayCostPrice : costPrice * factor
+      );
+      const displaySalePrice = cleanNumber(
+        !convertedUnsupportedToPiece && p.displaySalePrice !== undefined && p.displaySalePrice !== "" ? p.displaySalePrice : salePrice * factor
+      );
 
       return {
         ...p,
         id: p.id || uid("prod"),
         unitType,
         baseUnit: baseUnitForType(unitType),
-        customUnit: p.customUnit || "",
+        customUnit: "",
         cartonUnits,
         unitFactor: factor,
         stock,
         costPrice,
         salePrice,
-        displayCostPrice: cleanNumber(p.displayCostPrice || costPrice * factor),
-        displaySalePrice: cleanNumber(p.displaySalePrice || salePrice * factor),
-        cartonPrice: unitType === "carton" ? cleanNumber(p.displaySalePrice || p.cartonPrice || salePrice * factor) : 0,
+        displayCostPrice,
+        displaySalePrice,
+        cartonPrice: 0,
         lowStock: cleanNumber(p.lowStock || state.settings?.lowStock || 5, 5),
         image: ""
       };
@@ -3725,44 +3812,28 @@
     function getSaleUnitOptions(product) {
       const p = normalizeProduct(product);
 
-      if (p.unitType === "carton") {
-        return [
-          { value: "piece", label: "قطعة", factor: 1 },
-          { value: "carton", label: `كرتونة (${p.cartonUnits} قطعة)`, factor: p.cartonUnits }
-        ];
-      }
-
       if (p.unitType === "kg") {
         return [
-          { value: "g", label: "جرام", factor: 1 },
-          { value: "kg", label: "كيلو", factor: 1000 }
+          { value: "kg", label: "كيلو / كسور مثل 0.25", factor: 1000 }
         ];
       }
 
       if (p.unitType === "liter") {
         return [
-          { value: "ml", label: "مل", factor: 1 },
-          { value: "liter", label: "لتر", factor: 1000 }
-        ];
-      }
-
-      if (p.unitType === "custom") {
-        return [
-          { value: "custom", label: p.customUnit || "مخصص", factor: 1 }
+          { value: "liter", label: "لتر / كسور مثل 0.25", factor: 1000 }
         ];
       }
 
       return [
-        { value: p.unitType, label: unitLabel(p.unitType, p.customUnit), factor: 1 }
+        { value: "piece", label: "قطعة", factor: 1 }
       ];
     }
 
     function getDefaultSaleUnit(product) {
       const p = normalizeProduct(product);
-      if (p.unitType === "carton") return "piece";
-      if (p.unitType === "kg") return "g";
-      if (p.unitType === "liter") return "ml";
-      return p.unitType;
+      if (p.unitType === "kg") return "kg";
+      if (p.unitType === "liter") return "liter";
+      return "piece";
     }
 
     function getUnitFactor(product, selectedUnit) {
@@ -4622,6 +4693,78 @@
       }
     }
 
+    let afterLoginSyncRunning = false;
+    let afterLoginSyncDone = false;
+
+    async function runAfterLoginSync(reason = "login") {
+      if (!currentUser()) return;
+      if (afterLoginSyncDone && reason !== "online") return;
+      if (OSKAR_TRIAL_LOCAL_ONLY) return;
+      if (!navigator.onLine) {
+        await refreshPendingCount();
+        return;
+      }
+      if (afterLoginSyncRunning) return;
+
+      afterLoginSyncRunning = true;
+      try {
+        updateSyncUi({
+          spin: true,
+          visible: false,
+          title: OSKAR_TRIAL_ACTIVE ? "مزامنة التجربة" : "المزامنة",
+          status: "رفع العمليات المحلية أولاً بعد تسجيل الدخول",
+          progress: 20,
+          operations: []
+        });
+
+        await syncNow(false);
+
+        updateSyncUi({
+          spin: true,
+          visible: false,
+          title: OSKAR_TRIAL_ACTIVE ? "تنزيل بيانات التجربة" : "تنزيل البيانات",
+          status: OSKAR_TRIAL_ACTIVE ? "تنزيل مسار التجربة المستقل فقط" : "تنزيل تحديثات Firebase بعد تسجيل الدخول",
+          progress: 45
+        });
+
+        await loadFirebaseOnce();
+        await loadLocalData(true);
+        await validateCurrentEmployeeSession();
+
+        updateSyncUi({
+          spin: true,
+          visible: false,
+          title: "تثبيت البيانات",
+          status: OSKAR_TRIAL_ACTIVE ? "تثبيت بيانات التجربة في مسارها المستقل" : "تثبيت نسخة الجهاز على المشروع الحالي عند الحاجة",
+          progress: 72
+        });
+
+        await syncLocalSnapshotToFirebase();
+        startRealtimeListeners();
+        renderAll();
+        afterLoginSyncDone = true;
+
+        updateSyncUi({
+          spin: false,
+          visible: false,
+          title: "جاهز",
+          status: OSKAR_TRIAL_ACTIVE ? "التجربة تعمل على تخزين ومزامنة مستقلة" : "تم تشغيل المزامنة بعد تسجيل الدخول",
+          progress: 100
+        });
+      } catch (e) {
+        console.warn("runAfterLoginSync failed", e);
+        updateSyncUi({
+          spin: false,
+          visible: false,
+          title: "المزامنة",
+          status: "تعذر إكمال المزامنة الآن، سيتم الحفظ محليًا والمحاولة لاحقًا",
+          progress: 0
+        });
+      } finally {
+        afterLoginSyncRunning = false;
+      }
+    }
+
     function applySettingsToUI() {
       const s = state.settings || defaultSettings;
       const logo = s.localLogo || s.logo || makeLogoDataUrl(s.shopName || "المحل");
@@ -4769,13 +4912,13 @@
         <div class="product-card" data-add-product="${p.id}">
           <div class="product-icon"><i class="fa-solid fa-box"></i></div>
           <div class="product-name">${escapeHtml(p.name)}</div>
-          <div class="money">${money(p.salePrice)} / ${escapeHtml(unitLabel(p.baseUnit, p.customUnit))}</div>
+          <div class="money">${money(p.displaySalePrice)} / ${escapeHtml(unitLabel(p.unitType, p.customUnit))}</div>
           <div class="product-meta">
             <span>${escapeHtml(unitLabel(p.unitType, p.customUnit))}</span>
             <span class="stock-pill ${low ? "stock-low" : ""}">${cleanNumber(p.stock)} ${escapeHtml(unitLabel(p.baseUnit, p.customUnit))}</span>
           </div>
           <div class="product-meta">
-            <span>${p.unitType === "carton" ? `كرتونة: ${p.cartonUnits}` : `أساس: ${unitLabel(p.baseUnit, p.customUnit)}`}</span>
+            <span>${p.unitType === "kg" ? "1 كيلو = 1000 جرام" : p.unitType === "liter" ? "1 لتر = 1000 مل" : "بيع بالقطعة"}</span>
             <span>${escapeHtml(p.category || "-")}</span>
           </div>
         </div>
@@ -5177,7 +5320,7 @@
               <div class="muted">${escapeHtml(p.barcode || p.code || "")} · المتوفر: ${cleanNumber(p.stock)} ${escapeHtml(unitLabel(p.baseUnit, p.customUnit))}</div>
             </div>
             <div style="text-align:left">
-              <div class="money">${money(p.salePrice)}</div>
+              <div class="money">${money(p.displaySalePrice)}</div>
               <div class="muted" style="font-size:11px">${escapeHtml(unitLabel(p.unitType, p.customUnit))}</div>
             </div>
           </div>
@@ -5306,13 +5449,11 @@
           const low = cleanNumber(p.stock) <= cleanNumber(p.lowStock || state.settings?.lowStock || 5);
 
           const conversionText =
-            p.unitType === "carton"
-              ? `1 كرتونة = ${cleanNumber(p.cartonUnits)} قطعة`
-              : p.unitType === "kg"
-                ? "1 كيلو = 1000 جرام"
-                : p.unitType === "liter"
-                  ? "1 لتر = 1000 مل"
-                  : "-";
+            p.unitType === "kg"
+              ? "1 كيلو = 1000 جرام، ويمكن البيع بالكسور مثل 0.25"
+              : p.unitType === "liter"
+                ? "1 لتر = 1000 مل، ويمكن البيع بالكسور مثل 0.25"
+                : "بيع بالقطعة فقط";
 
           return `
             <tr>
@@ -5331,11 +5472,11 @@
                   ${cleanNumber(p.stock)} ${escapeHtml(unitLabel(p.baseUnit, p.customUnit))}
                 </span>
               </td>
-              <td>${money(p.costPrice)}</td>
-              <td class="money">${money(p.salePrice)}</td>
+              <td>${money(p.displayCostPrice)}</td>
+              <td class="money">${money(p.displaySalePrice)}</td>
               <td>
-                ${money(p.displaySalePrice)}
-                <div class="muted" style="font-size:11px">${escapeHtml(unitLabel(p.unitType, p.customUnit))}</div>
+                ${escapeHtml(unitLabel(p.unitType, p.customUnit))}
+                <div class="muted" style="font-size:11px">${escapeHtml(conversionText)}</div>
               </td>
               <td>
                 <button class="ghost-btn" data-show-barcode="${p.id}">
@@ -5949,13 +6090,13 @@
     }
     function refreshProductUnitUI() {
       const unitType = $("productUnitType").value;
-      const isCarton = unitType === "carton";
-      const isCustom = unitType === "custom";
+      const isCarton = false;
+      const isCustom = false;
 
-      $("cartonUnitsBox").classList.toggle("show", isCarton);
-      $("customUnitBox").classList.toggle("show", isCustom);
+      $("cartonUnitsBox").classList.toggle("show", false);
+      $("customUnitBox").classList.toggle("show", false);
 
-      const cartonUnits = cleanNumber($("productCartonUnits").value, 1);
+      const cartonUnits = 1;
       const factor = factorForUnitType(unitType, cartonUnits);
       const baseUnit = baseUnitForType(unitType);
       const enteredStock = cleanNumber($("productStock").value, 0);
@@ -6016,8 +6157,8 @@
 
         const id = $("productId").value || uid("prod");
         const old = getProductById(id);
-        const unitType = $("productUnitType").value;
-        const cartonUnits = unitType === "carton" ? Math.max(1, cleanNumber($("productCartonUnits").value, 1)) : 1;
+        const unitType = ["piece", "kg", "liter"].includes($("productUnitType").value) ? $("productUnitType").value : "piece";
+        const cartonUnits = 1;
         const factor = factorForUnitType(unitType, cartonUnits);
 
         const enteredStock = cleanNumber($("productStock").value, 0);
@@ -6055,7 +6196,7 @@
           name: $("productName").value.trim(),
           category: $("productCategory").value.trim(),
           unitType,
-          customUnit: unitType === "custom" ? $("productCustomUnit").value.trim() : "",
+          customUnit: "",
           cartonUnits,
           stock: enteredStock * factor,
           lowStock: cleanNumber($("productLowStock").value, state.settings?.lowStock || 5),
@@ -6063,7 +6204,7 @@
           salePrice: factor > 0 ? enteredSale / factor : enteredSale,
           displayCostPrice: enteredCost,
           displaySalePrice: enteredSale,
-          cartonPrice: unitType === "carton" ? enteredSale : 0,
+          cartonPrice: 0,
           image: "",
           createdAt: old?.createdAt || Date.now(),
           updatedAt: Date.now()
@@ -7863,6 +8004,7 @@
       const freshCustomer = state.customers.find(c => c.id === customerId) || customer;
       const bal = customerBalanceText(freshCustomer.balance);
       const rows = getCustomerTableRows(freshCustomer, tab);
+      const manualDebtTotalForCustomerPage = (freshCustomer.manualDebts || []).reduce((sum, d) => sum + cleanNumber(d.amount), 0);
 
       openModal(`حساب ${freshCustomer.name}`, `
         <div class="debt-summary-strip" style="box-shadow:none">
@@ -7872,8 +8014,8 @@
           </div>
 
           <div class="debt-summary-item">
-            <span>إجمالي المبيعات</span>
-            <b>${money(freshCustomer.totalSales)}</b>
+            <span>إجمالي المبيعات + الدين اليدوي</span>
+            <b>${money(cleanNumber(freshCustomer.totalSales) + manualDebtTotalForCustomerPage)}</b>
           </div>
 
           <div class="debt-summary-item">
@@ -8218,7 +8360,8 @@
           </head>
           <body>
             ${html}
-          </body>
+          
+</body>
         </html>
       `;
 
@@ -9001,6 +9144,10 @@
     }
 
     function exportBackup() {
+      if (OSKAR_TRIAL_ACTIVE) {
+        toast("لا يتوفر هذا القسم في النسخة التجريبية");
+        return;
+      }
       const data = {
         version: DB_VERSION,
         dbName: DB_NAME,
@@ -9031,6 +9178,11 @@
     }
 
     async function importBackup(file) {
+      if (OSKAR_TRIAL_ACTIVE) {
+        toast("لا يتوفر هذا القسم في النسخة التجريبية");
+        if ($("importBackupInput")) $("importBackupInput").value = "";
+        return;
+      }
       if (!file) return;
 
       try {
@@ -10054,8 +10206,9 @@
 
       window.addEventListener("online", async () => {
         await refreshPendingCount();
-        await syncNow(false);
-        startRealtimeListeners();
+        if (currentUser()) {
+          await runAfterLoginSync("online");
+        }
       });
 
       window.addEventListener("offline", () => {
@@ -10186,10 +10339,6 @@
 
       await loadLocalData(true);
 
-      if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY) {
-        await fetchFreshSettingsFromFirebase();
-      }
-
       if (!state.freeLines.length) {
         state.freeLines = [{ id: uid("free"), name: "", qty: 1, cost: 0, price: 0 }];
       }
@@ -10198,55 +10347,14 @@
 
       renderAll();
 
-      if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY) {
-        updateSyncUi({
-          spin: true,
-          visible: false,
-          title: "المزامنة",
-          status: "رفع العمليات المحلية أولاً",
-          progress: 20
-        });
-
-        await syncNow(false);
-
-        updateSyncUi({
-          spin: true,
-          visible: false,
-          title: "المزامنة",
-          status: "تنزيل تحديثات Firebase الجديدة",
-          progress: 45
-        });
-
-        await loadFirebaseOnce();
-
-        await loadLocalData(true);
-        await validateCurrentEmployeeSession();
-
-        updateSyncUi({
-          spin: true,
-          visible: false,
-          title: "المزامنة",
-          status: "تثبيت نسخة الجهاز على المشروع الحالي عند الحاجة",
-          progress: 72
-        });
-
-        await syncLocalSnapshotToFirebase();
-
-        startRealtimeListeners();
-
-        updateSyncUi({
-          spin: false,
-          visible: false,
-          title: "جاهز",
-          status: "تم تشغيل المزامنة المباشرة",
-          progress: 100
-        });
+      if (currentUser() && navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY) {
+        await runAfterLoginSync("boot");
       } else {
         updateSyncUi({
           spin: false,
           visible: false,
-          title: "أوفلاين",
-          status: "التطبيق يعمل من التخزين المحلي",
+          title: currentUser() ? "جاهز" : "بانتظار الدخول",
+          status: currentUser() ? "التطبيق يعمل من التخزين المحلي وسيزامن بعد توفر الاتصال" : "لن يتم تنزيل بيانات Firebase قبل تسجيل الدخول",
           progress: 0
         });
       }
@@ -10256,9 +10364,12 @@
       setInterval(async () => {
         await refreshPendingCount();
 
-        if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY) {
-          await syncNow(false);
-          await validateCurrentEmployeeSession();
+        if (navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY && currentUser()) {
+          if (!afterLoginSyncDone) await runAfterLoginSync("interval");
+          else {
+            await syncNow(false);
+            await validateCurrentEmployeeSession();
+          }
         }
       }, 12000);
     }
@@ -10309,6 +10420,7 @@
       removeLocal,
       enqueueSync,
       syncNow,
+      runAfterLoginSync,
       startRealtimeListeners,
       rebuildCustomerBalances,
       logout
@@ -12604,6 +12716,69 @@
   function tick(){ keepTrialFirebaseMode(); stabilizeReports(); }
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", function(){ tick(); setInterval(tick, 700); });
   else { tick(); setInterval(tick, 700); }
+})();
+</script>
+
+
+<script id="oskar-final-isolation-units-scroll-2026-04-30">
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const MODE_KEY = "oskar_storage_mode_v1";
+  const START_KEY = "oskar_trial_started_at_v1";
+  const DURATION = 12 * 60 * 60 * 1000;
+  function trialActive(){ const st = Number(localStorage.getItem(START_KEY) || 0); return localStorage.getItem(MODE_KEY) === "trial" && st && Date.now() - st < DURATION; }
+  function toast(msg){ if(typeof window.toast === "function") window.toast(msg); else alert(msg); }
+  function hardenTrialUi(){
+    const backupCard = $("exportBackupBtn")?.closest(".card");
+    if(backupCard && trialActive()){
+      backupCard.dataset.trialLocked = "1";
+      backupCard.style.opacity = ".75";
+      const buttons = backupCard.querySelectorAll("button,label");
+      buttons.forEach(el => { if(el.id !== "clearLocalBtn") { el.style.pointerEvents = "auto"; el.title = "لا يتوفر هذا القسم في النسخة التجريبية"; } });
+      if(!$("trialBackupLockNote")){
+        const note = document.createElement("div");
+        note.id = "trialBackupLockNote";
+        note.className = "auth-note";
+        note.style.marginTop = "10px";
+        note.textContent = "لا يتوفر هذا القسم في النسخة التجريبية";
+        backupCard.appendChild(note);
+      }
+    }
+  }
+  document.addEventListener("click", function(e){
+    if(!trialActive()) return;
+    const backupBtn = e.target.closest("#exportBackupBtn");
+    const importLabel = e.target.closest("label");
+    const blocked = backupBtn || (importLabel && importLabel.querySelector("#importBackupInput"));
+    if(blocked){ e.preventDefault(); e.stopImmediatePropagation(); toast("لا يتوفر هذا القسم في النسخة التجريبية"); }
+  }, true);
+  document.addEventListener("submit", function(e){
+    if(!trialActive()) return;
+    if(e.target && (e.target.id === "adminLoginForm" || e.target.id === "employeeLoginForm")){
+      localStorage.setItem(MODE_KEY, "main");
+      localStorage.removeItem("oskar_trial_logged_out_v1");
+      try{ Object.keys(localStorage).filter(k=>k.startsWith("cashier_auth_session_")).forEach(k=>localStorage.removeItem(k)); }catch{}
+      e.preventDefault(); e.stopImmediatePropagation();
+      toast("سيتم فتح نسخة المدير ببياناتها المستقلة الآن");
+      setTimeout(()=>location.reload(), 350);
+    }
+  }, true);
+  function patchNumericInputs(){
+    document.querySelectorAll('input[type="number"][inputmode="decimal"]').forEach(inp=>{
+      if(!inp.step || inp.step === "1") inp.step = "0.001";
+      inp.setAttribute("inputmode", "decimal");
+    });
+  }
+  function tick(){
+    hardenTrialUi();
+    patchNumericInputs();
+    const side = $("sidebar");
+    if(side){ side.style.overflowY = "auto"; side.style.maxHeight = "100dvh"; side.style.paddingBottom = "96px"; }
+    document.querySelectorAll(".table-wrap,.modal,.folder-tabs,.sync-operation-list").forEach(el=>{ el.style.webkitOverflowScrolling = "touch"; el.style.overscrollBehavior = "contain"; });
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", tick); else tick();
+  setInterval(tick, 1500);
 })();
 </script>
 
