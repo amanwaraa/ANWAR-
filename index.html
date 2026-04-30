@@ -2057,7 +2057,7 @@
           </div>
 
           <div class="form-grid">
-            <input id="invoiceSearch" class="input" placeholder="بحث برقم الفاتورة أو العميل أو الصنف...">
+            <input id="invoiceSearch" class="input" placeholder="بحث برقم الفاتورة أو اسم الزبون أو باركود الفاتورة...">
 
             <select id="invoicePeriod" class="select">
               <option value="today">اليوم</option>
@@ -3830,8 +3830,8 @@
       if (p.unitType === "carton") {
         const cartonFactor = Math.max(1, cleanNumber(p.cartonUnits, 1));
         return [
-          { value: "carton", label: `كرتونة (${cartonFactor} قطعة)`, factor: cartonFactor },
-          { value: "piece", label: "قطعة", factor: 1 }
+          { value: "piece", label: "قطعة", factor: 1 },
+          { value: "carton", label: `كرتونة (${cartonFactor} قطعة)`, factor: cartonFactor }
         ];
       }
 
@@ -3844,7 +3844,7 @@
       const p = normalizeProduct(product);
       if (p.unitType === "kg") return "kg";
       if (p.unitType === "liter") return "liter";
-      if (p.unitType === "carton") return "carton";
+      if (p.unitType === "carton") return "piece";
       return "piece";
     }
 
@@ -5624,8 +5624,18 @@
       `;
     }
 
+    function getInvoiceBarcodeValue(invoice) {
+      const raw = String(invoice?.invoiceBarcode || invoice?.barcode || invoice?.number || "").trim();
+      return raw.padStart(8, "0");
+    }
+
+    function normalizeSearchDigits(value) {
+      return String(value || "").replace(/[^0-9]/g, "");
+    }
+
     function getFilteredInvoices() {
       const q = ($("invoiceSearch")?.value || "").trim().toLowerCase();
+      const qDigits = normalizeSearchDigits(q);
       const period = $("invoicePeriod")?.value || "today";
       const custom = $("invoiceCustomDate")?.value || "";
       const status = $("invoiceStatusFilter")?.value || "all";
@@ -5636,17 +5646,23 @@
 
       return periodFilter(state.invoices, period, "createdAt", custom)
         .filter(inv => {
-          const itemsText = (inv.items || [])
-            .map(item => `${item.name || ""} ${item.qtyText || ""} ${item.unitLabel || ""}`)
-            .join(" ")
-            .toLowerCase();
+          const invoiceNumber = String(inv.number || "").toLowerCase();
+          const invoiceBarcode = getInvoiceBarcodeValue(inv).toLowerCase();
+          const barcodeDigits = normalizeSearchDigits(invoiceBarcode);
+          const barcodeWithoutLeadingZeros = barcodeDigits.replace(/^0+/, "") || "0";
+          const qDigitsNoZeros = qDigits.replace(/^0+/, "") || "0";
 
           const searchOk =
             !q ||
-            String(inv.number).includes(q) ||
+            invoiceNumber.includes(q) ||
+            invoiceBarcode.includes(q) ||
+            (!!qDigits && (
+              barcodeDigits.includes(qDigits) ||
+              barcodeWithoutLeadingZeros === qDigitsNoZeros ||
+              invoiceNumber === qDigitsNoZeros
+            )) ||
             String(inv.customerName || "").toLowerCase().includes(q) ||
-            String(inv.customerPhone || "").includes(q) ||
-            itemsText.includes(q);
+            String(inv.customerPhone || "").includes(q);
 
           const statusOk = status === "all" || inv.paymentMethod === status || inv.status === status;
 
@@ -8171,13 +8187,14 @@
     function buildInvoiceHtml(invoice) {
       const s = state.settings || defaultSettings;
       const acc = state.paymentAccounts.find(a => a.id === invoice.paymentAccountId);
-      const logo = s.localLogo || s.logo || makeLogoDataUrl(s.shopName);
+      const visibleLogo = document.getElementById("topShopLogo")?.src || document.getElementById("sideShopLogo")?.src || "";
+      const logo = s.localLogo || s.logo || visibleLogo || makeLogoDataUrl(s.shopName);
 
       return `
         <div class="invoice-paper" style="direction:rtl;font-family:Cairo,Arial,sans-serif">
           <div class="invoice-header">
             <div style="display:flex;align-items:center;gap:10px;min-width:0">
-              <img class="invoice-logo" src="${logo}" alt="">
+              <img class="invoice-logo" src="${logo}" alt="" crossorigin="anonymous">
               <div style="min-width:0">
                 <h2 class="invoice-shop-title">${escapeHtml(s.shopName || "oskar")}</h2>
                 <div style="color:#64748b;font-size:11px">${escapeHtml(s.shopPhone || "")}</div>
@@ -8188,7 +8205,7 @@
 
             <div style="text-align:center">
               <div style="font-size:20px;font-weight:900;color:#1d4ed8">#${invoice.number}</div>
-              <svg class="barcode-svg" id="invoiceBarcode_${invoice.id}"></svg>
+              <svg class="barcode-svg" id="invoiceBarcode_${invoice.id}" data-invoice-barcode="${escapeHtml(getInvoiceBarcodeValue(invoice))}"></svg>
               <div class="invoice-date-small">${formatDate(invoice.createdAt)}</div>
             </div>
           </div>
@@ -8287,7 +8304,7 @@
 
       setTimeout(() => {
         try {
-          JsBarcode(`#invoiceBarcode_${invoice.id}`, String(invoice.number).padStart(8, "0"), {
+          JsBarcode(`#invoiceBarcode_${invoice.id}`, getInvoiceBarcodeValue(invoice), {
             format: "CODE128",
             displayValue: false,
             height: 38,
@@ -8497,13 +8514,14 @@
 
     function reportShell(title, bodyHtml) {
       const s = state.settings || defaultSettings;
-      const logo = s.localLogo || s.logo || makeLogoDataUrl(s.shopName);
+      const visibleLogo = document.getElementById("topShopLogo")?.src || document.getElementById("sideShopLogo")?.src || "";
+      const logo = s.localLogo || s.logo || visibleLogo || makeLogoDataUrl(s.shopName);
 
       return `
         <div class="invoice-paper" style="direction:rtl;font-family:Cairo,Arial,sans-serif">
           <div class="invoice-header">
             <div style="display:flex;align-items:center;gap:10px">
-              <img class="invoice-logo" src="${logo}">
+              <img class="invoice-logo" src="${logo}" crossorigin="anonymous">
               <div>
                 <h2 class="invoice-shop-title">${escapeHtml(s.shopName || "oskar")}</h2>
                 <div style="font-size:11px;color:#64748b">${escapeHtml(title)}</div>
@@ -12856,11 +12874,11 @@
     if(!p) return [{value:"piece",label:"قطعة",factor:1}];
     if(p.unitType==="kg") return [{value:"kg",label:"كيلو / كسور مثل 0.25",factor:1000}];
     if(p.unitType==="liter") return [{value:"liter",label:"لتر / كسور مثل 0.25",factor:1000}];
-    if(p.unitType==="carton") return [{value:"carton",label:`كرتونة (${p.cartonUnits} قطعة)`,factor:p.cartonUnits},{value:"piece",label:"قطعة",factor:1}];
+    if(p.unitType==="carton") return [{value:"piece",label:"قطعة",factor:1},{value:"carton",label:`كرتونة (${p.cartonUnits} قطعة)`,factor:p.cartonUnits}];
     return [{value:"piece",label:"قطعة",factor:1}];
   }
   function factor(p, unit){ const opt=options(p).find(x=>x.value===unit); return opt ? opt.factor : 1; }
-  function defaultUnit(p){ p=cleanProduct(p); return p?.unitType==="carton" ? "carton" : p?.unitType==="kg" ? "kg" : p?.unitType==="liter" ? "liter" : "piece"; }
+  function defaultUnit(p){ p=cleanProduct(p); return p?.unitType==="kg" ? "kg" : p?.unitType==="liter" ? "liter" : "piece"; }
   function priceLine(product, qtyValue, selectedUnit){
     const p=cleanProduct(product), qty=Math.max(0,num(qtyValue,0)), f=factor(p, selectedUnit);
     const opt=options(p).find(x=>x.value===selectedUnit);
@@ -13132,6 +13150,83 @@
   }, true);
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", tick); else tick();
   setInterval(tick, 700);
+})();
+</script>
+
+
+<!-- OSKAR_CLIENT_REQUEST_PATCH_2026_04_30_V2 -->
+<style id="oskarClientRequestPatch20260430V2Style">
+  html body .oskar-cart-unit option[value="piece"]{font-weight:900;}
+  html body .sidebar{padding-right:48px!important;}
+  html body .sidebar-header,html body #authUserBox,html body .sidebar .nav-btn{position:relative!important;z-index:2!important;}
+  html body .oskar-sidebar-scroll-rail{right:6px!important;left:auto!important;top:185px!important;bottom:auto!important;height:min(390px,48dvh)!important;width:30px!important;opacity:.92!important;z-index:1!important;pointer-events:none!important;}
+  html body .oskar-sidebar-scroll-line{width:3px!important;background:linear-gradient(180deg,rgba(37,99,235,.08),rgba(37,99,235,.32),rgba(217,164,65,.16))!important;}
+  html body .oskar-sidebar-scroll-thumb{width:24px!important;height:34px!important;font-size:11px!important;box-shadow:0 8px 18px rgba(15,23,42,.13)!important;}
+  html body .oskar-sidebar-scroll-btn{width:24px!important;height:24px!important;border-radius:11px!important;font-size:10px!important;box-shadow:0 7px 15px rgba(37,99,235,.18)!important;}
+  html body .oskar-sidebar-scroll-hint{display:none!important;}
+  @media(max-width:900px){html body .sidebar{padding-right:46px!important;}html body .oskar-sidebar-scroll-rail{right:6px!important;top:176px!important;height:min(360px,45dvh)!important;}}
+  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card{display:block!important;position:relative!important;opacity:.72!important;filter:saturate(.82)!important;overflow:hidden!important;}
+  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card > *{pointer-events:none!important;}
+  body.oskar-trial-mode #page-settings > .card.oskar-trial-locked-settings-card::after{content:"مقفول في النسخة التجريبية";position:absolute;inset:10px;border-radius:22px;border:1px dashed rgba(217,119,6,.42);background:rgba(255,247,237,.62);color:#9a3412;display:flex;align-items:flex-start;justify-content:flex-start;padding:12px 14px;font-weight:900;font-size:13px;pointer-events:auto;}
+  body.oskar-trial-mode #page-settings .oskar-payment-settings-card{display:block!important;opacity:1!important;filter:none!important;}
+  body.oskar-trial-mode #page-settings .oskar-payment-settings-card::after{display:none!important;}
+  html body .invoice-header{align-items:center!important;padding:9px 12px!important;}
+  html body .invoice-logo{width:48px!important;height:48px!important;max-width:48px!important;max-height:48px!important;min-width:48px!important;min-height:48px!important;object-fit:cover!important;object-position:center!important;border-radius:14px!important;background:#dbeafe!important;}
+</style>
+<script id="oskarClientRequestPatch20260430V2Script">
+(function(){
+  "use strict";
+  if(window.__OSKAR_CLIENT_PATCH_V2_20260430__) return;
+  window.__OSKAR_CLIENT_PATCH_V2_20260430__ = true;
+  const $ = id => document.getElementById(id);
+  const MODE_KEY = "oskar_storage_mode_v1";
+  const START_KEY = "oskar_trial_started_at_v1";
+  const DURATION = 12 * 60 * 60 * 1000;
+  function isTrial(){ const st = Number(localStorage.getItem(START_KEY) || 0); return localStorage.getItem(MODE_KEY) === "trial" && st && Date.now() - st < DURATION; }
+  function num(v,d=0){ const n = parseFloat(String(v ?? "").replace(/[^0-9.\-]/g,"")); return Number.isFinite(n) ? n : d; }
+  function toast(msg){ if(typeof window.toast === "function") window.toast(msg); else console.log(msg); }
+  function getCleanProduct(p){ if(!p) return null; try{ if(typeof window.normalizeProduct === "function") p = window.normalizeProduct(p); }catch{} return p || null; }
+  function saleOptions(product){
+    const p = getCleanProduct(product);
+    if(!p) return [{value:"piece",label:"قطعة",factor:1}];
+    if(p.unitType === "carton"){ const c = Math.max(1, num(p.cartonUnits, 1)); return [{value:"piece", label:"قطعة", factor:1},{value:"carton", label:`كرتونة (${c} قطعة)`, factor:c}]; }
+    if(p.unitType === "kg") return [{value:"kg", label:"كيلو / كسور مثل 0.25", factor:1000}];
+    if(p.unitType === "liter") return [{value:"liter", label:"لتر / كسور مثل 0.25", factor:1000}];
+    return [{value:"piece",label:"قطعة",factor:1}];
+  }
+  function defaultSaleUnit(product){ const p = getCleanProduct(product); if(p && p.unitType === "kg") return "kg"; if(p && p.unitType === "liter") return "liter"; return "piece"; }
+  function unitFactor(product, unit){ return num(saleOptions(product).find(x => x.value === unit)?.factor, 1); }
+  function unitText(product, unit){ return saleOptions(product).find(x => x.value === unit)?.label || unit || "قطعة"; }
+  function priceLine(product, qtyValue, selectedUnit){
+    const p = getCleanProduct(product), qty = Math.max(0, num(qtyValue, 0)), unit = selectedUnit || defaultSaleUnit(p), f = unitFactor(p, unit);
+    const unitPrice = num(p?.salePrice, 0) * f, unitCost = num(p?.costPrice, 0) * f;
+    return {qty, qtyText:String(qty), selectedUnit:unit, baseQty:qty*f, unitLabel:unitText(p, unit), price:unitPrice, costPrice:unitCost, total:unitPrice*qty, costTotal:unitCost*qty};
+  }
+  function patchUnitRuntime(){
+    window.getSaleUnitOptions = saleOptions; window.getDefaultSaleUnit = defaultSaleUnit; window.getUnitFactor = unitFactor; window.getUnitText = unitText; window.priceForLine = priceLine;
+    const sel = $("productUnitType");
+    if(sel){ const desired=["piece","carton","kg","liter"], labels={piece:"قطعة",carton:"كرتونة",kg:"كيلو",liter:"لتر"}; desired.forEach((value,idx)=>{ let opt=sel.querySelector('option[value="'+value+'"]'); if(!opt){opt=document.createElement("option");opt.value=value;opt.textContent=labels[value];} if(sel.children[idx]!==opt) sel.insertBefore(opt,sel.children[idx]||null); }); if(!sel.value) sel.value="piece"; }
+    document.querySelectorAll("select.oskar-cart-unit").forEach(select=>{ const lineId=select.dataset.changeCartUnit; const line=(window.state?.cart||[]).find(x=>x.id===lineId); const product=line?(window.state?.products||[]).find(p=>p.id===line.productId):null; if(product && getCleanProduct(product)?.unitType==="carton"){ const val=select.value||"piece"; select.innerHTML=saleOptions(product).map(o=>'<option value="'+o.value+'" '+(o.value===val?'selected':'')+'>'+o.label+'</option>').join(""); } });
+  }
+  function patchAddToCart(){
+    if(!window.addToCart || window.addToCart.__oskarPieceFirstV2) return;
+    const wrapped = function(product, selectedUnit=""){ const p=getCleanProduct(product), st=window.state||{}; if(!p || !Array.isArray(st.cart)) return null; const unit=selectedUnit||defaultSaleUnit(p); let line=st.cart.find(x=>x.productId===p.id && (x.selectedUnit||defaultSaleUnit(p))===unit); if(line){ line.qty=num(line.qty,1)+1; Object.assign(line, priceLine(p,line.qty,unit)); } else { line={id:'cart_'+Date.now()+'_'+Math.random().toString(16).slice(2),productId:p.id,name:p.name,selectedUnit:unit,...priceLine(p,1,unit)}; st.cart.push(line); } if(typeof window.renderCart==="function") window.renderCart(); toast('تمت إضافة '+(p.name||'المنتج')); return line; };
+    wrapped.__oskarPieceFirstV2 = true; window.addToCart = wrapped;
+  }
+  function betterSidebarRail(){ const side=$("sidebar"), rail=side?.querySelector(".oskar-sidebar-scroll-rail"); if(!side||!rail) return; if(rail.dataset.oskarBetterV2!=="1"){ rail.dataset.oskarBetterV2="1"; rail.querySelectorAll(".oskar-sidebar-scroll-btn").forEach(btn=>btn.setAttribute("aria-label",btn.dataset.sideScroll==="down"?"نزول القائمة":"صعود القائمة")); } const max=Math.max(1,side.scrollHeight-side.clientHeight), line=rail.querySelector(".oskar-sidebar-scroll-line"), thumb=rail.querySelector(".oskar-sidebar-scroll-thumb"); if(line&&thumb){ const h=line.clientHeight||1, th=thumb.offsetHeight||34; thumb.style.top=Math.max(0,Math.min(h-th,(side.scrollTop/max)*Math.max(0,h-th)))+"px"; } }
+  function trialSettingsLocksVisible(){
+    const page=$("page-settings"); if(!page) return; const paymentCard=$("paymentAccountsList")?.closest(".card"); if(paymentCard) paymentCard.classList.add("oskar-payment-settings-card");
+    page.querySelectorAll(":scope > .card").forEach(card=>{ if(card!==paymentCard){ card.classList.add("oskar-trial-locked-settings-card"); card.querySelectorAll("input,select,textarea,button,label").forEach(el=>{ if(isTrial()){ if(!el.dataset.oskarOldDisabled) el.dataset.oskarOldDisabled=el.disabled?"1":"0"; el.disabled=true; } else if(el.dataset.oskarOldDisabled==="0") el.disabled=false; }); } });
+    const note=$("oskarTrialSettingsNote"); if(note) note.style.display=isTrial()?"block":"none";
+  }
+  function getBestLogoSrc(){ const st=window.state?.settings||{}; const candidates=[st.localLogo,st.logo,$("topShopLogo")?.src,$("sideShopLogo")?.src].filter(Boolean); return candidates.find(src=>src&&!/undefined|null/.test(src))||""; }
+  function applyLogoToInvoices(){ const src=getBestLogoSrc(); if(!src) return; if(window.state){ window.state.settings=window.state.settings||{}; if(!window.state.settings.localLogo && /^data:image\//.test(src)) window.state.settings.localLogo=src; } document.querySelectorAll(".invoice-logo").forEach(img=>{ if(img.src!==src) img.src=src; img.crossOrigin="anonymous"; img.style.objectFit="cover"; }); }
+  function patchLogoUploadImmediate(){ const input=$("settingLogoFile"); if(!input || input.dataset.oskarLogoV2==="1") return; input.dataset.oskarLogoV2="1"; input.addEventListener("change",()=>setTimeout(applyLogoToInvoices,80)); }
+  function patchInvoiceSearchPlaceholder(){ const inp=$("invoiceSearch"); if(inp) inp.placeholder="بحث برقم الفاتورة أو اسم الزبون أو الهاتف أو باركود الفاتورة..."; }
+  function tick(){ patchUnitRuntime(); patchAddToCart(); betterSidebarRail(); trialSettingsLocksVisible(); applyLogoToInvoices(); patchLogoUploadImmediate(); patchInvoiceSearchPlaceholder(); }
+  document.addEventListener("click",()=>setTimeout(()=>{applyLogoToInvoices();patchUnitRuntime();},80),true);
+  document.addEventListener("input",e=>{ if(e.target && e.target.id==="invoiceSearch" && typeof window.renderInvoices==="function") setTimeout(()=>window.renderInvoices(),0); },true);
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",tick); else tick(); setInterval(tick,700);
 })();
 </script>
 </body>
