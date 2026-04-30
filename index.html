@@ -10498,7 +10498,7 @@
         overflow-y:visible!important;
         -webkit-overflow-scrolling:touch!important;
         touch-action:pan-x pan-y!important;
-        overscroll-behavior-x:contain!important;
+        overscroll-behavior-x:auto!important;
         display:block!important;
         position:relative!important;
         z-index:1!important;
@@ -12392,31 +12392,33 @@
 })();
 </script>
 
-<!-- OSKAR_TABLE_TOUCH_SCROLL_SMOOTH_V4 -->
-<style id="oskarTableTouchScrollSmoothV4Style">
+<!-- OSKAR_TABLE_TOUCH_SCROLL_FAST_HORIZONTAL_V5 -->
+<style id="oskarTableTouchScrollFastHorizontalV5Style">
   html body .table-wrap,
   html body .new-page-table-holder{
     overflow-x:auto!important;
     overflow-y:visible!important;
     -webkit-overflow-scrolling:touch!important;
-    touch-action:pan-y pan-x!important;
-    overscroll-behavior-x:contain!important;
+    touch-action:pan-x pan-y!important;
+    overscroll-behavior-x:auto!important;
     overscroll-behavior-y:auto!important;
     scroll-behavior:auto!important;
     cursor:grab;
     will-change:scroll-position;
+    transform:translateZ(0);
+    contain:paint;
   }
   html body .table-wrap:active,
   html body .new-page-table-holder:active{cursor:grabbing;}
   html body .table-wrap table,
   html body .new-page-table-holder table{
-    touch-action:pan-y pan-x!important;
+    touch-action:pan-x pan-y!important;
   }
   html body .table-wrap th,
   html body .table-wrap td,
   html body .new-page-table-holder th,
   html body .new-page-table-holder td{
-    touch-action:pan-y pan-x!important;
+    touch-action:pan-x pan-y!important;
   }
   html body .table-wrap button,
   html body .table-wrap input,
@@ -12442,11 +12444,11 @@
     overscroll-behavior:auto!important;
   }
 </style>
-<script id="oskarTableTouchScrollSmoothV4Script">
+<script id="oskarTableTouchScrollFastHorizontalV5Script">
 (function(){
   "use strict";
-  if (window.__OSKAR_TABLE_TOUCH_SCROLL_SMOOTH_V4__) return;
-  window.__OSKAR_TABLE_TOUCH_SCROLL_SMOOTH_V4__ = true;
+  if (window.__OSKAR_TABLE_TOUCH_SCROLL_FAST_HORIZONTAL_V5__) return;
+  window.__OSKAR_TABLE_TOUCH_SCROLL_FAST_HORIZONTAL_V5__ = true;
 
   const TABLE_SELECTOR = ".table-wrap,.new-page-table-holder";
   const INTERACTIVE_SELECTOR = "input,textarea,select,option,button,a,label,[contenteditable='true']";
@@ -12516,18 +12518,10 @@
       touchDrag.mode = absX > (absY * HORIZONTAL_BIAS) ? "horizontal" : "vertical";
     }
 
-    if (touchDrag.mode === "vertical") {
-      // لا نمنع اللمس العمودي نهائياً حتى يبقى نزول الصفحة/النافذة سريعاً وطبيعياً.
-      touchDrag.lastX = t.clientX;
-      touchDrag.lastY = t.clientY;
-      return;
+    if (touchDrag.mode === "horizontal") {
+      suppressClickUntil = Date.now() + 160;
     }
 
-    e.preventDefault();
-    e.stopPropagation();
-    suppressClickUntil = Date.now() + 260;
-    const delta = touchDrag.lastX - t.clientX;
-    scheduleHorizontalScroll(touchDrag, delta);
     touchDrag.lastX = t.clientX;
     touchDrag.lastY = t.clientY;
   }
@@ -12589,8 +12583,8 @@
       el.style.overflowX = "auto";
       el.style.overflowY = "visible";
       el.style.webkitOverflowScrolling = "touch";
-      el.style.touchAction = "pan-y pan-x";
-      el.style.overscrollBehaviorX = "contain";
+      el.style.touchAction = "pan-x pan-y";
+      el.style.overscrollBehaviorX = "auto";
       el.style.overscrollBehaviorY = "auto";
       el.style.scrollBehavior = "auto";
       if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "0");
@@ -12598,7 +12592,7 @@
   }
 
   document.addEventListener("touchstart", onTouchStart, {capture:true, passive:true});
-  document.addEventListener("touchmove", onTouchMove, {capture:true, passive:false});
+  document.addEventListener("touchmove", onTouchMove, {capture:true, passive:true});
   document.addEventListener("touchend", onTouchEnd, {capture:true, passive:true});
   document.addEventListener("touchcancel", onTouchEnd, {capture:true, passive:true});
   document.addEventListener("mousedown", onMouseDown, true);
@@ -12616,7 +12610,7 @@
   }catch(e){}
 })();
 </script>
-<!-- /OSKAR_TABLE_TOUCH_SCROLL_SMOOTH_V4 -->
+<!-- /OSKAR_TABLE_TOUCH_SCROLL_FAST_HORIZONTAL_V5 -->
 </body>
 </html>
 <!-- legacy-disabled-patches-2026-04-29-base64: old duplicate scripts after </html> were disabled to prevent app startup errors. Do not execute. 
