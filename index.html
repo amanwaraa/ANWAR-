@@ -14,6 +14,7 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@zxing/library@latest"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -12557,8 +12558,8 @@
     try{
       const formats = window.Html5QrcodeSupportedFormats ? [Html5QrcodeSupportedFormats.QR_CODE,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.CODE_93,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.DATA_MATRIX,Html5QrcodeSupportedFormats.AZTEC,Html5QrcodeSupportedFormats.PDF_417] : undefined;
       scanner=new Html5Qrcode("oskarFastReader", formats?{formatsToSupport:formats,verbose:false}:undefined);
-      const config={fps:45,qrbox:(w,h)=>({width:Math.floor(w*.94),height:Math.floor(h*.44)}),aspectRatio:1.7777778,disableFlip:false,experimentalFeatures:{useBarCodeDetectorIfSupported:true},videoConstraints:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:"continuous"},{exposureMode:"continuous"}]}};
-      await scanner.start({facingMode:"environment"},config,(txt)=>{ const c=String(txt||"").trim(); const t=Date.now(); if(!c) return; if(c===lastCode && t-lastAt<1700) return; lastCode=c; lastAt=t; handleCode(c); },()=>{}); running=true;
+      const config={fps:30,qrbox:(w,h)=>({width:Math.floor(w*.82),height:Math.floor(h*.34)}),aspectRatio:1.7777778,disableFlip:false,experimentalFeatures:{useBarCodeDetectorIfSupported:true},videoConstraints:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:"continuous"},{exposureMode:"continuous"},{whiteBalanceMode:"continuous"}]}};
+      await scanner.start({facingMode:"environment"},config,(txt)=>{ const c=String(txt||"").trim(); const t=Date.now(); if(!c) return; if(c===lastCode && t-lastAt<1400) return; lastCode=c; lastAt=t; handleCode(c); },()=>{}); running=true;
     }catch(e){ console.error(e); await stopScanner(); toast("اسمح باستخدام الكاميرا وتأكد أن الرابط HTTPS"); }
   }
   function bindFastScannerButtons(){
@@ -14728,6 +14729,395 @@
   else markTrialSyncLock();
   window.addEventListener("load", markTrialSyncLock, {once:true});
   setInterval(markTrialSyncLock, 750);
+})();
+</script>
+
+
+<!-- oskar final thermal receipt + faster scanner + trial lock patch 2026-05-01 -->
+<style id="oskar-thermal-receipt-scanner-final-style">
+  body.oskar-trial-mode #syncNowBtn{
+    display:inline-flex!important;
+    opacity:.95!important;
+    filter:none!important;
+  }
+  body.oskar-trial-mode #syncPopover{display:none!important}
+  #syncNowBtn.oskar-trial-sync-locked{position:relative!important;overflow:visible!important;background:#f8fafc!important;color:#334155!important}
+  #syncNowBtn.oskar-trial-sync-locked i{opacity:.72!important}
+  #syncNowBtn.oskar-trial-sync-locked::after{
+    content:"\f023";
+    font-family:"Font Awesome 6 Free";
+    font-weight:900;
+    position:absolute;
+    top:-6px;
+    left:-6px;
+    width:20px;
+    height:20px;
+    border-radius:999px;
+    background:#f59e0b;
+    color:#fff;
+    border:2px solid #fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:10px;
+    box-shadow:0 8px 18px rgba(245,158,11,.28);
+    z-index:3;
+  }
+  .oskar-thermal-preview-wrap{
+    width:100%;
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:24px;
+    padding:14px 8px;
+    overflow:auto;
+  }
+  .oskar-thermal-receipt{
+    direction:rtl;
+    width:80mm!important;
+    max-width:80mm!important;
+    min-width:80mm!important;
+    margin:0 auto!important;
+    padding:5mm!important;
+    box-sizing:border-box!important;
+    background:#fff!important;
+    color:#000!important;
+    font-family:"Courier New", Courier, monospace!important;
+    font-size:12px!important;
+    line-height:1.42!important;
+    border:0!important;
+    border-radius:0!important;
+    box-shadow:0 8px 22px rgba(15,23,42,.08)!important;
+    overflow:hidden!important;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:geometricPrecision;
+  }
+  .oskar-thermal-receipt *{box-sizing:border-box!important;color:#000!important;box-shadow:none!important;text-shadow:none!important;filter:none!important;transform:none!important;animation:none!important;transition:none!important}
+  .oskar-thermal-header{text-align:center;border-bottom:1px dashed #000;padding-bottom:10px;margin-bottom:10px}
+  .oskar-thermal-header h1{margin:0;font-size:20px!important;font-weight:900!important;text-transform:uppercase;line-height:1.2!important;white-space:normal!important;word-break:break-word!important}
+  .oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{width:100%!important;border-collapse:collapse!important;margin:0 0 10px!important;min-width:0!important;table-layout:auto!important}
+  .oskar-thermal-info td{vertical-align:top!important;padding:1px 0!important;border:0!important;background:#fff!important;font-size:12px!important;white-space:normal!important;word-break:break-word!important}
+  .oskar-thermal-left{text-align:left!important;direction:rtl!important}
+  .oskar-thermal-items th{border:0!important;border-bottom:1px solid #000!important;background:#fff!important;text-align:right!important;padding:5px 0!important;font-size:12px!important;font-weight:900!important;white-space:nowrap!important}
+  .oskar-thermal-items td{border:0!important;border-bottom:1px dotted #000!important;background:#fff!important;padding:5px 0!important;font-size:12px!important;white-space:normal!important;word-break:break-word!important}
+  .oskar-thermal-items .center{text-align:center!important}.oskar-thermal-items .left{text-align:left!important}
+  .oskar-thermal-totals td{border:0!important;background:#fff!important;padding:2px 0!important;font-size:12px!important;white-space:normal!important}
+  .oskar-thermal-total-row td{font-weight:900!important;font-size:16px!important;border-top:1px double #000!important;border-bottom:1px double #000!important;padding:5px 0!important}
+  .oskar-thermal-payment{margin-top:10px;font-size:12px!important;word-break:break-word!important}
+  .oskar-thermal-footer{text-align:center;margin-top:20px;font-size:10px!important;border-top:1px dashed #000;padding-top:10px}
+  .oskar-thermal-barcode{display:block;margin:8px auto 0!important;width:62mm!important;max-width:62mm!important;height:18mm!important;overflow:hidden!important}
+  .oskar-thermal-barcode svg{width:62mm!important;height:16mm!important;display:block!important;margin:0 auto!important}
+  .oskar-thermal-code{font-size:10px!important;text-align:center!important;direction:ltr!important;margin-top:2px!important;letter-spacing:.2px!important}
+  .oskar-thermal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;justify-content:center}
+  .oskar-export-busy{opacity:.65!important;pointer-events:none!important}
+  @media(max-width:520px){
+    .oskar-thermal-preview-wrap{padding:10px 0;border-radius:20px;margin-inline:-4px;width:calc(100% + 8px)}
+    .oskar-thermal-receipt{width:80mm!important;max-width:80mm!important;min-width:80mm!important;padding:5mm!important;font-size:12px!important}
+    .oskar-thermal-actions{justify-content:stretch}.oskar-thermal-actions button{flex:1 1 42%}
+  }
+  @media print{
+    .oskar-thermal-receipt{box-shadow:none!important;margin:0!important}
+  }
+</style>
+<script id="oskar-thermal-receipt-scanner-final-patch">
+(function(){
+  "use strict";
+  const TRIAL_MODE_KEY = "oskar_storage_mode_v1";
+  const TRIAL_STARTED_KEY = "oskar_trial_started_at_v1";
+  const TRIAL_DURATION_MS = 12 * 60 * 60 * 1000;
+  const HTML5_QRCODE_SRC = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+  const $ = id => document.getElementById(id);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const esc = v => String(v ?? "").replace(/[&<>\"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]));
+  const num = (v, f=0) => { const n = Number(String(v ?? "").replace(",", ".").replace(/[^\d.\-]/g, "")); return Number.isFinite(n) ? n : f; };
+  const fixed3 = v => num(v).toFixed(3);
+  const toast = (msg, ms=2600) => {
+    if(typeof window.toast === "function") return window.toast(msg, ms);
+    const el = $("toast");
+    if(el){ el.textContent = msg; el.classList.add("show"); clearTimeout(el.__t); el.__t = setTimeout(()=>el.classList.remove("show"), ms); }
+    else alert(msg);
+  };
+  function trialActive(){
+    const started = Number(localStorage.getItem(TRIAL_STARTED_KEY) || 0);
+    return localStorage.getItem(TRIAL_MODE_KEY) === "trial" && started && Date.now() - started < TRIAL_DURATION_MS;
+  }
+  function markTrialSyncLock(){
+    const btn = $("syncNowBtn");
+    if(!btn) return;
+    if(trialActive() || document.body.classList.contains("oskar-trial-mode")){
+      document.body.classList.add("oskar-trial-mode");
+      btn.classList.add("oskar-trial-sync-locked");
+      btn.title = "المزامنة مقفلة في النسخة التجريبية";
+      const badge = $("syncCountBadge");
+      if(badge) badge.style.display = "none";
+    }else{
+      btn.classList.remove("oskar-trial-sync-locked");
+    }
+  }
+  document.addEventListener("click", function(e){
+    const sync = e.target && e.target.closest && e.target.closest("#syncNowBtn");
+    if(sync && (trialActive() || sync.classList.contains("oskar-trial-sync-locked"))){
+      markTrialSyncLock();
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      toast("المزامنة مقفلة في النسخة التجريبية، بيانات التجربة محفوظة على الجهاز فقط");
+    }
+  }, true);
+  setInterval(markTrialSyncLock, 700);
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", markTrialSyncLock, {once:true}); else markTrialSyncLock();
+
+  function preloadQrLib(){
+    if(window.Html5Qrcode) return;
+    if([...document.scripts].some(s => (s.src || "").includes("html5-qrcode"))) return;
+    const sc = document.createElement("script");
+    sc.src = HTML5_QRCODE_SRC;
+    sc.async = true;
+    sc.dataset.oskarFastPreload = "1";
+    document.head.appendChild(sc);
+  }
+  preloadQrLib();
+
+  function paymentLabel(method){
+    return ({cash:"كاش", instant_app:"تطبيق فوري", later_app:"تطبيق لاحق", debt:"دين"})[method] || method || "-";
+  }
+  function paymentFolder(invoice){
+    const accounts = window.state?.paymentAccounts || [];
+    const acc = accounts.find(a => String(a.id) === String(invoice?.paymentAccountId || ""));
+    if(acc) return acc.name || "-";
+    if(invoice?.paymentMethod === "cash") return "دفع كاش";
+    if(invoice?.paymentMethod === "debt") return "دين";
+    if(invoice?.paymentMethod === "later_app") return "تطبيق لاحق";
+    if(invoice?.paymentMethod === "instant_app") return "تطبيق فوري";
+    return "غير محدد";
+  }
+  function pad2(n){ return String(n).padStart(2, "0"); }
+  function dateParts(ts){
+    const d = new Date(num(ts, Date.now()));
+    let h = d.getHours(); const am = h < 12; h = h % 12 || 12;
+    return { date:`${d.getFullYear()}/${pad2(d.getMonth()+1)}/${pad2(d.getDate())}`, time:`${pad2(h)}:${pad2(d.getMinutes())} ${am ? "ص" : "م"}`, compact:`${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}` };
+  }
+  function invoiceNumberFromTitle(){
+    const t = $("modalTitle")?.textContent || "";
+    const m = t.match(/#\s*(\d+)/) || t.match(/(\d+)/);
+    return m ? m[1] : "";
+  }
+  function currentInvoice(){
+    const list = window.state?.invoices || [];
+    const n = invoiceNumberFromTitle();
+    let inv = list.find(i => String(i.number) === String(n));
+    if(inv) return inv;
+    const box = $("invoiceViewBox");
+    const m = (box?.textContent || "").match(/#\s*(\d+)/);
+    return m ? list.find(i => String(i.number) === String(m[1])) : null;
+  }
+  function barcodeValue(invoice){
+    const n = String(invoice?.number || "0").replace(/\D/g, "") || "0";
+    const d = dateParts(invoice?.createdAt).compact;
+    return `${n}-${d}`;
+  }
+  function thermalReceiptHtml(invoice){
+    const s = window.state?.settings || {};
+    const shopName = s.shopName || $("topShopName")?.textContent?.trim() || "oskar";
+    const employee = invoice.employeeName || window.state?.auth?.user?.name || "المدير";
+    const dp = dateParts(invoice.createdAt);
+    const items = Array.isArray(invoice.items) ? invoice.items : [];
+    const code = barcodeValue(invoice);
+    return `
+      <div class="oskar-thermal-preview-wrap">
+        <div class="oskar-thermal-receipt" data-oskar-thermal-receipt="1" data-invoice-number="${esc(invoice.number)}">
+          <div class="oskar-thermal-header">
+            <h1>${esc(shopName)}</h1>
+            <div>فاتورة مبيعات</div>
+            <div>الموظف: ${esc(employee)}</div>
+          </div>
+
+          <table class="oskar-thermal-info">
+            <tr>
+              <td>الرقم: <span style="font-weight:900">#${esc(invoice.number)}</span></td>
+              <td class="oskar-thermal-left">التاريخ: ${esc(dp.date)}</td>
+            </tr>
+            <tr>
+              <td>الزبون: <span style="font-weight:900">${esc(invoice.customerName || "زبون نقدي")}</span></td>
+              <td class="oskar-thermal-left">${esc(dp.time)}</td>
+            </tr>
+            <tr>
+              <td colspan="2">رقم الهاتف: ${esc(invoice.customerPhone || "-")}</td>
+            </tr>
+          </table>
+
+          <table class="oskar-thermal-items">
+            <thead>
+              <tr>
+                <th>المادة</th>
+                <th class="center">كمية</th>
+                <th class="center">السعر</th>
+                <th class="left">القيمة</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(item => `
+                <tr>
+                  <td>${esc(item.name || "-")}</td>
+                  <td class="center">${esc(item.qtyText || item.qty || "1")}</td>
+                  <td class="center">${fixed3(item.price)}</td>
+                  <td class="left">${fixed3(item.total)}</td>
+                </tr>
+              `).join("") || `<tr><td colspan="4" class="center">لا توجد أصناف</td></tr>`}
+            </tbody>
+          </table>
+
+          <table class="oskar-thermal-totals">
+            <tr><td>المجموع:</td><td class="oskar-thermal-left">${fixed3(invoice.subtotal)} ₪</td></tr>
+            <tr><td>الخصم:</td><td class="oskar-thermal-left">${fixed3(invoice.discount)} ₪</td></tr>
+            <tr class="oskar-thermal-total-row"><td>الإجمالي:</td><td class="oskar-thermal-left">${fixed3(invoice.total)} ₪</td></tr>
+          </table>
+
+          <div class="oskar-thermal-payment">
+            <div>طريقة الدفع: <span style="font-weight:900">${esc(paymentLabel(invoice.paymentMethod))}</span></div>
+            <div>مجلد الدفع: <span style="font-weight:900">${esc(paymentFolder(invoice))}</span></div>
+          </div>
+
+          <div class="oskar-thermal-footer">
+            <div style="font-weight:900">شكراً لتعاملكم معنا</div>
+            <div class="oskar-thermal-barcode">
+              <svg data-oskar-thermal-barcode="${esc(code)}"></svg>
+              <div class="oskar-thermal-code">#${esc(invoice.number)} - ${esc(dp.compact)}</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+  function renderBarcodes(root=document){
+    root.querySelectorAll("svg[data-oskar-thermal-barcode]").forEach(svg => {
+      const code = svg.getAttribute("data-oskar-thermal-barcode") || "";
+      if(!code) return;
+      if(window.JsBarcode){
+        try{
+          window.JsBarcode(svg, code, {format:"CODE128", displayValue:false, height:42, width:1.15, margin:0});
+        }catch{}
+      }else{
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", "50%"); text.setAttribute("y", "50%"); text.setAttribute("text-anchor", "middle");
+        text.textContent = code; svg.appendChild(text);
+      }
+    });
+  }
+  function replaceInvoiceActions(){
+    const body = $("modalBody"); if(!body) return;
+    const oldWrap = body.querySelector(".no-print");
+    if(!oldWrap || oldWrap.dataset.oskarThermalActions === "1") return;
+    oldWrap.dataset.oskarThermalActions = "1";
+    const print = oldWrap.querySelector("#printInvoiceBtn"); if(print){ print.id = "thermalPrintInvoiceBtn"; print.innerHTML = '<i class="fa-solid fa-print"></i> طباعة حرارية'; }
+    const img = oldWrap.querySelector("#imageInvoiceBtn"); if(img){ img.id = "thermalImageInvoiceBtn"; img.innerHTML = '<i class="fa-solid fa-image"></i> تحميل صورة'; }
+    const pdf = oldWrap.querySelector("#pdfInvoiceBtn"); if(pdf){ pdf.id = "thermalPdfInvoiceBtn"; pdf.innerHTML = '<i class="fa-solid fa-file-pdf"></i> PDF حراري'; }
+    oldWrap.classList.add("oskar-thermal-actions");
+  }
+  function thermalizeInvoiceView(){
+    const box = $("invoiceViewBox");
+    if(!box || box.dataset.oskarThermalized === "1") return;
+    const inv = currentInvoice();
+    if(!inv) return;
+    box.dataset.oskarThermalized = "1";
+    box.innerHTML = thermalReceiptHtml(inv);
+    replaceInvoiceActions();
+    renderBarcodes(box);
+    const title = $("modalTitle"); if(title) title.textContent = `فاتورة حرارية رقم #${inv.number}`;
+  }
+  function scheduleThermalize(){
+    clearTimeout(window.__oskarThermalizeTimer);
+    window.__oskarThermalizeTimer = setTimeout(thermalizeInvoiceView, 180);
+  }
+  const mo = new MutationObserver(scheduleThermalize);
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => { const body=$("modalBody"); if(body) mo.observe(body,{childList:true,subtree:true}); });
+  else { const body=$("modalBody"); if(body) mo.observe(body,{childList:true,subtree:true}); }
+  document.addEventListener("click", function(e){
+    if(e.target.closest && e.target.closest("[data-view-invoice]")) setTimeout(scheduleThermalize, 40);
+  }, true);
+
+  function setBusy(btn, busy){ if(btn){ btn.disabled = !!busy; btn.classList.toggle("oskar-export-busy", !!busy); } }
+  async function waitFrame(){ return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); }
+  async function receiptCanvas(){
+    thermalizeInvoiceView();
+    const receipt = document.querySelector(".oskar-thermal-receipt[data-oskar-thermal-receipt]");
+    if(!receipt) throw new Error("receipt_not_found");
+    renderBarcodes(receipt);
+    if(!window.html2canvas) throw new Error("html2canvas_not_ready");
+    await waitFrame();
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "position:fixed;right:-10000px;top:0;background:#fff;width:80mm;z-index:-1;opacity:1;pointer-events:none;direction:rtl";
+    const clone = receipt.cloneNode(true);
+    clone.style.boxShadow = "none";
+    clone.style.margin = "0";
+    wrap.appendChild(clone);
+    document.body.appendChild(wrap);
+    renderBarcodes(clone);
+    await waitFrame();
+    try{
+      return await html2canvas(clone, {backgroundColor:"#ffffff", scale:3, useCORS:false, allowTaint:true, logging:false, scrollX:0, scrollY:0, windowWidth:360, imageTimeout:350});
+    }finally{
+      wrap.remove();
+    }
+  }
+  function invoiceName(){ const inv = currentInvoice(); return "invoice-" + (inv?.number || Date.now()); }
+  async function downloadThermalImage(btn){
+    setBusy(btn, true);
+    try{
+      const canvas = await receiptCanvas();
+      const a = document.createElement("a");
+      a.download = invoiceName() + "-thermal.png";
+      a.href = canvas.toDataURL("image/png");
+      document.body.appendChild(a); a.click(); a.remove();
+      toast("تم تنزيل صورة الفاتورة الحرارية");
+    }catch(err){ console.error(err); toast("تعذر تنزيل الصورة الآن"); }
+    finally{ setBusy(btn, false); }
+  }
+  async function downloadThermalPdf(btn){
+    setBusy(btn, true);
+    try{
+      if(!window.jspdf || !window.jspdf.jsPDF) throw new Error("jspdf_not_ready");
+      const canvas = await receiptCanvas();
+      const img = canvas.toDataURL("image/jpeg", .92);
+      const widthMm = 80;
+      const heightMm = Math.max(90, canvas.height * widthMm / canvas.width);
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({orientation:"p", unit:"mm", format:[widthMm, heightMm], compress:true});
+      pdf.addImage(img, "JPEG", 0, 0, widthMm, heightMm, undefined, "FAST");
+      pdf.save(invoiceName() + "-thermal.pdf");
+      toast("تم تجهيز PDF حراري");
+    }catch(err){ console.error(err); toast("تعذر تجهيز PDF الآن"); }
+    finally{ setBusy(btn, false); }
+  }
+  async function printThermal(btn){
+    setBusy(btn, true);
+    try{
+      thermalizeInvoiceView();
+      const receipt = document.querySelector(".oskar-thermal-receipt[data-oskar-thermal-receipt]");
+      if(!receipt) throw new Error("receipt_not_found");
+      renderBarcodes(receipt);
+      const frame = document.createElement("iframe");
+      frame.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;border:0;opacity:0";
+      document.body.appendChild(frame);
+      const doc = frame.contentWindow.document;
+      doc.open();
+      doc.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة حرارية</title><style>
+        @page{size:80mm auto;margin:0}*{box-sizing:border-box!important}html,body{margin:0!important;padding:0!important;background:#fff!important;color:#000!important;direction:rtl!important}.oskar-thermal-receipt{width:80mm!important;max-width:80mm!important;min-width:80mm!important;margin:0!important;padding:5mm!important;background:#fff!important;color:#000!important;font-family:"Courier New",Courier,monospace!important;font-size:12px!important;line-height:1.42!important;box-shadow:none!important;border:0!important;border-radius:0!important}.oskar-thermal-receipt *{color:#000!important;box-shadow:none!important;text-shadow:none!important;filter:none!important;transform:none!important}.oskar-thermal-header{text-align:center;border-bottom:1px dashed #000;padding-bottom:10px;margin-bottom:10px}.oskar-thermal-header h1{margin:0;font-size:20px!important;font-weight:900!important;text-transform:uppercase}.oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{width:100%!important;border-collapse:collapse!important;margin:0 0 10px!important;min-width:0!important}.oskar-thermal-info td{vertical-align:top!important;padding:1px 0!important;border:0!important;background:#fff!important;font-size:12px!important}.oskar-thermal-left{text-align:left!important}.oskar-thermal-items th{border:0!important;border-bottom:1px solid #000!important;background:#fff!important;text-align:right!important;padding:5px 0!important;font-size:12px!important;font-weight:900!important}.oskar-thermal-items td{border:0!important;border-bottom:1px dotted #000!important;background:#fff!important;padding:5px 0!important;font-size:12px!important}.center{text-align:center!important}.left{text-align:left!important}.oskar-thermal-totals td{border:0!important;background:#fff!important;padding:2px 0!important;font-size:12px!important}.oskar-thermal-total-row td{font-weight:900!important;font-size:16px!important;border-top:1px double #000!important;border-bottom:1px double #000!important;padding:5px 0!important}.oskar-thermal-payment{margin-top:10px;font-size:12px!important}.oskar-thermal-footer{text-align:center;margin-top:20px;font-size:10px!important;border-top:1px dashed #000;padding-top:10px}.oskar-thermal-barcode{display:block;margin:8px auto 0!important;width:62mm!important;max-width:62mm!important;height:18mm!important;overflow:hidden!important}.oskar-thermal-barcode svg{width:62mm!important;height:16mm!important;display:block!important;margin:0 auto!important}.oskar-thermal-code{font-size:10px!important;text-align:center!important;direction:ltr!important;margin-top:2px!important}.oskar-thermal-preview-wrap{display:block!important;background:#fff!important;border:0!important;padding:0!important}
+      </style></head><body>${receipt.outerHTML}</body></html>`);
+      doc.close();
+      setTimeout(() => { try{ frame.contentWindow.focus(); frame.contentWindow.print(); } finally{ setTimeout(()=>frame.remove(), 900); } }, 90);
+    }catch(err){ console.error(err); toast("تعذر فتح الطباعة الآن"); }
+    finally{ setTimeout(()=>setBusy(btn, false), 350); }
+  }
+  document.addEventListener("click", function(e){
+    const img = e.target.closest && e.target.closest("#thermalImageInvoiceBtn");
+    const pdf = e.target.closest && e.target.closest("#thermalPdfInvoiceBtn");
+    const prn = e.target.closest && e.target.closest("#thermalPrintInvoiceBtn");
+    if(!img && !pdf && !prn) return;
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    if(img) return void downloadThermalImage(img);
+    if(pdf) return void downloadThermalPdf(pdf);
+    if(prn) return void printThermal(prn);
+  }, true);
 })();
 </script>
 
