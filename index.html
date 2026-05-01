@@ -8299,7 +8299,7 @@
           <button class="tab-btn ${tab === "manual" ? "active" : ""}" data-customer-tab="${freshCustomer.id}|manual">ديون يدوية</button>
         </div>
 
-        <div class="table-wrap">
+        <div class="table-wrap sortat-table-wrap" data-sortat-table="1">
           <table>
             <thead>
               <tr>
@@ -15538,6 +15538,32 @@
     background:#16a34a;
   }
 
+  .sort-status-dot.orange{
+    background:#f59e0b;
+  }
+
+  /* تثبيت تمرير الجداول أفقيًا في RTL: لا يرجع يمين بعد السحب */
+  .table-wrap{
+    direction:ltr;
+    overflow-x:auto;
+    overflow-y:auto;
+    scroll-behavior:auto!important;
+    overscroll-behavior-x:contain;
+    overscroll-behavior-y:auto;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-x pan-y;
+  }
+
+  .table-wrap table{
+    direction:rtl;
+  }
+
+  #page-sortat .table-wrap{
+    max-width:100%;
+    scroll-snap-type:none;
+    scrollbar-gutter:stable both-edges;
+  }
+
   .sort-status-dot:hover{
     transform:translateY(-1px) scale(1.05);
   }
@@ -15988,6 +16014,7 @@
       if (!invoice.customer) return toast("أدخل اسم الزبون");
 
       await saveStore("sortInvoices", invoice);
+      if (invoice.saleInvoiceId) await syncLinkedSaleInvoiceFromSort(invoice);
       closeModal();
       renderSortat();
       patchReports();
@@ -16066,7 +16093,37 @@
     }).join("");
   }
 
+  function getSortPaymentState(inv){
+    const st = state();
+    const linked = inv?.saleInvoiceId ? (st.invoices || []).find(i => i.id === inv.saleInvoiceId) : null;
+    if (linked) {
+      if (["debt", "later_app"].includes(linked.paymentMethod) && linked.status !== "paid") return "orange";
+      if (linked.status === "paid" || ["cash", "instant_app"].includes(linked.paymentMethod)) return "green";
+    }
+    const raw = inv?.paymentState || inv?.paymentStatus || ((inv?.statuses || {}).paid ? "green" : "red");
+    return ["red", "orange", "green"].includes(raw) ? raw : "red";
+  }
+
+  function setSortPaymentState(inv, mode){
+    const next = ["red", "orange", "green"].includes(mode) ? mode : "red";
+    inv.paymentState = next;
+    inv.paymentStatus = next;
+    inv.statuses = { design:false, folder:false, received:false, paid:false, ...(inv.statuses || {}), paid: next === "green" };
+    inv.updatedAt = Date.now();
+  }
+
   function statusCell(inv, field){
+    if (field.key === "paid") {
+      const payState = getSortPaymentState(inv);
+      const label = payState === "green" ? "دفع مكتمل" : (payState === "orange" ? "دفع لاحق / دين" : "غير مدفوع");
+      return `
+        <td style="text-align:center">
+          <button class="sort-status-dot ${payState}" data-sort-status="${inv.id}" data-sort-status-key="${field.key}" data-sort-payment-state="${payState}" title="${esc(label)}" type="button"></button>
+          <span class="sort-status-label">${esc(field.label)}</span>
+        </td>
+      `;
+    }
+
     const on = !!(inv.statuses || {})[field.key];
     return `
       <td style="text-align:center">
@@ -16087,6 +16144,9 @@
       renderFolderTabs();
 
       if (!folder) {
+        const emptySig = "empty-sortat";
+        if (root.dataset.sortatSignature === emptySig && root.innerHTML.trim()) return;
+        root.dataset.sortatSignature = emptySig;
         root.innerHTML = `
           <div class="sort-empty">
             <i class="fa-solid fa-folder-plus" style="font-size:34px;color:#2563eb;margin-bottom:10px"></i>
@@ -16107,6 +16167,18 @@
 
       const totalQty = rows.reduce((sum, x)=>sum + clean(x.qty), 0);
       const totalSales = rows.reduce((sum, x)=>sum + clean(x.total || (clean(x.qty) * clean(x.salePrice))), 0);
+      const signature = JSON.stringify({
+        folder: folder.id,
+        folderUpdated: folder.updatedAt || 0,
+        rows: rows.map(x => [
+          x.id, x.updatedAt || 0, x.number, x.productId, x.productName, x.qty, x.customer, x.phone,
+          x.salePrice, x.total, x.paymentState || x.paymentStatus || "", x.saleInvoiceId || "",
+          x.statuses?.design ? 1 : 0, x.statuses?.folder ? 1 : 0, x.statuses?.received ? 1 : 0, x.statuses?.paid ? 1 : 0
+        ])
+      });
+      if (root.dataset.sortatSignature === signature && root.innerHTML.trim()) return;
+      const oldScroll = Array.from(root.querySelectorAll(".table-wrap")).map(el => ({ left: el.scrollLeft, top: el.scrollTop }));
+      root.dataset.sortatSignature = signature;
 
       root.innerHTML = `
         <div class="sortat-hero">
@@ -16180,6 +16252,11 @@
           <div style="background:#f1f5f9;border-radius:16px;padding:11px 18px;font-weight:900">إجمالي البيع: <span class="money">${money(totalSales)}</span></div>
         </div>
       `;
+      requestAnimationFrame(() => {
+        Array.from(root.querySelectorAll(".table-wrap")).forEach((el, i) => {
+          if (oldScroll[i]) { el.scrollLeft = oldScroll[i].left; el.scrollTop = oldScroll[i].top; }
+        });
+      });
     } finally {
       syncingRender = false;
     }
@@ -16189,6 +16266,10 @@
     const inv = state().sortInvoices.find(x => x.id === invoiceId);
     const field = STATUS_FIELDS.find(f => f.key === key);
     if (!inv || !field) return;
+    if (key === "paid") {
+      openSortPaymentManager(invoiceId);
+      return;
+    }
     const next = !((inv.statuses || {})[key]);
     confirmBox({
       title: "تأكيد العملية",
@@ -16214,10 +16295,14 @@
       confirmText: "حذف",
       danger: true,
       onConfirm: async () => {
+        if (inv.saleInvoiceId) {
+          await removeStore("invoices", inv.saleInvoiceId);
+          if (typeof window.rebuildCustomerBalances === "function") window.rebuildCustomerBalances(true);
+        }
         await removeStore("sortInvoices", invoiceId);
         renderSortat();
         patchReports();
-        toast("تم حذف الفاتورة");
+        toast("تم حذف الفاتورة وإعادة الحسابات");
       }
     });
   }
@@ -16233,8 +16318,12 @@
       danger: true,
       onConfirm: async () => {
         const linked = state().sortInvoices.filter(inv => inv.folderId === folderId);
-        for (const inv of linked) await removeStore("sortInvoices", inv.id);
+        for (const inv of linked) {
+          if (inv.saleInvoiceId) await removeStore("invoices", inv.saleInvoiceId);
+          await removeStore("sortInvoices", inv.id);
+        }
         await removeStore("sortFolders", folderId);
+        if (typeof window.rebuildCustomerBalances === "function") window.rebuildCustomerBalances(true);
         activeFolderId = "";
         renderSortat();
         patchReports();
@@ -16269,7 +16358,7 @@
 
   function patchReports(){
     const st = state();
-    const inv = periodFilter(st.invoices || []);
+    const inv = periodFilter(st.invoices || []).filter(x => x.source !== "sortat" && !x.sortInvoiceId);
     const sortInv = periodFilter(st.sortInvoices || []);
     const expenses = periodFilter(st.expenses || []);
     const supplier = periodFilter(st.supplierPayments || []);
@@ -16296,7 +16385,7 @@
     const todayInvoices = (st.invoices || []).filter(x => {
       const d = new Date(clean(x.createdAt));
       const n = new Date();
-      return d.toDateString() === n.toDateString();
+      return x.source !== "sortat" && !x.sortInvoiceId && d.toDateString() === n.toDateString();
     });
     const todaySales = todayInvoices.reduce((a,x)=>a+clean(x.total),0) + todaySort.reduce((a,x)=>a+clean(x.total || clean(x.qty)*clean(x.salePrice)),0);
 
@@ -16306,6 +16395,417 @@
 
     if ($("homeTodaySales")) $("homeTodaySales").textContent = money(todaySales);
     if ($("homeTodayProfit")) $("homeTodayProfit").textContent = money(todaySales - todayExpenses - todaySupplier - todayWages);
+  }
+
+  function escapeForOption(str){ return esc(str); }
+
+  function sortDateKey(ts=Date.now()){
+    const d = new Date(ts);
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return `${d.getFullYear()}-${m}-${day}`;
+  }
+
+  function nextRegularInvoiceNumber(){
+    const nums = (state().invoices || []).map(x => clean(x.number)).filter(Boolean);
+    return (nums.length ? Math.max(...nums) : 0) + 1;
+  }
+
+  function paymentAccountsOptions(includeCash=false, selected=""){
+    const accounts = (state().paymentAccounts || []).filter(a => includeCash || a.id !== "cash");
+    const html = accounts.map(a => `
+      <option value="${esc(a.id)}" ${selected === a.id ? "selected" : ""}>${escapeForOption(a.name || "حساب دفع")}${a.number ? " - " + escapeForOption(a.number) : ""}</option>
+    `).join("");
+    return html || `<option value="bank">تطبيق / بنك</option>`;
+  }
+
+  function normalizeSortCustomer(c={}){
+    return {
+      id: c.id || uid("cus"),
+      name: c.name || "زبون",
+      phone: c.phone || "",
+      balance: clean(c.balance),
+      totalSales: clean(c.totalSales || c.total),
+      totalPaid: clean(c.totalPaid || c.paid),
+      invoicesCount: clean(c.invoicesCount),
+      dueDate: c.dueDate || "",
+      payments: Array.isArray(c.payments) ? c.payments : [],
+      manualDebts: Array.isArray(c.manualDebts) ? c.manualDebts : [],
+      createdAt: c.createdAt || Date.now(),
+      updatedAt: Date.now()
+    };
+  }
+
+  function findSortCustomer(name, phone){
+    const n = String(name || "").trim();
+    const p = String(phone || "").trim();
+    return (state().customers || []).find(c =>
+      (p && String(c.phone || "").trim() === p) ||
+      (n && String(c.name || "").trim() === n)
+    ) || null;
+  }
+
+  async function ensureSortCustomer(name, phone){
+    const st = state();
+    let c = findSortCustomer(name, phone);
+    if (!c) {
+      c = normalizeSortCustomer({ id: uid("cus"), name: name || "زبون", phone: phone || "" });
+      st.customers = Array.isArray(st.customers) ? st.customers : [];
+      st.customers.push(c);
+    }
+    c.name = name || c.name || "زبون";
+    c.phone = phone || c.phone || "";
+    c.updatedAt = Date.now();
+    await saveStore("customers", normalizeSortCustomer(c));
+    return c;
+  }
+
+  function getSortInvoiceTotals(inv){
+    const qty = clean(inv.qty);
+    const price = clean(inv.salePrice);
+    const product = productById(inv.productId) || {};
+    const costOne = clean(product.costPrice || product.displayCostPrice || 0);
+    const total = clean(inv.total || qty * price);
+    const cost = costOne * qty;
+    return { subtotal: total, discount: 0, total, cost, profit: total - cost };
+  }
+
+  function buildSortSaleItems(inv){
+    const qty = clean(inv.qty);
+    const price = clean(inv.salePrice);
+    const product = productById(inv.productId) || {};
+    const costOne = clean(product.costPrice || product.displayCostPrice || 0);
+    return [{
+      id: uid("item"),
+      productId: inv.productId || "",
+      name: inv.productName || product.name || "صنف فرزة",
+      selectedUnit: "sortat",
+      qty,
+      qtyText: String(qty),
+      baseQty: qty,
+      unitLabel: "فرزة",
+      price,
+      costPrice: costOne,
+      total: qty * price,
+      costTotal: qty * costOne,
+      sortInvoiceId: inv.id,
+      free: false
+    }];
+  }
+
+  async function saveSortSaleWithPayment(inv, payment){
+    const st = state();
+    st.invoices = Array.isArray(st.invoices) ? st.invoices : [];
+    const totals = getSortInvoiceTotals(inv);
+    let linked = inv.saleInvoiceId ? st.invoices.find(i => i.id === inv.saleInvoiceId) : null;
+
+    let customerId = payment.customerId || "";
+    let customerName = payment.customerName || inv.customer || "";
+    let customerPhone = payment.customerPhone || inv.phone || "";
+
+    if (["debt", "later_app"].includes(payment.paymentMethod)) {
+      const customer = await ensureSortCustomer(customerName, customerPhone);
+      customerId = customer.id;
+      customerName = customer.name;
+      customerPhone = customer.phone;
+    } else if (payment.paymentMethod === "instant_app" && (customerName || customerPhone)) {
+      const customer = await ensureSortCustomer(customerName, customerPhone);
+      customerId = customer.id;
+      customerName = customer.name;
+      customerPhone = customer.phone;
+    }
+
+    const createdAt = linked?.createdAt || inv.createdAt || Date.now();
+    const invoice = {
+      ...(linked || {}),
+      id: linked?.id || uid("inv"),
+      number: linked?.number || nextRegularInvoiceNumber(),
+      dateKey: linked?.dateKey || sortDateKey(createdAt),
+      source: "sortat",
+      sortInvoiceId: inv.id,
+      sortFolderId: inv.folderId || "",
+      createdAt,
+      updatedAt: Date.now(),
+      employeeId: window.state?.auth?.user?.id || "",
+      employeeName: window.state?.auth?.user?.name || "",
+      customerId,
+      customerName,
+      customerPhone,
+      paymentMethod: payment.paymentMethod,
+      paymentAccountId: payment.paymentAccountId || (payment.paymentMethod === "cash" ? "cash" : ""),
+      dueDate: payment.dueDate || "",
+      status: payment.status || "unpaid",
+      notes: `فاتورة فرزة رقم ${inv.farzaNumber || ""} - ${inv.farzaType || ""}${inv.notes ? " | " + inv.notes : ""}`,
+      items: buildSortSaleItems(inv),
+      subtotal: totals.subtotal,
+      discount: 0,
+      total: totals.total,
+      cost: totals.cost,
+      profit: totals.profit
+    };
+
+    await saveStore("invoices", invoice);
+
+    inv.saleInvoiceId = invoice.id;
+    inv.paymentMethod = invoice.paymentMethod;
+    inv.paymentAccountId = invoice.paymentAccountId;
+    inv.customerId = customerId;
+    inv.customer = customerName || inv.customer;
+    inv.phone = customerPhone || inv.phone;
+    setSortPaymentState(inv, ["debt", "later_app"].includes(invoice.paymentMethod) && invoice.status !== "paid" ? "orange" : "green");
+    await saveStore("sortInvoices", inv);
+
+    if (typeof window.rebuildCustomerBalances === "function") window.rebuildCustomerBalances(true);
+    if (typeof window.renderAll === "function") window.renderAll();
+    renderSortat();
+    patchReports();
+    toast("تم إنشاء الفاتورة وتسجيلها في سجل العملاء والفواتير");
+  }
+
+  async function syncLinkedSaleInvoiceFromSort(inv){
+    const linked = inv.saleInvoiceId ? (state().invoices || []).find(i => i.id === inv.saleInvoiceId) : null;
+    if (!linked) return;
+    await saveSortSaleWithPayment(inv, {
+      paymentMethod: linked.paymentMethod || inv.paymentMethod || "cash",
+      status: linked.status || (getSortPaymentState(inv) === "orange" ? "unpaid" : "paid"),
+      customerId: linked.customerId || inv.customerId || "",
+      customerName: inv.customer || linked.customerName || "",
+      customerPhone: inv.phone || linked.customerPhone || "",
+      paymentAccountId: linked.paymentAccountId || inv.paymentAccountId || "",
+      dueDate: linked.dueDate || ""
+    });
+  }
+
+  async function markLinkedSortPaymentPaid(inv){
+    const linked = inv.saleInvoiceId ? (state().invoices || []).find(i => i.id === inv.saleInvoiceId) : null;
+    if (linked) {
+      linked.status = "paid";
+      linked.updatedAt = Date.now();
+      await saveStore("invoices", linked);
+    }
+    setSortPaymentState(inv, "green");
+    await saveStore("sortInvoices", inv);
+    if (typeof window.rebuildCustomerBalances === "function") window.rebuildCustomerBalances(true);
+    if (typeof window.renderAll === "function") window.renderAll();
+    renderSortat();
+    patchReports();
+    toast("تم تحويل الدفع إلى أخضر ومكتمل");
+  }
+
+  async function cancelSortPayment(inv){
+    if (inv.saleInvoiceId) await removeStore("invoices", inv.saleInvoiceId);
+    inv.saleInvoiceId = "";
+    inv.paymentMethod = "";
+    inv.paymentAccountId = "";
+    setSortPaymentState(inv, "red");
+    await saveStore("sortInvoices", inv);
+    if (typeof window.rebuildCustomerBalances === "function") window.rebuildCustomerBalances(true);
+    if (typeof window.renderAll === "function") window.renderAll();
+    renderSortat();
+    patchReports();
+    toast("تم إرجاع مربع الدفع إلى الأحمر وحذف فاتورة الدفع المرتبطة");
+  }
+
+  function openSortPaymentManager(invoiceId){
+    const inv = state().sortInvoices.find(x => x.id === invoiceId);
+    if (!inv) return;
+    const ps = getSortPaymentState(inv);
+    if (ps === "red" || !inv.saleInvoiceId) return openSortPaymentChoice(inv);
+
+    openModal("إدارة دفع الفاتورة", `
+      <div class="card" style="box-shadow:none">
+        <h3 style="margin:0 0 10px;font-weight:900">فاتورة رقم ${formatInvNo(inv.number)}</h3>
+        <div class="muted" style="line-height:1.9;margin-bottom:12px">
+          الحالة الحالية: <b style="color:${ps === "orange" ? "#d97706" : "#16a34a"}">${ps === "orange" ? "برتقالي - دين / تطبيق لاحق" : "أخضر - مكتمل"}</b><br>
+          المبلغ: <b class="money">${money(clean(inv.total || clean(inv.qty)*clean(inv.salePrice)))}</b>
+        </div>
+        <div style="display:grid;gap:9px">
+          ${ps === "orange" ? `<button id="sortMarkPaidBtn" class="success-btn" type="button"><i class="fa-solid fa-circle-check"></i> تحويل الدفع إلى أخضر / تم السداد</button>` : ""}
+          <button id="sortChangePaymentBtn" class="primary-btn" type="button"><i class="fa-solid fa-money-bill-transfer"></i> تغيير طريقة الدفع</button>
+          <button id="sortCancelPaymentBtn" class="danger-btn" type="button"><i class="fa-solid fa-rotate-left"></i> إرجاع الدفع أحمر وإلغاء الفاتورة المرتبطة</button>
+        </div>
+      </div>
+    `);
+    const paidBtn = $("sortMarkPaidBtn");
+    if (paidBtn) paidBtn.onclick = () => confirmBox({ title:"تأكيد السداد", message:"سيتم تحويل مربع الدفع إلى أخضر وتحديث فاتورة العميل إلى مكتملة.", confirmText:"تأكيد السداد", onConfirm:()=>markLinkedSortPaymentPaid(inv) });
+    $("sortChangePaymentBtn").onclick = () => openSortPaymentChoice(inv);
+    $("sortCancelPaymentBtn").onclick = () => confirmBox({ title:"إلغاء الدفع", message:"سيتم حذف الفاتورة المرتبطة من سجل الفواتير وإعادة حساب سجل العملاء.", confirmText:"إلغاء الدفع", danger:true, onConfirm:()=>cancelSortPayment(inv) });
+  }
+
+  function openSortPaymentChoice(inv){
+    const totals = getSortInvoiceTotals(inv);
+    openModal("إتمام الدفع", `
+      <div class="card" style="box-shadow:none">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+          <h3 style="margin:0;font-weight:900">فاتورة رقم ${formatInvNo(inv.number)}</h3>
+          <b class="money">${money(totals.total)}</b>
+        </div>
+        <div id="sortPaymentChoiceGrid" class="payment-choice-grid"></div>
+      </div>
+    `, true);
+    const buttons = [
+      { method:"cash", icon:"fa-money-bill-wave", title:"كاش", sub:"بيع مباشر مكتمل" },
+      { method:"instant_app", icon:"fa-mobile-screen-button", title:"تطبيق فوري", sub:"تحويل تم استلامه" },
+      { method:"later_app", icon:"fa-clock", title:"تطبيق لاحق", sub:"يتحول للون البرتقالي حتى السداد" },
+      { method:"debt", icon:"fa-user-clock", title:"دين", sub:"يتحول للون البرتقالي ويسجل على الزبون" }
+    ];
+    $("sortPaymentChoiceGrid").innerHTML = buttons.map(btn => `
+      <button class="payment-choice" data-sort-payment-choice="${btn.method}" type="button">
+        <i class="fa-solid ${btn.icon}"></i>
+        <span>${esc(btn.title)}</span>
+        <small class="muted">${esc(btn.sub)}</small>
+      </button>
+    `).join("");
+    $$('[data-sort-payment-choice]').forEach(btn => btn.onclick = () => openSortPaymentDetails(inv, btn.dataset.sortPaymentChoice));
+  }
+
+  function openSortPaymentDetails(inv, method){
+    const totals = getSortInvoiceTotals(inv);
+    const customerName = esc(inv.customer || "");
+    const customerPhone = esc(inv.phone || "");
+
+    if (method === "cash") {
+      openModal("تأكيد بيع كاش", `
+        <div class="card" style="box-shadow:none">
+          <h3 style="font-size:20px;font-weight:900;margin:0 0 10px">بيع كاش مكتمل</h3>
+          <div style="display:flex;justify-content:space-between;font-size:20px"><span>الإجمالي:</span><b class="money">${money(totals.total)}</b></div>
+          <button id="sortConfirmCashBtn" class="primary-btn" style="width:100%;margin-top:16px"><i class="fa-solid fa-check"></i> حفظ الفاتورة</button>
+        </div>
+      `);
+      $("sortConfirmCashBtn").onclick = () => saveSortSaleWithPayment(inv, { paymentMethod:"cash", status:"paid", paymentAccountId:"cash" });
+      return;
+    }
+
+    if (method === "instant_app") {
+      openModal("بيع تطبيق فوري", `
+        <form id="sortInstantPaymentForm">
+          <div class="form-grid-compact">
+            <div><label class="field-label">اسم الزبون</label><input id="sortPayCustomerName" class="input" placeholder="اسم الزبون" value="${customerName}"></div>
+            <div><label class="field-label">رقم الجوال</label><input id="sortPayCustomerPhone" class="input" placeholder="رقم الجوال" value="${customerPhone}"></div>
+            <div><label class="field-label">حساب التحويل / مجلد الفاتورة</label><select id="sortPayAccountId" class="select">${paymentAccountsOptions(false, inv.paymentAccountId || "")}</select></div>
+            <div><label class="field-label">الإجمالي</label><input class="input" value="${money(totals.total)}" disabled></div>
+          </div>
+          <button class="primary-btn" type="submit" style="width:100%;margin-top:16px"><i class="fa-solid fa-check"></i> حفظ بيع تطبيق فوري</button>
+        </form>
+      `, true);
+      $("sortInstantPaymentForm").onsubmit = ev => {
+        ev.preventDefault();
+        saveSortSaleWithPayment(inv, {
+          paymentMethod:"instant_app",
+          status:"paid",
+          customerName: $("sortPayCustomerName").value.trim(),
+          customerPhone: $("sortPayCustomerPhone").value.trim(),
+          paymentAccountId: $("sortPayAccountId").value,
+          dueDate:""
+        });
+      };
+      return;
+    }
+
+    if (method === "later_app") {
+      openModal("تطبيق لاحق", `
+        <form id="sortLaterPaymentForm">
+          <div class="form-grid-compact">
+            <div><label class="field-label">اسم الزبون</label><input id="sortPayCustomerName" class="input" required placeholder="اسم الزبون" value="${customerName}"></div>
+            <div><label class="field-label">رقم الجوال</label><input id="sortPayCustomerPhone" class="input" placeholder="رقم الجوال" value="${customerPhone}"></div>
+            <div><label class="field-label">على أي حساب سيحوّل؟</label><select id="sortPayAccountId" class="select">${paymentAccountsOptions(false, inv.paymentAccountId || "")}</select></div>
+            <div><label class="field-label">تاريخ السداد اختياري</label><input id="sortPayDueDate" type="date" class="input"></div>
+            <div><label class="field-label">الإجمالي</label><input class="input" value="${money(totals.total)}" disabled></div>
+          </div>
+          <button class="gold-btn" type="submit" style="width:100%;margin-top:16px"><i class="fa-solid fa-check"></i> حفظ كتطبيق لاحق</button>
+        </form>
+      `, true);
+      $("sortLaterPaymentForm").onsubmit = ev => {
+        ev.preventDefault();
+        saveSortSaleWithPayment(inv, {
+          paymentMethod:"later_app",
+          status:"unpaid",
+          customerName: $("sortPayCustomerName").value.trim(),
+          customerPhone: $("sortPayCustomerPhone").value.trim(),
+          paymentAccountId: $("sortPayAccountId").value,
+          dueDate: $("sortPayDueDate").value || ""
+        });
+      };
+      return;
+    }
+
+    if (method === "debt") openSortDebtCustomerPicker(inv);
+  }
+
+  function openSortDebtCustomerPicker(inv){
+    const totals = getSortInvoiceTotals(inv);
+    const customers = [...(state().customers || [])].sort((a,b)=>clean(b.updatedAt)-clean(a.updatedAt));
+    openModal("اختيار حساب الدين", `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button id="sortUseInvoiceCustomerBtn" class="gold-btn" type="button"><i class="fa-solid fa-user-check"></i> استخدام اسم الفاتورة</button>
+        <button id="sortAddDebtCustomerBtn" class="primary-btn" type="button"><i class="fa-solid fa-user-plus"></i> إضافة اسم جديد</button>
+      </div>
+      <input id="sortDebtPickerSearch" class="input" placeholder="بحث عن اسم أو رقم..." style="margin-bottom:12px">
+      <div id="sortDebtPickerList">
+        ${customers.map(c => `
+          <div class="debt-card" data-sort-select-debt-customer="${esc(c.id)}">
+            <div><div class="debt-name">${esc(c.name)}</div><div class="debt-sub">${esc(c.phone || "بدون رقم")}</div></div>
+            <div class="debt-amount owed">${money(clean(c.balance))}</div>
+          </div>
+        `).join("") || `<div class="muted" style="text-align:center;padding:20px">لا توجد أسماء، أضف زبون جديد</div>`}
+      </div>
+      <div style="margin-top:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:12px;font-weight:900;display:flex;justify-content:space-between"><span>مبلغ الفاتورة:</span><b class="money">${money(totals.total)}</b></div>
+    `, true);
+
+    $("sortDebtPickerSearch").oninput = () => {
+      const q = $("sortDebtPickerSearch").value.trim().toLowerCase();
+      $$('[data-sort-select-debt-customer]').forEach(el => { el.style.display = el.textContent.toLowerCase().includes(q) ? "grid" : "none"; });
+    };
+    $("sortUseInvoiceCustomerBtn").onclick = async () => {
+      if (!String(inv.customer || "").trim()) return toast("أدخل اسم الزبون في الفاتورة أولاً");
+      const c = await ensureSortCustomer(inv.customer, inv.phone || "");
+      confirmSortDebtSale(inv, c);
+    };
+    $("sortAddDebtCustomerBtn").onclick = () => openSortQuickDebtCustomerForm(inv);
+    $$('[data-sort-select-debt-customer]').forEach(el => el.onclick = () => {
+      const c = (state().customers || []).find(x => x.id === el.dataset.sortSelectDebtCustomer);
+      if (c) confirmSortDebtSale(inv, c);
+    });
+  }
+
+  function openSortQuickDebtCustomerForm(inv){
+    openModal("إضافة زبون جديد للدين", `
+      <form id="sortQuickDebtCustomerForm">
+        <div class="form-grid-compact">
+          <div><label class="field-label">اسم الزبون</label><input id="sortQuickDebtCustomerName" class="input" required value="${esc(inv.customer || "")}"></div>
+          <div><label class="field-label">رقم الهاتف</label><input id="sortQuickDebtCustomerPhone" class="input" value="${esc(inv.phone || "")}"></div>
+        </div>
+        <button class="gold-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-check"></i> إضافة وحفظ البيع عليه</button>
+      </form>
+    `);
+    $("sortQuickDebtCustomerForm").onsubmit = async ev => {
+      ev.preventDefault();
+      const c = await ensureSortCustomer($("sortQuickDebtCustomerName").value.trim(), $("sortQuickDebtCustomerPhone").value.trim());
+      confirmSortDebtSale(inv, c);
+    };
+  }
+
+  function confirmSortDebtSale(inv, customer){
+    const totals = getSortInvoiceTotals(inv);
+    openModal("تأكيد البيع دين", `
+      <div class="card" style="box-shadow:none">
+        <h3 style="font-size:20px;font-weight:900;margin:0 0 10px">${esc(customer.name)}</h3>
+        <div class="muted" style="margin-bottom:10px">${esc(customer.phone || "بدون رقم")}</div>
+        <div style="display:flex;justify-content:space-between;font-size:20px;margin-bottom:12px"><span>مبلغ الفاتورة:</span><b class="money">${money(totals.total)}</b></div>
+        <label class="field-label">تاريخ السداد اختياري</label>
+        <input id="sortDebtDueDate" type="date" class="input">
+        <button id="sortConfirmDebtSaleBtn" class="gold-btn" style="width:100%;margin-top:16px"><i class="fa-solid fa-check"></i> حفظ على حساب الزبون</button>
+      </div>
+    `);
+    $("sortConfirmDebtSaleBtn").onclick = () => saveSortSaleWithPayment(inv, {
+      paymentMethod:"debt",
+      status:"unpaid",
+      customerId: customer.id,
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      paymentAccountId:"",
+      dueDate: $("sortDebtDueDate").value || ""
+    });
   }
 
   function exportSortatExcel(){
@@ -16455,9 +16955,9 @@
 
     setInterval(() => {
       removeObsoleteUi();
-      renderSortat();
       patchReports();
-    }, 2500);
+      if ($("page-sortat")?.classList.contains("active")) renderSortat();
+    }, 5000);
 
     console.log("[oskar-sortat] ready");
   }
