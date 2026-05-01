@@ -10845,7 +10845,7 @@
     const forgot=$("forgotAdminPasswordBtn"); if(forgot) forgot.onclick=openForgot; const saveBtn=$("saveAdminPasswordBtn")||$("changeAdminPasswordBtn"); if(saveBtn) saveBtn.onclick=changeAdminPassword; const logoutBtn=$("logoutBtn"); if(logoutBtn)logoutBtn.onclick=()=>{setUser(null);toast('تم تسجيل الخروج')}; const topLogoutBtn=$("topLogoutBtn"); if(topLogoutBtn)topLogoutBtn.onclick=()=>{setUser(null);toast('تم تسجيل الخروج')}; document.addEventListener('click',e=>{ if(e.target.closest('#forgotAdminPasswordBtn')){e.preventDefault();e.stopImmediatePropagation();openForgot();} if(e.target.closest('#saveAdminPasswordBtn,#changeAdminPasswordBtn')){e.preventDefault();e.stopImmediatePropagation();changeAdminPassword();} },true);
   }
   function styleFix(){ if($("directAuthFinalStyle"))return; const s=document.createElement('style'); s.id='directAuthFinalStyle'; s.textContent='.sidebar{z-index:5000!important}.bottom-nav{z-index:60!important}.auth-lock{z-index:9999!important}.modal-backdrop{z-index:10000!important}'; document.head.appendChild(s); }
-  async function init(){ for(let i=0;i<60;i++){ if(window.state)break; await wait(100); } styleFix(); ensureRecoveryUi(); bind(); applyUi(); if(window.state?.settings?.recoveryEmail && $("settingRecoveryEmail")) $("settingRecoveryEmail").value=window.state.settings.recoveryEmail; setInterval(()=>{ensureRecoveryUi();applyUi();},3000); log('direct auth final fix ready'); }
+  async function init(){ for(let i=0;i<60;i++){ if(window.state)break; await wait(100); } styleFix(); ensureRecoveryUi(); bind(); applyUi(); if(window.state?.settings?.recoveryEmail && $("settingRecoveryEmail")) $("settingRecoveryEmail").value=window.state.settings.recoveryEmail; setInterval(()=>{ensureRecoveryUi();applyUi();},3000); try{console.log('direct auth final fix ready')}catch{}; }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
 })();
 </script>
@@ -13323,28 +13323,33 @@
     window.OSKAR_TRIAL_LOCAL_ONLY = false;
     window.OSKAR_TRIAL_FIREBASE_ALLOWED = true;
     const ct = $("connectionText");
-    if(ct){ ct.textContent = "نسخة تجريبية - مزامنة أونلاين مستقلة"; ct.style.color = "#d97706"; }
-    const badge = $("syncCountBadge");
-    if(badge) badge.style.display = "none";
-    if(typeof window.idbClear === "function") window.idbClear("syncQueue").catch(()=>{});
+    if(ct){ ct.textContent = navigator.onLine ? "نسخة تجريبية - مزامنة أونلاين مستقلة" : "غير متصل - سيتم رفع البيانات عند عودة النت"; ct.style.color = navigator.onLine ? "#16a34a" : "#dc2626"; }
+    const btn = $("syncNowBtn"); if(btn){ btn.style.display = "inline-flex"; btn.disabled = false; }
   }
   function markSettingsTrialLocks(){
     const page = $("page-settings");
     if(!page) return;
+    const shopCard = $("settingShopName")?.closest(".card");
+    const adminCard = $("adminSecurityBox");
+    const locked = new Set([shopCard, adminCard].filter(Boolean));
     const paymentCard = $("paymentAccountsList")?.closest(".card");
     if(paymentCard) paymentCard.classList.add("oskar-payment-settings-card");
     page.querySelectorAll(":scope > .card").forEach(card => {
-      if(card !== paymentCard) card.classList.add("oskar-trial-locked-settings-card");
+      const should = trialActive() && locked.has(card);
+      card.classList.toggle("oskar-trial-locked-settings-card", should);
+      card.classList.toggle("oskar-trial-open-settings-card", trialActive() && !should);
     });
+    const emp = $("employeesSettingsBox");
+    if(emp){ emp.classList.remove("oskar-trial-locked-settings-card"); emp.classList.add("oskar-trial-open-settings-card"); }
     let note = $("oskarTrialSettingsNote");
     if(!note){
       note = document.createElement("div");
       note.id = "oskarTrialSettingsNote";
       note.className = "oskar-trial-settings-note";
-      note.innerHTML = '<i class="fa-solid fa-lock"></i> في النسخة التجريبية كل الإعدادات مقفلة، والمتاح فقط حسابات الدفع والتحويل.';
       const h = page.querySelector("h1");
       if(h) h.insertAdjacentElement("afterend", note); else page.prepend(note);
     }
+    note.innerHTML = '<i class="fa-solid fa-lock-open"></i> في التجربة: كل التطبيق متاح، والمقفول فقط بيانات المحل وأمان المدير.';
     note.style.display = trialActive() ? "block" : "none";
   }
   function patchTableScrollChaining(){
@@ -13439,13 +13444,9 @@
     patchLogoUpload();
     patchPrecisionInputs();
   }
-  document.addEventListener("click", function(e){
-    if(!trialActive()) return;
-    const syncBtn = e.target.closest && e.target.closest("#syncNowBtn");
-    if(syncBtn){ e.preventDefault(); e.stopImmediatePropagation(); forceTrialOffline(); toast("النسخة التجريبية أوفلاين فقط بدون مزامنة"); }
-  }, true);
+  /* تم تعطيل مانع المزامنة القديم للتجربة */
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", tick); else tick();
-  setInterval(tick, 700);
+  setInterval(tick, 3000);
 })();
 </script>
 
@@ -14018,13 +14019,23 @@
   function bad(src){src=String(src||'');return !src||/undefined|null|about:blank/i.test(src)}
   function bestLogo(dataOnly){const st=(window.state&&window.state.settings)||{};const list=[st.localLogo,st.logo,st.logoUrl,st.shopLogo,$('topShopLogo')?.getAttribute('src'),$('sideShopLogo')?.getAttribute('src'),$('topShopLogo')?.src,$('sideShopLogo')?.src].filter(x=>!bad(x));if(dataOnly)return list.find(x=>String(x).startsWith('data:image/'))||logoSvg();return list[0]||logoSvg()}
   function applyLogos(force){logoTicks++;const src=bestLogo(false), fallback=logoSvg();$$('img.shop-logo,img.invoice-logo').forEach(img=>{img.removeAttribute('crossorigin');img.referrerPolicy='no-referrer';img.onerror=function(){this.onerror=null;this.src=fallback};if(force || bad(img.getAttribute('src')) || bad(img.src) || (logoTicks<8 && img.complete && img.naturalWidth===0)){img.src=src}if(img.classList.contains('invoice-logo')){img.style.width='54px';img.style.height='54px';img.style.maxWidth='54px';img.style.maxHeight='54px';img.style.objectFit='cover';}})}
-  function enforceTrial(){if(!trialActive())return;document.body.classList.add('oskar-trial-mode');window.OSKAR_TRIAL_ACTIVE=true;window.OSKAR_TRIAL_LOCAL_ONLY=false;window.OSKAR_TRIAL_FIREBASE_ALLOWED=true;['db','app'].forEach(k=>{try{if(window[k]&&window.OSKAR_TRIAL_LOCAL_ONLY){} }catch{}});const ct=$('connectionText');if(ct)ct.textContent='نسخة تجريبية - تخزين محلي فقط بدون مزامنة';const badge=$('syncCountBadge');if(badge)badge.style.display='none';try{if(window.idbClear)window.idbClear('syncQueue')}catch{}['syncNow','enqueueSync','runAfterLoginSync','startRealtimeListeners','downloadAllFromFirebase'].forEach(name=>{const old=window[name];if(typeof old==='function'&&!old.__safeTrialNoop){window[name]=function(){if(trialActive()){if(name==='syncNow')toast('النسخة التجريبية تخزين محلي فقط ولا تستخدم المزامنة');return Promise.resolve()}return old.apply(this,arguments)};window[name].__safeTrialNoop=true}})}
-  document.addEventListener('click',function(e){if(trialActive()&&e.target.closest('#syncNowBtn')){e.preventDefault();e.stopImmediatePropagation();enforceTrial();toast('النسخة التجريبية تخزين محلي فقط بدون مزامنة')}},true);
+  function enforceTrial(){
+    if(!trialActive()) return;
+    document.body.classList.add('oskar-trial-mode');
+    window.OSKAR_TRIAL_ACTIVE=true;
+    window.OSKAR_TRIAL_LOCAL_ONLY=false;
+    window.OSKAR_TRIAL_FIREBASE_ALLOWED=true;
+    const ct=$('connectionText');
+    if(ct){ct.textContent=navigator.onLine?'نسخة تجريبية - مزامنة أونلاين مستقلة':'غير متصل - سيتم رفع البيانات عند عودة النت';ct.style.color=navigator.onLine?'#16a34a':'#dc2626'}
+    const badge=$('syncCountBadge');
+    if(badge) badge.style.display = (badge.textContent&&badge.textContent!=='0')?'flex':'none';
+  }
+  /* تم تعطيل مانع مزامنة التجربة القديم: التجربة الآن تزامن أونلاين بمسار مستقل */
   function setupLockedSettings(){const page=$('page-settings');if(!page)return;const shop=$('settingShopName')?.closest('.card'),admin=$('adminSecurityBox'),pay=$('paymentAccountsList')?.closest('.card'),emp=$('employeesSettingsBox');if(pay)pay.classList.add('oskar-payment-settings-card');page.querySelectorAll(':scope > .card').forEach(card=>{const should=trialActive()&&(card===shop||card===admin);card.classList.toggle('oskar-trial-locked-settings-card',should);card.classList.toggle('oskar-trial-open-settings-card',trialActive()&&!should)});if(emp){emp.classList.remove('oskar-trial-locked-settings-card');emp.classList.add('oskar-trial-open-settings-card')}let note=$('oskarTrialSettingsNote');if(!note){note=document.createElement('div');note.id='oskarTrialSettingsNote';note.className='oskar-trial-settings-note';const h=page.querySelector('h1');h?h.insertAdjacentElement('afterend',note):page.prepend(note)}note.innerHTML='<i class="fa-solid fa-lock-open"></i> في التجربة: كل التطبيق متاح، والمقفول فقط بيانات المحل وأمان المدير.';note.style.display=trialActive()?'block':'none'}
   function guideHtml(){const sections=[['fa-house','الرئيسية',['متابعة مبيعات اليوم وربح اليوم بسرعة.','عرض الديون على الزبائن وما لهم.','البحث عن المنتجات السريعة وإضافتها للبيع من بطاقة المنتج.']],['fa-cart-shopping','الكاشير',['البحث باسم المنتج أو الباركود.','اختيار الكمية والوحدة المناسبة.','إضافة خصم ثابت أو نسبة.','إتمام البيع كاش أو دين أو عبر حساب دفع.']],['fa-file-circle-plus','فاتورة مباشرة',['إنشاء فاتورة لعناصر غير موجودة في المخزون.','إدخال اسم الصنف والكمية والسعر يدويًا.','مناسبة للخدمات أو المبيعات السريعة خارج المخزون.']],['fa-boxes-stacked','المخزون',['إضافة المنتجات وتعديلها.','اختيار نوع الوحدة: قطعة، كرتونة، كيلو، لتر.','تحديد أسعار الجملة والبيع.','متابعة الكميات والبحث والتصدير.']],['fa-file-invoice-dollar','الفواتير',['البحث برقم الفاتورة أو باركود الفاتورة أو اسم الزبون.','فلترة الفواتير حسب اليوم أو الأسبوع أو الشهر أو الكل.','فتح الفاتورة للطباعة أو التحميل صورة/PDF/Excel.']],['fa-address-book','الديون والعملاء',['عرض جميع العملاء وأرصدة الدين.','فتح صفحة العميل لمراجعة الفواتير والدفعات.','تسجيل دفعات وتسويات ودين يدوي.']],['fa-truck-ramp-box','المشتريات',['إدخال بضاعة جديدة من الموردين.','تحديد المنتج والكمية والوحدة.','تحديث المخزون وأسعار الشراء والبيع.']],['fa-hand-holding-dollar','دفعات التجار',['تسجيل الدفعات المدفوعة للموردين.','اختيار حساب الدفع المستخدم.','ظهور الدفعات في التقارير المالية.']],['fa-money-bill-wave','المصروفات',['تسجيل المصاريف اليومية والشهرية.','خصم المصاريف من صافي الربح.','البحث والتصدير عند الحاجة.']],['fa-chart-line','التقارير',['مراجعة المبيعات والأرباح والمصاريف.','معرفة صافي الربح حسب الفترة.','طباعة أو تصدير التقارير.']],['fa-credit-card','حسابات الدفع والتحويل',['إضافة حسابات مثل الكاش أو البنك أو المحفظة.','ربط الفواتير والدفعات بالحساب المناسب.','إدارة التحويلات بين الحسابات.']],['fa-gear','الإعدادات',['تعديل اسم المحل والشعار والعملة.','إدارة كلمة المرور والموظفين والصلاحيات.','في التجربة تظهر الأقسام مقفولة باستثناء حسابات الدفع والتحويل.']]];return '<div class="guide-pro-hero"><h1><i class="fa-solid fa-circle-question"></i> دليل المستخدم الكامل</h1><p>شرح تفصيلي للواجهة وطريقة استخدام الأقسام كما تظهر للمستخدم، بدون تفاصيل برمجية.</p></div><div class="guide-pro-grid">'+sections.map(s=>'<div class="guide-pro-card"><h3><i class="fa-solid '+s[0]+'"></i>'+s[1]+'</h3><ul>'+s[2].map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>').join('')+'</div><div class="guide-pro-tip"><i class="fa-solid fa-lightbulb"></i> نصيحة: اضبط اسم المحل والشعار وحسابات الدفع أولًا، ثم أضف المنتجات، وبعدها استخدم الكاشير والفواتير والتقارير يوميًا.</div>'}
   function enhanceGuide(){const page=$('page-userGuide');if(page&&!page.dataset.safeGuide){page.dataset.safeGuide='1';page.innerHTML=guideHtml()}const body=$('modalBody'),title=$('modalTitle');if(body&&title&&/دليل المستخدم/.test(title.textContent||'')&&!body.dataset.safeGuide){body.dataset.safeGuide='1';body.innerHTML=guideHtml()}}
   function renameLabels(root){root=root||document.body;if(!root)return;const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode(n){return /فاتورة بدون مخز/.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT}});let n;const nodes=[];while((n=walker.nextNode())&&nodes.length<200)nodes.push(n);nodes.forEach(x=>{x.nodeValue=x.nodeValue.replace(/فاتورة بدون مخز(?:و)?ن/g,'فاتورة مباشرة')})}
-  function passwordGuard(){const form=$('adminLoginForm');if(!form||form.dataset.safePwGuard==='1')return;form.dataset.safePwGuard='1';form.addEventListener('submit',function(e){const pass=$('adminPasswordInput')?.value||'', known=window.state?.settings?.adminPasswordHash;if(known&&simpleHash(pass)!==known&&!(known===simpleHash(DEFAULT_PIN)&&pass===DEFAULT_PIN)){e.preventDefault();e.stopImmediatePropagation();toast('كلمة مرور المدير غير صحيحة')}},true)}
+  function passwordGuard(){/* تعطيل حارس قديم كان يمنع دخول المدير قبل اكتمال تحميل الإعدادات */}
   function staticWork(){if(didStatic)return;didStatic=true;ensureButtons();setupLockedSettings();enhanceGuide();renameLabels(document.body);passwordGuard();applyLogos(true)}
   function lightTick(){enforceTrial();ensureButtons();setupLockedSettings();enhanceGuide();passwordGuard();if(logoTicks<20)applyLogos(false);}
   function schedule(){if(scheduled)return;scheduled=true;setTimeout(()=>{scheduled=false;lightTick()},160)}
@@ -14093,7 +14104,7 @@
 <style id="oskar-request-final-v2-style">
   :root{--oskar-default-logo-url:url('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhc2-SIvoXM037iekfqFFgG9ScPFkd2OYmDCTxAsulO8-UYIByWI5H7pAhaNRr3OkT-WR5h-RrPQfjsWpv4RCPLDIauhevT3RdNQIAICh-ZgdTMWn8ZL8oabWZL-sttvTQ2EAk6LckmOIa2lEdSyjHW9_jrjbMpnItLw9TzulLth5MoEQxj3un_cLoqHL9C/s759/1000002395.jpg')}
   img.shop-logo,img.invoice-logo{background:#dbeafe!important;object-fit:cover!important;object-position:center!important}
-  .oskar-prime-safe-spinner,.fa-circle-notch.fa-spin,.fa-spinner.fa-spin{animation-duration:.38s!important}
+  .oskar-prime-safe-spinner,.fa-circle-notch.fa-spin,.fa-spinner.fa-spin{animation-duration:.75s!important}
   .oskar-prime-safe-select.best:before,.oskar-prime-select-card.best:before,.oskar-prime-plan.best:before{content:"الأكثر بيعًا"!important}
   @media(max-width:820px){
     #paymentChoiceGrid.payment-choice-grid,.payment-choice-grid{grid-template-columns:1fr!important}
@@ -14207,10 +14218,7 @@
   }
   async function sanitizeSyncQueue(){
     if(typeof window.idbGetAll !== "function" || typeof window.idbPut !== "function") return;
-    if(isTrialActive()){
-      try{ if(typeof window.idbClear === "function") await window.idbClear("syncQueue"); }catch{}
-      return;
-    }
+    /* التجربة أصبحت أونلاين؛ لا نحذف طابور المزامنة في التجربة */
     try{
       const q = await window.idbGetAll("syncQueue");
       for(const item of q || []){
@@ -14265,8 +14273,8 @@
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", tick, {once:true}); else tick();
   window.addEventListener("load", ()=>{ applyLogo(true); tick(); }, {once:true});
   window.addEventListener("resize", fixMobilePrimePaymentGrid);
-  try{ new MutationObserver(()=>setTimeout(tick,40)).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["class","style"]}); }catch{}
-  setInterval(tick, 700);
+  try{ new MutationObserver(()=>setTimeout(tick,120)).observe(document.body||document.documentElement,{childList:true,subtree:true}); }catch{}
+  setInterval(tick, 3000);
 })();
 </script>
 
@@ -14281,8 +14289,8 @@
   .primary-btn:active,.gold-btn:active,.success-btn:active,.danger-btn:active,.ghost-btn:active,.icon-btn:active,.nav-btn:active,.payment-choice:active{transform:scale(.985)!important}
   .input:focus,.select:focus,.textarea:focus,.auth-input:focus{box-shadow:var(--oskar-ring)!important}
   .section:not(.active){content-visibility:hidden}.section.active{content-visibility:auto;contain-intrinsic-size:900px}
-  .sync-popover{border:1px solid rgba(37,99,235,.15)!important}.sync-mini-progress-bar{transition:width .12s linear!important;background:linear-gradient(90deg,#2563eb,#06b6d4,#22c55e)!important;background-size:180% 100%;animation:oskarSyncFlow .55s linear infinite}@keyframes oskarSyncFlow{from{background-position:0 0}to{background-position:180% 0}}
-  .icon-btn.syncing i,.fa-circle-notch.fa-spin,.fa-spinner.fa-spin,.oskar-prime-safe-spinner{animation-duration:.32s!important}
+  .sync-popover{border:1px solid rgba(37,99,235,.15)!important}.sync-mini-progress-bar{transition:width .12s linear!important;background:linear-gradient(90deg,#2563eb,#06b6d4,#22c55e)!important;background-size:180% 100%;animation:oskarSyncFlow 1.4s linear infinite}@keyframes oskarSyncFlow{from{background-position:0 0}to{background-position:180% 0}}
+  .icon-btn.syncing i{animation-duration:.9s!important}.fa-circle-notch.fa-spin,.fa-spinner.fa-spin,.oskar-prime-safe-spinner{animation-duration:.75s!important}
   body.oskar-trial-mode #syncNowBtn{display:inline-flex!important;opacity:1!important;pointer-events:auto!important}body.oskar-trial-mode #syncPopover.show{display:block!important}body.oskar-trial-mode #syncCountBadge[style*="flex"],body.oskar-trial-mode #syncCountBadge:not([style*="none"]){display:flex!important}
   body.oskar-trial-mode #page-settings>.card.oskar-trial-open-settings-card{filter:none!important;opacity:1!important;pointer-events:auto!important}body.oskar-trial-mode #page-settings>.card.oskar-trial-open-settings-card:before,body.oskar-trial-mode #page-settings>.card.oskar-trial-open-settings-card:after{display:none!important;content:none!important}
   body.oskar-trial-mode #page-settings>.card.oskar-trial-locked-settings-card{position:relative!important;overflow:hidden!important;filter:none!important;opacity:1!important;border-color:#fde68a!important;background:linear-gradient(180deg,#fff,#fffbeb)!important}
@@ -14292,7 +14300,7 @@
   #employeesSettingsBox,#paymentAccountsList{pointer-events:auto!important;filter:none!important;opacity:1!important}
   @media(max-width:820px){.payment-choice-grid,#paymentChoiceGrid,.oskar-prime-method-grid,#oskarPrimeSafeContent .oskar-prime-safe-grid:has(.oskar-prime-safe-method),.oskar-prime-safe-grid.methods{grid-template-columns:1fr!important}.payment-choice,#oskarPrimeSafeContent .oskar-prime-safe-method,.oskar-prime-method{width:100%!important;max-width:none!important;min-width:0!important;display:grid!important;grid-template-columns:76px minmax(0,1fr)!important;align-items:center!important;text-align:right!important}.payment-choice i,#oskarPrimeSafeContent .oskar-prime-safe-method img,.oskar-prime-method img{justify-self:center!important}.payment-choice span,.payment-choice b,#oskarPrimeSafeContent .oskar-prime-safe-method h3,#oskarPrimeSafeContent .oskar-prime-safe-method p,.oskar-prime-method h3,.oskar-prime-method p{white-space:normal!important;overflow:visible!important;text-overflow:clip!important}}
   .oskar-prime-safe-shell,.oskar-prime-shell{background:rgba(255,255,255,.96)!important;backdrop-filter:blur(22px)!important;border-radius:34px!important}.oskar-prime-safe-hero,.oskar-prime-home-card{background:radial-gradient(circle at top left,rgba(255,255,255,.22),transparent 28%),linear-gradient(135deg,#0f172a,#1d4ed8 58%,#06b6d4)!important}.oskar-prime-safe-select,.oskar-prime-plan,.oskar-prime-safe-method,.oskar-prime-method{box-shadow:0 16px 42px rgba(15,23,42,.08)!important}.oskar-prime-safe-select.best:before,.oskar-prime-select-card.best:before,.oskar-prime-plan.best:before{content:"الأكثر بيعًا"!important;background:linear-gradient(135deg,#f59e0b,#f97316)!important;color:#fff!important;box-shadow:0 10px 20px rgba(245,158,11,.24)!important}
-  .oskar-pro-shine{position:relative;overflow:hidden}.oskar-pro-shine:after{content:"";position:absolute;inset:-40% auto auto -80%;width:60%;height:180%;transform:rotate(25deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.34),transparent);animation:oskarShine 3.8s ease-in-out infinite}@keyframes oskarShine{0%,65%{left:-85%}100%{left:135%}}
+  .oskar-pro-shine:after{content:none!important;display:none!important;animation:none!important}
 </style>
 <script id="oskarFinalFastSyncTrialOnlinePro20260430">
 (function(){
@@ -14377,15 +14385,15 @@
     const oldToast=window.toast; if(typeof oldToast==="function"&&!oldToast.__oskarSoundGuard){window.toast=function(msg){if(/باركود|barcode|تمت قراءة|تمت إضافة/i.test(String(msg||"")))allow();return oldToast.apply(this,arguments)};window.toast.__oskarSoundGuard=true}
   }
   function oneColumnPayments(){if(innerWidth<=820){$$(".payment-choice-grid,#paymentChoiceGrid,.oskar-prime-method-grid,#oskarPrimeSafeContent .oskar-prime-safe-grid").forEach(g=>{if(g.querySelector(".payment-choice,.oskar-prime-safe-method,.oskar-prime-method"))g.style.setProperty("grid-template-columns","1fr","important")})}}
-  function proTouch(){ $$(".oskar-prime-safe-hero,.oskar-prime-home-card,.primary-btn,.gold-btn,.oskar-prime-action").forEach(el=>el.classList.add("oskar-pro-shine")); document.querySelectorAll('[data-safe-plan="lifetime"],.oskar-prime-plan').forEach(el=>{if(/مدى الحياة/.test(el.textContent||""))el.classList.add("best")}); }
+  function proTouch(){ document.querySelectorAll('[data-safe-plan="lifetime"],.oskar-prime-plan,.oskar-prime-safe-select').forEach(el=>{if(/مدى الحياة/.test(el.textContent||"") || el.getAttribute("data-safe-plan")==="lifetime")el.classList.add("best")}); }
   document.addEventListener("click",function(e){const btn=e.target.closest&&e.target.closest("#syncNowBtn"); if(btn){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();fastSyncNow(true)}},true);
   window.addEventListener("online",()=>setTimeout(()=>fastSyncNow(false),280));
   function tick(){installFastSync();lockTrialSettings();preventBarcodeAutoplay();oneColumnPayments();proTouch()}
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",tick,{once:true});else tick();
   window.addEventListener("load",()=>{tick();setTimeout(tick,180);setTimeout(tick,800)},{once:true});
   window.addEventListener("resize",oneColumnPayments);
-  try{new MutationObserver(()=>setTimeout(tick,35)).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["class","style"]})}catch{}
-  const iv=setInterval(tick,700); setTimeout(()=>clearInterval(iv),60000);
+  try{new MutationObserver(()=>setTimeout(tick,150)).observe(document.body||document.documentElement,{childList:true,subtree:true})}catch{}
+  const iv=setInterval(tick,2500); setTimeout(()=>clearInterval(iv),15000);
 })();
 </script>
 
@@ -14395,6 +14403,124 @@
   body.oskar-trial-mode #employeesSettingsBox,body.oskar-trial-mode #employeesSettingsBox *{filter:none!important;opacity:1!important;pointer-events:auto!important}
   body.oskar-trial-mode #employeesSettingsBox::before,body.oskar-trial-mode #employeesSettingsBox::after{content:none!important;display:none!important}
 </style>
+
+
+
+<!-- OSKAR_STABLE_REPAIR_PATCH_2026_05_01 -->
+<style id="oskarStableRepairStyle20260501">
+  .oskar-pro-shine::after{content:none!important;display:none!important;animation:none!important}
+  .primary-btn,.gold-btn,.success-btn,.danger-btn,.ghost-btn,.icon-btn{transition:transform .16s ease,box-shadow .18s ease,background .18s ease!important}
+  .icon-btn.syncing i{animation:syncSpin .9s linear infinite!important}
+  .sync-mini-progress-bar{animation-duration:1.4s!important;transition:width .18s ease!important}
+  .toast.show{animation:fadeIn .14s ease!important}
+  body.oskar-trial-mode #syncNowBtn{display:inline-flex!important;opacity:1!important;pointer-events:auto!important}
+  body.oskar-trial-mode #page-settings>.card.oskar-trial-open-settings-card,
+  body.oskar-trial-mode #employeesSettingsBox,
+  body.oskar-trial-mode #employeesSettingsBox *{filter:none!important;opacity:1!important;pointer-events:auto!important}
+  body.oskar-trial-mode #page-settings>.card.oskar-trial-open-settings-card::before,
+  body.oskar-trial-mode #page-settings>.card.oskar-trial-open-settings-card::after,
+  body.oskar-trial-mode #employeesSettingsBox::before,
+  body.oskar-trial-mode #employeesSettingsBox::after{content:none!important;display:none!important}
+  body.oskar-trial-mode #page-settings>.card.oskar-trial-locked-settings-card{display:block!important} body.oskar-trial-mode #page-settings>.card.oskar-trial-locked-settings-card>*{filter:none!important;opacity:.72!important}
+  body.oskar-trial-mode #page-settings>.card.oskar-trial-locked-settings-card::after{content:"\f023  مقفول في التجربة"!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:rgba(15,23,42,.80)!important}
+  #oskarPrimeBuyLoginBtn{display:flex!important;width:100%!important;align-items:center!important;justify-content:center!important;gap:8px!important;margin-top:10px!important}
+  .oskar-prime-home-card{display:block!important}
+  @media(max-width:820px){#paymentChoiceGrid.payment-choice-grid,.payment-choice-grid,.oskar-prime-method-grid,#oskarPrimeSafeContent .oskar-prime-safe-grid{grid-template-columns:1fr!important}.payment-choice,.oskar-prime-method,#oskarPrimeSafeContent .oskar-prime-safe-method{width:100%!important;max-width:none!important}}
+</style>
+<script id="oskarStableRepairScript20260501">
+(function(){
+  "use strict";
+  if(window.__OSKAR_STABLE_REPAIR_20260501__) return;
+  window.__OSKAR_STABLE_REPAIR_20260501__ = true;
+  const MODE_KEY="oskar_storage_mode_v1", START_KEY="oskar_trial_started_at_v1", DUR=12*60*60*1000;
+  const $=id=>document.getElementById(id), $$=(s,r=document)=>Array.from((r||document).querySelectorAll(s));
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const trialActive=()=>{try{const st=Number(localStorage.getItem(START_KEY)||0);return localStorage.getItem(MODE_KEY)==="trial"&&st&&Date.now()-st<DUR}catch{return !!window.OSKAR_TRIAL_ACTIVE}};
+  window.log = window.log || function(){try{console.log.apply(console,arguments)}catch{}};
+  function toast(msg,ms=1800){
+    msg=String(msg||"");
+    const old=window.__oskarOriginalToastStable || window.toast;
+    const now=Date.now();
+    if(window.__oskarLastToastText===msg && now-(window.__oskarLastToastAt||0)<1200) return;
+    window.__oskarLastToastText=msg; window.__oskarLastToastAt=now;
+    const el=$("toast");
+    if(el){
+      el.textContent=msg; el.classList.add("show"); el.style.display="block";
+      clearTimeout(window.__oskarStableToastTimer);
+      window.__oskarStableToastTimer=setTimeout(()=>{el.classList.remove("show");el.style.display="none";}, Math.max(900, Math.min(ms, 2400)));
+      return;
+    }
+    if(typeof old==="function" && old!==toast){try{return old(msg,Math.min(ms,2400))}catch{}}
+  }
+  if(typeof window.toast==="function" && !window.__oskarOriginalToastStable) window.__oskarOriginalToastStable=window.toast;
+  window.toast=toast;
+  function resetSyncUi(status){
+    try{window.state&&(window.state.syncing=false)}catch{}
+    const btn=$("syncNowBtn"); if(btn){btn.classList.remove("syncing");btn.disabled=false;btn.style.pointerEvents="auto";}
+    try{window.updateSyncUi&&window.updateSyncUi({spin:false,visible:false,progress:0,status:status||"جاهز"})}catch{}
+  }
+  setInterval(()=>{try{if(window.state?.syncing && Date.now()-(window.__oskarSyncStartedAt||0)>25000) resetSyncUi("تم إيقاف دوران المزامنة القديمة تلقائيًا")}catch{}},4000);
+  function firebaseReady(){return !!(navigator.onLine && window.db && window.ref && window.set && window.remove && window.firebasePath)}
+  async function withTimeout(p,ms){let t;try{return await Promise.race([p,new Promise((_,rej)=>{t=setTimeout(()=>rej(new Error("timeout")),ms)})])}finally{clearTimeout(t)}}
+  const labels={products:"المنتجات",invoices:"الفواتير",customers:"العملاء",expenses:"المصروفات",purchases:"المشتريات",supplierPayments:"دفعات التجار",paymentAccounts:"حسابات الدفع",employees:"الموظفون",settings:"الإعدادات"};
+  function sanitizeSettings(d){if(!d)return d;const x={...d};delete x.localLogo;if(x.logoMode==="local")x.logoMode=x.logo?"url":"default";return x}
+  async function stableFastSync(showPopover=false){
+    if(window.state?.syncing && Date.now()-(window.__oskarSyncStartedAt||0)<25000){toast("المزامنة تعمل الآن");return}
+    window.__oskarSyncStartedAt=Date.now(); window.state=window.state||{}; window.state.syncing=true;
+    const btn=$("syncNowBtn"); if(btn){btn.classList.add("syncing");btn.disabled=false;btn.style.pointerEvents="auto";}
+    if(trialActive()){window.OSKAR_TRIAL_ACTIVE=true;window.OSKAR_TRIAL_LOCAL_ONLY=false;window.OSKAR_TRIAL_FIREBASE_ALLOWED=true;}
+    try{
+      if(!firebaseReady()){
+        await window.refreshPendingCount?.();
+        window.updateSyncUi?.({visible:!!showPopover,spin:false,title:"لا يوجد اتصال",status:"البيانات محفوظة محليًا وستُرفع عند عودة النت",progress:0});
+        return;
+      }
+      const raw=typeof window.idbGetAll==="function"?await window.idbGetAll("syncQueue"):[];
+      const queue=(raw||[]).filter(q=>q&&q.store&&q.itemId&&!['syncQueue','localMeta'].includes(q.store));
+      if(!queue.length){
+        try{await window.loadLocalData?.(true)}catch{}
+        try{window.renderAll?.()}catch{}
+        await window.refreshPendingCount?.();
+        window.updateSyncUi?.({visible:!!showPopover,spin:false,title:"المزامنة",status:"كل البيانات مرفوعة ولا توجد عمليات معلقة",progress:100,operations:[]});
+        if(showPopover) setTimeout(()=>window.updateSyncUi?.({visible:false,spin:false}),850);
+        return;
+      }
+      const latest=new Map(); queue.sort((a,b)=>Number(a.createdAt||0)-Number(b.createdAt||0)).forEach(q=>latest.set(q.store+"::"+q.itemId,q));
+      const jobs=Array.from(latest.values());
+      window.updateSyncUi?.({visible:!!showPopover,spin:true,title:"مزامنة سريعة",status:"بدء رفع البيانات...",progress:4,operations:[]});
+      let done=0, ok=new Set(), failed=0;
+      for(let i=0;i<jobs.length;i+=12){
+        const chunk=jobs.slice(i,i+12);
+        const res=await Promise.allSettled(chunk.map(q=>withTimeout((async()=>{const path=window.firebasePath(q.store,q.itemId); if((q.type||"set")==="remove") await window.remove(window.ref(window.db,path)); else await window.set(window.ref(window.db,path), q.store==="settings"?sanitizeSettings(q.data):q.data); return q;})(),8000)));
+        res.forEach((r,idx)=>{done++;const q=chunk[idx]; if(r.status==="fulfilled")ok.add(q.id); else failed++;});
+        window.updateSyncUi?.({visible:!!showPopover,spin:true,title:"مزامنة سريعة",status:`رفع البيانات ${done} / ${jobs.length}`,progress:Math.min(96,8+(done/jobs.length)*88),operation:{store:labels[chunk[chunk.length-1]?.store]||"المزامنة",text:"تمت دفعة",done:true}});
+        await sleep(25);
+      }
+      for(const q of queue){if(ok.has(q.id)){try{await window.idbDelete?.("syncQueue",q.id)}catch{}}}
+      try{await window.loadLocalData?.(true)}catch{}
+      try{window.renderAll?.()}catch{}
+      await window.refreshPendingCount?.();
+      if(failed){window.updateSyncUi?.({visible:!!showPopover,spin:false,title:"المزامنة",status:`تم رفع أغلب البيانات وبقيت ${failed} عملية ستعاد لاحقًا`,progress:85});toast("تمت المزامنة جزئيًا وبقيت عمليات قليلة");}
+      else{window.updateSyncUi?.({visible:!!showPopover,spin:false,title:"تمت المزامنة",status:"تم رفع كل البيانات وتحديث الصفحة الرئيسية",progress:100,operations:[{store:"المزامنة",text:"كل شيء مرفوع",done:true}]}); if(showPopover)toast("تمت المزامنة بسرعة"); setTimeout(()=>window.updateSyncUi?.({visible:false,spin:false}),850);}
+    }catch(e){console.warn("stable sync failed",e);window.updateSyncUi?.({visible:!!showPopover,spin:false,title:"المزامنة",status:"لم تكتمل الآن، البيانات محفوظة وستعاد المحاولة",progress:15});}
+    finally{resetSyncUi();try{await window.refreshPendingCount?.()}catch{}}
+  }
+  function installSync(){window.syncNow=stableFastSync; const btn=$("syncNowBtn"); if(btn&&!btn.dataset.oskarStableSync){btn.dataset.oskarStableSync="1";btn.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();stableFastSync(true);},true)}}
+  function fixBarcodeSound(){if(window.__oskarStableBarcodeGuard)return; window.__oskarStableBarcodeGuard=true; const nativePlay=HTMLMediaElement.prototype.play; HTMLMediaElement.prototype.play=function(){try{const src=String(this.currentSrc||this.src||""); const isBeep=/qr\.mp3|barcode|beep|scan/i.test(src); if(isBeep && !window.__OSKAR_ALLOW_BARCODE_AUDIO__) return Promise.resolve();}catch{} return nativePlay.apply(this,arguments);}; const allow=()=>{window.__OSKAR_ALLOW_BARCODE_AUDIO__=true;setTimeout(()=>window.__OSKAR_ALLOW_BARCODE_AUDIO__=false,700)}; window.oskarAllowBarcodeSound=allow; document.addEventListener("oskar:barcode-detected",allow,true);}
+  function trialUi(){
+    const active=trialActive(); document.body&&document.body.classList.toggle("oskar-trial-mode",active);
+    if(active){window.OSKAR_TRIAL_ACTIVE=true;window.OSKAR_TRIAL_LOCAL_ONLY=false;window.OSKAR_TRIAL_FIREBASE_ALLOWED=true;const ct=$("connectionText");if(ct){ct.textContent=navigator.onLine?"نسخة تجريبية - مزامنة أونلاين مستقلة":"غير متصل - سيتم الرفع عند عودة النت";ct.style.color=navigator.onLine?"#16a34a":"#dc2626"}}
+    const page=$("page-settings"); if(!page)return; const shop=$("settingShopName")?.closest(".card"), admin=$("adminSecurityBox"); const locked=new Set([shop,admin].filter(Boolean));
+    page.querySelectorAll(":scope > .card").forEach(card=>{const should=active&&locked.has(card); card.classList.toggle("oskar-trial-locked-settings-card",should); card.classList.toggle("oskar-trial-open-settings-card",active&&!should); card.querySelectorAll("input,select,textarea,button").forEach(el=>{if(should){if(el.dataset.oskarStableOldDisabled===undefined)el.dataset.oskarStableOldDisabled=el.disabled?"1":"0";el.disabled=true;}else{if(el.dataset.oskarStableOldDisabled==="0")el.disabled=false;delete el.dataset.oskarStableOldDisabled;}})});
+    const emp=$("employeesSettingsBox"); if(emp){emp.classList.remove("oskar-trial-locked-settings-card");emp.classList.add("oskar-trial-open-settings-card");emp.querySelectorAll("input,select,textarea,button").forEach(el=>{if(el.dataset.oskarStableOldDisabled==="0")el.disabled=false;delete el.dataset.oskarStableOldDisabled;});}
+  }
+  let lastLockedToast=0; document.addEventListener("click",e=>{const card=e.target.closest&&e.target.closest("body.oskar-trial-mode #page-settings>.card.oskar-trial-locked-settings-card"); if(card){e.preventDefault();e.stopPropagation(); if(Date.now()-lastLockedToast>1800){lastLockedToast=Date.now();toast("هذا القسم مقفول في التجربة",1600);}}},true);
+  function ensurePrime(){const auth=document.querySelector("#authLock .auth-card"), trial=$("trialLoginBtn"); if(auth&&trial){let btn=$("oskarPrimeBuyLoginBtn"); if(!btn){btn=document.createElement("button");btn.id="oskarPrimeBuyLoginBtn";btn.type="button";btn.className="auth-main-btn oskar-prime-open-btn";} btn.innerHTML='<i class="fa-solid fa-crown"></i> شراء النسخة إلكترونيًا'; btn.style.cssText="background:linear-gradient(135deg,#7c3aed,#2563eb);margin-top:10px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px"; const note=$("trialLoginNote"); (note||trial).insertAdjacentElement("afterend",btn); btn.onclick=function(e){e.preventDefault();openPrimePage();};} const home=$("page-home"); if(home&&!$("oskarStablePrimeBanner")){const b=document.createElement("div");b.id="oskarStablePrimeBanner";b.className="oskar-prime-home-card"; b.innerHTML='<h3><i class="fa-solid fa-crown"></i> Prime</h3><p>فعّل النسخة الكاملة إلكترونيًا بخطوات سهلة وبواجهة شراء احترافية.</p><button type="button" class="oskar-prime-open-btn"><i class="fa-solid fa-bolt"></i> شراء النسخة إلكترونيًا</button>'; home.insertBefore(b,home.firstChild); b.querySelector("button").onclick=openPrimePage;}}
+  function openPrimePage(){const existing=$("oskarPrimeSafeOverlay")||$("oskarPrimeOverlay"); if(existing){existing.classList.add("show");return;} const page=document.createElement("div"); page.id="oskarPrimeSafeOverlay"; page.className="oskar-prime-overlay show"; page.innerHTML='<div class="oskar-prime-shell"><div class="oskar-prime-top"><div class="oskar-prime-title"><i class="fa-solid fa-crown"></i> شراء Prime</div><button class="oskar-prime-small-btn" type="button" data-close-prime>رجوع <i class="fa-solid fa-arrow-left"></i></button></div><div class="oskar-prime-stepper"><div class="oskar-prime-step active">1 - اختيار النسخة</div><div class="oskar-prime-step">2 - طريقة الدفع</div><div class="oskar-prime-step">3 - بيانات الدفع</div><div class="oskar-prime-step">4 - تأكيد الطلب</div></div><div class="oskar-prime-plan-grid"><div class="oskar-prime-plan"><b>خطة شهر</b><div class="oskar-prime-price">₪ 49</div><div class="oskar-prime-sub">اشتراك Prime لمدة شهر.</div></div><div class="oskar-prime-plan"><b>خطة 3 شهور</b><div class="oskar-prime-price">₪ 99</div><div class="oskar-prime-sub">قيمة أفضل لفترة أطول.</div></div><div class="oskar-prime-plan best"><b>خطة مدى الحياة</b><div class="oskar-prime-price">₪ 149</div><div class="oskar-prime-sub">الأكثر بيعًا - تفعيل دائم.</div></div></div><div class="oskar-prime-method-grid" style="margin-top:14px"><div class="oskar-prime-method"><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS4zWThetSPpBwUBzFSBYzU4g1HSTdqdSXGnyh7PyOHhQ&s=10"><b>بنك فلسطين</b></div><div class="oskar-prime-method"><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSgCBX8yJGaKvVWmuiUX36B5K8OaY5Fj8dfYortV5w3GA&s&ec=121643259"><b>محفظة بال باي</b></div></div></div>'; document.body.appendChild(page); page.querySelector("[data-close-prime]").onclick=()=>page.classList.remove("show");}
+  function tick(){installSync();fixBarcodeSound();trialUi();ensurePrime();$$('.oskar-prime-plan,.oskar-prime-safe-select').forEach(x=>{if(/مدى الحياة/.test(x.textContent||'')||x.getAttribute('data-safe-plan')==='lifetime')x.classList.add('best')});}
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",tick,{once:true});else tick(); window.addEventListener("load",()=>{tick();resetSyncUi();},{once:true}); window.addEventListener("online",()=>setTimeout(()=>stableFastSync(false),600)); setInterval(tick,3500);
+})();
+</script>
 
 </body>
 </html>
