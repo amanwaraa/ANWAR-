@@ -14790,7 +14790,7 @@
     box-sizing:border-box!important;
     background:#fff!important;
     color:#000!important;
-    font-family:"Courier New", Courier, monospace!important;
+    font-family:"Cairo","Tahoma","Arial",sans-serif!important;
     font-size:12px!important;
     line-height:1.42!important;
     border:0!important;
@@ -14813,8 +14813,8 @@
   .oskar-thermal-total-row td{font-weight:900!important;font-size:16px!important;border-top:1px double #000!important;border-bottom:1px double #000!important;padding:5px 0!important}
   .oskar-thermal-payment{margin-top:10px;font-size:12px!important;word-break:break-word!important}
   .oskar-thermal-footer{text-align:center;margin-top:20px;font-size:10px!important;border-top:1px dashed #000;padding-top:10px}
-  .oskar-thermal-barcode{display:block;margin:8px auto 0!important;width:62mm!important;max-width:62mm!important;height:18mm!important;overflow:hidden!important}
-  .oskar-thermal-barcode svg{width:62mm!important;height:16mm!important;display:block!important;margin:0 auto!important}
+  .oskar-thermal-barcode{display:block;margin:8px auto 0!important;width:50mm!important;max-width:50mm!important;height:13mm!important;overflow:hidden!important}
+  .oskar-thermal-barcode svg{width:50mm!important;height:11mm!important;display:block!important;margin:0 auto!important}
   .oskar-thermal-code{font-size:10px!important;text-align:center!important;direction:ltr!important;margin-top:2px!important;letter-spacing:.2px!important}
   .oskar-thermal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;justify-content:center}
   .oskar-export-busy{opacity:.65!important;pointer-events:none!important}
@@ -14826,7 +14826,7 @@
   /* إصلاح تداخل/قص نص الفاتورة، ومنع ظهور القالب العادي قبل استبداله */
   #invoiceViewBox:not([data-oskar-thermalized="1"]) .invoice-paper{display:none!important;visibility:hidden!important}
   .oskar-thermal-receipt{
-    font-family:"Tahoma","Arial",sans-serif!important;
+    font-family:"Cairo","Tahoma","Arial",sans-serif!important;
     width:80mm!important;
     max-width:80mm!important;
     min-width:80mm!important;
@@ -14869,10 +14869,10 @@
   .oskar-thermal-left{direction:ltr!important;text-align:left!important;unicode-bidi:plaintext!important}
   .oskar-thermal-totals td{width:50%!important;line-height:1.55!important}
   .oskar-thermal-total-row td{font-size:17px!important;line-height:1.45!important}
-  .oskar-thermal-barcode{width:62mm!important;height:auto!important;min-height:16mm!important;overflow:visible!important}
-  .oskar-thermal-barcode svg{width:62mm!important;height:16mm!important;overflow:visible!important}
+  .oskar-thermal-barcode{width:50mm!important;height:auto!important;min-height:12mm!important;overflow:visible!important}
+  .oskar-thermal-barcode svg{width:50mm!important;height:11mm!important;overflow:visible!important}
   @media print{
-    .oskar-thermal-receipt{box-shadow:none!important;margin:0!important;font-family:"Tahoma","Arial",sans-serif!important;overflow:visible!important}
+    .oskar-thermal-receipt{box-shadow:none!important;margin:0!important;font-family:"Cairo","Tahoma","Arial",sans-serif!important;overflow:visible!important}
   }
 </style>
 <script id="oskar-thermal-receipt-scanner-final-patch">
@@ -15056,7 +15056,7 @@
       if(!code) return;
       if(window.JsBarcode){
         try{
-          window.JsBarcode(svg, code, {format:"CODE128", displayValue:false, height:42, width:1.15, margin:0});
+          window.JsBarcode(svg, code, {format:"CODE128", displayValue:false, height:28, width:0.85, margin:0});
         }catch{}
       }else{
         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -15105,18 +15105,32 @@
     if(!receipt) throw new Error("receipt_not_found");
     renderBarcodes(receipt);
     if(!window.html2canvas) throw new Error("html2canvas_not_ready");
+    try{ if(document.fonts && document.fonts.ready) await document.fonts.ready; }catch{}
     await waitFrame();
     const wrap = document.createElement("div");
-    wrap.style.cssText = "position:fixed;right:-10000px;top:0;background:#fff;width:80mm;z-index:-1;opacity:1;pointer-events:none;direction:rtl";
+    wrap.style.cssText = "position:fixed;left:-100000px;top:0;background:#fff;width:80mm;z-index:2147483647;opacity:1;visibility:visible;pointer-events:none;direction:rtl;padding:0;margin:0;overflow:visible";
     const clone = receipt.cloneNode(true);
-    clone.style.boxShadow = "none";
-    clone.style.margin = "0";
+    clone.style.cssText = "width:80mm!important;max-width:80mm!important;min-width:80mm!important;box-shadow:none!important;margin:0!important;border:0!important;border-radius:0!important;overflow:visible!important;background:#fff!important;color:#000!important;font-family:'Cairo','Tahoma','Arial',sans-serif!important;line-height:1.55!important";
+    clone.querySelectorAll("*").forEach(el => {
+      el.style.boxShadow = "none";
+      el.style.textShadow = "none";
+      el.style.filter = "none";
+      el.style.transform = "none";
+      el.style.animation = "none";
+      el.style.transition = "none";
+      el.style.maxWidth = "100%";
+    });
     wrap.appendChild(clone);
     document.body.appendChild(wrap);
     renderBarcodes(clone);
+    try{ if(document.fonts && document.fonts.ready) await document.fonts.ready; }catch{}
+    await waitFrame();
     await waitFrame();
     try{
-      return await html2canvas(clone, {backgroundColor:"#ffffff", scale:3, useCORS:false, allowTaint:true, logging:false, scrollX:0, scrollY:0, windowWidth:360, imageTimeout:350});
+      const rect = clone.getBoundingClientRect();
+      const w = Math.ceil(Math.max(clone.scrollWidth, rect.width, 302));
+      const h = Math.ceil(Math.max(clone.scrollHeight, rect.height, 80)) + 10;
+      return await html2canvas(clone, {backgroundColor:"#ffffff", scale:3, useCORS:false, allowTaint:true, logging:false, scrollX:0, scrollY:0, windowWidth:w, windowHeight:h, width:w, height:h, imageTimeout:1200, removeContainer:true});
     }finally{
       wrap.remove();
     }
@@ -15162,11 +15176,11 @@
       document.body.appendChild(frame);
       const doc = frame.contentWindow.document;
       doc.open();
-      doc.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة</title><style>
-        @page{size:80mm auto;margin:0}*{box-sizing:border-box!important}html,body{margin:0!important;padding:0!important;background:#fff!important;color:#000!important;direction:rtl!important}.oskar-thermal-receipt{width:80mm!important;max-width:80mm!important;min-width:80mm!important;margin:0!important;padding:5mm!important;background:#fff!important;color:#000!important;font-family:"Courier New",Courier,monospace!important;font-size:12px!important;line-height:1.42!important;box-shadow:none!important;border:0!important;border-radius:0!important}.oskar-thermal-receipt *{color:#000!important;box-shadow:none!important;text-shadow:none!important;filter:none!important;transform:none!important}.oskar-thermal-header{text-align:center;border-bottom:1px dashed #000;padding-bottom:10px;margin-bottom:10px}.oskar-thermal-header h1{margin:0;font-size:20px!important;font-weight:900!important;text-transform:uppercase}.oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{width:100%!important;border-collapse:collapse!important;margin:0 0 10px!important;min-width:0!important}.oskar-thermal-info td{vertical-align:top!important;padding:1px 0!important;border:0!important;background:#fff!important;font-size:12px!important}.oskar-thermal-left{text-align:left!important}.oskar-thermal-items th{border:0!important;border-bottom:1px solid #000!important;background:#fff!important;text-align:right!important;padding:5px 0!important;font-size:12px!important;font-weight:900!important}.oskar-thermal-items td{border:0!important;border-bottom:1px dotted #000!important;background:#fff!important;padding:5px 0!important;font-size:12px!important}.center{text-align:center!important}.left{text-align:left!important}.oskar-thermal-totals td{border:0!important;background:#fff!important;padding:2px 0!important;font-size:12px!important}.oskar-thermal-total-row td{font-weight:900!important;font-size:16px!important;border-top:1px double #000!important;border-bottom:1px double #000!important;padding:5px 0!important}.oskar-thermal-payment{margin-top:10px;font-size:12px!important}.oskar-thermal-footer{text-align:center;margin-top:20px;font-size:10px!important;border-top:1px dashed #000;padding-top:10px}.oskar-thermal-barcode{display:block;margin:8px auto 0!important;width:62mm!important;max-width:62mm!important;height:18mm!important;overflow:hidden!important}.oskar-thermal-barcode svg{width:62mm!important;height:16mm!important;display:block!important;margin:0 auto!important}.oskar-thermal-code{font-size:10px!important;text-align:center!important;direction:ltr!important;margin-top:2px!important}.oskar-thermal-preview-wrap{display:block!important;background:#fff!important;border:0!important;padding:0!important}.oskar-thermal-receipt{font-family:"Tahoma","Arial",sans-serif!important;padding:4mm!important;line-height:1.55!important;overflow:visible!important}.oskar-thermal-receipt *{max-width:100%!important;overflow-wrap:anywhere!important;word-break:normal!important;letter-spacing:0!important}.oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{table-layout:fixed!important}.oskar-thermal-info td{width:50%!important;line-height:1.55!important;vertical-align:top!important}.oskar-thermal-items th,.oskar-thermal-items td{font-size:11px!important;line-height:1.45!important;vertical-align:top!important;overflow:visible!important;white-space:normal!important}.oskar-thermal-items th:nth-child(1),.oskar-thermal-items td:nth-child(1){width:28mm!important;text-align:right!important}.oskar-thermal-items th:nth-child(2),.oskar-thermal-items td:nth-child(2){width:9mm!important;text-align:center!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-items th:nth-child(3),.oskar-thermal-items td:nth-child(3){width:15mm!important;text-align:center!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-items th:nth-child(4),.oskar-thermal-items td:nth-child(4){width:17mm!important;text-align:left!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-left{direction:ltr!important;text-align:left!important;unicode-bidi:plaintext!important}.oskar-thermal-totals td{width:50%!important;line-height:1.55!important}.oskar-thermal-total-row td{font-size:17px!important;line-height:1.45!important}.oskar-thermal-barcode{width:62mm!important;height:auto!important;min-height:16mm!important;overflow:visible!important}.oskar-thermal-barcode svg{width:62mm!important;height:16mm!important;overflow:visible!important}
+      doc.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet"><style>
+        @page{size:80mm auto;margin:0}*{box-sizing:border-box!important}html,body{margin:0!important;padding:0!important;background:#fff!important;color:#000!important;direction:rtl!important}.oskar-thermal-receipt{width:80mm!important;max-width:80mm!important;min-width:80mm!important;margin:0!important;padding:5mm!important;background:#fff!important;color:#000!important;font-family:"Cairo","Tahoma","Arial",sans-serif!important;font-size:12px!important;line-height:1.42!important;box-shadow:none!important;border:0!important;border-radius:0!important}.oskar-thermal-receipt *{color:#000!important;box-shadow:none!important;text-shadow:none!important;filter:none!important;transform:none!important}.oskar-thermal-header{text-align:center;border-bottom:1px dashed #000;padding-bottom:10px;margin-bottom:10px}.oskar-thermal-header h1{margin:0;font-size:20px!important;font-weight:900!important;text-transform:uppercase}.oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{width:100%!important;border-collapse:collapse!important;margin:0 0 10px!important;min-width:0!important}.oskar-thermal-info td{vertical-align:top!important;padding:1px 0!important;border:0!important;background:#fff!important;font-size:12px!important}.oskar-thermal-left{text-align:left!important}.oskar-thermal-items th{border:0!important;border-bottom:1px solid #000!important;background:#fff!important;text-align:right!important;padding:5px 0!important;font-size:12px!important;font-weight:900!important}.oskar-thermal-items td{border:0!important;border-bottom:1px dotted #000!important;background:#fff!important;padding:5px 0!important;font-size:12px!important}.center{text-align:center!important}.left{text-align:left!important}.oskar-thermal-totals td{border:0!important;background:#fff!important;padding:2px 0!important;font-size:12px!important}.oskar-thermal-total-row td{font-weight:900!important;font-size:16px!important;border-top:1px double #000!important;border-bottom:1px double #000!important;padding:5px 0!important}.oskar-thermal-payment{margin-top:10px;font-size:12px!important}.oskar-thermal-footer{text-align:center;margin-top:20px;font-size:10px!important;border-top:1px dashed #000;padding-top:10px}.oskar-thermal-barcode{display:block;margin:8px auto 0!important;width:50mm!important;max-width:50mm!important;height:13mm!important;overflow:hidden!important}.oskar-thermal-barcode svg{width:50mm!important;height:11mm!important;display:block!important;margin:0 auto!important}.oskar-thermal-code{font-size:10px!important;text-align:center!important;direction:ltr!important;margin-top:2px!important}.oskar-thermal-preview-wrap{display:block!important;background:#fff!important;border:0!important;padding:0!important}.oskar-thermal-receipt{font-family:"Cairo","Tahoma","Arial",sans-serif!important;padding:4mm!important;line-height:1.55!important;overflow:visible!important}.oskar-thermal-receipt *{max-width:100%!important;overflow-wrap:anywhere!important;word-break:normal!important;letter-spacing:0!important}.oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{table-layout:fixed!important}.oskar-thermal-info td{width:50%!important;line-height:1.55!important;vertical-align:top!important}.oskar-thermal-items th,.oskar-thermal-items td{font-size:11px!important;line-height:1.45!important;vertical-align:top!important;overflow:visible!important;white-space:normal!important}.oskar-thermal-items th:nth-child(1),.oskar-thermal-items td:nth-child(1){width:28mm!important;text-align:right!important}.oskar-thermal-items th:nth-child(2),.oskar-thermal-items td:nth-child(2){width:9mm!important;text-align:center!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-items th:nth-child(3),.oskar-thermal-items td:nth-child(3){width:15mm!important;text-align:center!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-items th:nth-child(4),.oskar-thermal-items td:nth-child(4){width:17mm!important;text-align:left!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-left{direction:ltr!important;text-align:left!important;unicode-bidi:plaintext!important}.oskar-thermal-totals td{width:50%!important;line-height:1.55!important}.oskar-thermal-total-row td{font-size:17px!important;line-height:1.45!important}.oskar-thermal-barcode{width:50mm!important;height:auto!important;min-height:12mm!important;overflow:visible!important}.oskar-thermal-barcode svg{width:50mm!important;height:11mm!important;overflow:visible!important}
       </style></head><body>${receipt.outerHTML}</body></html>`);
       doc.close();
-      setTimeout(() => { try{ frame.contentWindow.focus(); frame.contentWindow.print(); } finally{ setTimeout(()=>frame.remove(), 900); } }, 90);
+      setTimeout(() => { try{ frame.contentWindow.focus(); frame.contentWindow.print(); } finally{ setTimeout(()=>frame.remove(), 1200); } }, 380);
     }catch(err){ console.error(err); toast("تعذر فتح الطباعة الآن"); }
     finally{ setTimeout(()=>setBusy(btn, false), 350); }
   }
@@ -15182,6 +15196,26 @@
   }, true);
 })();
 </script>
+
+
+<!-- OSKAR_INVOICE_FONT_IMAGE_PRINT_BARCODE_FINAL_FIX_2026_05_01 -->
+<style id="oskarInvoiceFontImagePrintBarcodeFinalFix20260501">
+  .oskar-thermal-receipt,
+  .oskar-thermal-receipt *{
+    font-family:"Cairo","Tahoma","Arial",sans-serif!important;
+  }
+  .oskar-thermal-receipt{overflow:visible!important;line-height:1.55!important;background:#fff!important;color:#000!important;}
+  .oskar-thermal-preview-wrap{overflow:visible!important;}
+  .oskar-thermal-barcode{width:50mm!important;max-width:50mm!important;height:auto!important;min-height:12mm!important;overflow:visible!important;margin:7px auto 0!important;}
+  .oskar-thermal-barcode svg{width:50mm!important;max-width:50mm!important;height:11mm!important;display:block!important;margin:0 auto!important;overflow:visible!important;}
+  .oskar-thermal-code{font-size:10px!important;line-height:1.2!important;margin-top:1mm!important;}
+  @media print{
+    .oskar-thermal-receipt,
+    .oskar-thermal-receipt *{font-family:"Cairo","Tahoma","Arial",sans-serif!important;}
+    .oskar-thermal-barcode{width:50mm!important;max-width:50mm!important;min-height:12mm!important;}
+    .oskar-thermal-barcode svg{width:50mm!important;height:11mm!important;}
+  }
+</style>
 
 </body>
 </html>
