@@ -8476,97 +8476,103 @@
     }
 
     function buildInvoiceHtml(invoice) {
-      const s = state.settings || defaultSettings;
-      const acc = state.paymentAccounts.find(a => a.id === invoice.paymentAccountId);
-      const visibleLogo = document.getElementById("topShopLogo")?.src || document.getElementById("sideShopLogo")?.src || "";
-      const logo = s.localLogo || s.logo || visibleLogo || makeLogoDataUrl(s.shopName || "oskar");
-      const logoFallback = makeLogoDataUrl(s.shopName || "oskar");
+      const s = state.settings || defaultSettings || {};
+      const acc = state.paymentAccounts.find(a => String(a.id) === String(invoice.paymentAccountId || ""));
+      const safeNum = (v, fallback = 0) => {
+        const n = Number(String(v ?? fallback).replace(",", ".").replace(/[^\d.\-]/g, ""));
+        return Number.isFinite(n) ? n : fallback;
+      };
+      const fixed3 = (v) => safeNum(v).toFixed(3);
+      const pad2 = (n) => String(n).padStart(2, "0");
+      const d = new Date(safeNum(invoice.createdAt, Date.now()));
+      let h = d.getHours();
+      const isAm = h < 12;
+      h = h % 12 || 12;
+      const dateText = `${d.getFullYear()}/${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}`;
+      const timeText = `${pad2(h)}:${pad2(d.getMinutes())} ${isAm ? "ص" : "م"}`;
+      const compactDate = `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}`;
+      const cleanNumber = String(invoice.number || "0").replace(/\D/g, "") || "0";
+      const barcodeCode = `${cleanNumber}-${compactDate}`;
+      const shopName = s.shopName || "oskar";
+      const employee = invoice.employeeName || state.auth?.user?.name || "المدير";
+      const folder = acc?.name || paymentFolderName(invoice);
+      const items = Array.isArray(invoice.items) ? invoice.items : [];
 
       return `
-        <div class="invoice-paper" style="direction:rtl;font-family:Cairo,Arial,sans-serif">
-          <div class="invoice-header">
-            <div style="display:flex;align-items:center;gap:10px;min-width:0">
-              <img class="invoice-logo" src="${logo}" alt="" onerror="this.onerror=null;this.src='${logoFallback}'">
-              <div style="min-width:0">
-                <h2 class="invoice-shop-title">${escapeHtml(s.shopName || "oskar")}</h2>
-                <div style="color:#64748b;font-size:11px">${escapeHtml(s.shopPhone || "")}</div>
-                <div style="color:#64748b;font-size:11px">فاتورة مبيعات</div>
-                ${invoice.employeeName ? `<div style="color:#64748b;font-size:11px">الموظف: ${escapeHtml(invoice.employeeName)}</div>` : ""}
-              </div>
+        <div class="oskar-thermal-preview-wrap">
+          <div class="oskar-thermal-receipt" data-oskar-thermal-receipt="1" data-invoice-number="${escapeHtml(invoice.number)}">
+            <div class="oskar-thermal-header">
+              <h1>${escapeHtml(shopName)}</h1>
+              <div>فاتورة مبيعات</div>
+              <div>الموظف: ${escapeHtml(employee)}</div>
             </div>
 
-            <div style="text-align:center">
-              <div style="font-size:20px;font-weight:900;color:#1d4ed8">#${invoice.number}</div>
-              <svg class="barcode-svg" id="invoiceBarcode_${invoice.id}" data-invoice-barcode="${escapeHtml(getInvoiceBarcodeValue(invoice))}"></svg>
-              <div class="invoice-date-small">${formatDate(invoice.createdAt)}</div>
-            </div>
-          </div>
-
-          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px">
-            <div style="background:#f8fafc;border-radius:14px;padding:10px;font-size:12px">
-              <b>اسم الزبون:</b> ${escapeHtml(invoice.customerName || "زبون نقدي")}
-            </div>
-
-            <div style="background:#f8fafc;border-radius:14px;padding:10px;font-size:12px">
-              <b>رقم الزبون:</b> ${escapeHtml(invoice.customerPhone || "-")}
-            </div>
-
-            <div style="background:#f8fafc;border-radius:14px;padding:10px;font-size:12px">
-              <b>طريقة الدفع:</b> ${escapeHtml(paymentMethodLabel(invoice.paymentMethod))}
-            </div>
-
-            <div style="background:#f8fafc;border-radius:14px;padding:10px;font-size:12px">
-              <b>مجلد الدفع:</b> ${escapeHtml(acc?.name || paymentFolderName(invoice))}
-            </div>
-          </div>
-
-          <table style="width:100%;border-collapse:collapse;min-width:0">
-            <thead>
+            <table class="oskar-thermal-info">
+              <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
               <tr>
-                <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:8px;font-size:11px">الصنف</th>
-                <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:8px;font-size:11px">الكمية</th>
-                <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:8px;font-size:11px">السعر</th>
-                <th style="border:1px solid #e5e7eb;background:#eff6ff;padding:8px;font-size:11px">الإجمالي</th>
+                <td>الرقم: <span style="font-weight:900">#${escapeHtml(invoice.number)}</span></td>
+                <td class="oskar-thermal-left">التاريخ: ${escapeHtml(dateText)}</td>
               </tr>
-            </thead>
+              <tr>
+                <td>الزبون: <span style="font-weight:900">${escapeHtml(invoice.customerName || "زبون نقدي")}</span></td>
+                <td class="oskar-thermal-left">${escapeHtml(timeText)}</td>
+              </tr>
+              <tr>
+                <td colspan="2">رقم الهاتف: ${escapeHtml(invoice.customerPhone || "-")}</td>
+              </tr>
+            </table>
 
-            <tbody>
-              ${(invoice.items || []).map(item => `
+            <table class="oskar-thermal-items">
+              <colgroup>
+                <col style="width:28mm">
+                <col style="width:9mm">
+                <col style="width:15mm">
+                <col style="width:17mm">
+              </colgroup>
+              <thead>
                 <tr>
-                  <td style="border:1px solid #e5e7eb;padding:8px;font-size:11px">${escapeHtml(item.name)}</td>
-                  <td style="border:1px solid #e5e7eb;padding:8px;font-size:11px">${escapeHtml(item.qtyText || item.qty || "1")}</td>
-                  <td style="border:1px solid #e5e7eb;padding:8px;font-size:11px">${money(item.price)}</td>
-                  <td style="border:1px solid #e5e7eb;padding:8px;font-size:11px;font-weight:900">${money(item.total)}</td>
+                  <th>المادة</th>
+                  <th class="center">كمية</th>
+                  <th class="center">السعر</th>
+                  <th class="left">القيمة</th>
                 </tr>
-              `).join("")}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                ${items.map(item => `
+                  <tr>
+                    <td>${escapeHtml(item.name || "-")}</td>
+                    <td class="center">${escapeHtml(item.qtyText || item.qty || "1")}</td>
+                    <td class="center">${fixed3(item.price)}</td>
+                    <td class="left">${fixed3(item.total)}</td>
+                  </tr>
+                `).join("") || `<tr><td colspan="4" class="center">لا توجد أصناف</td></tr>`}
+              </tbody>
+            </table>
 
-          <div style="display:flex;justify-content:flex-end;margin-top:16px">
-            <div style="width:300px;background:#f8fafc;border-radius:18px;padding:14px;font-size:12px">
-              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-                <span>المجموع:</span>
-                <b>${money(invoice.subtotal)}</b>
-              </div>
+            <table class="oskar-thermal-totals">
+              <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+              <tr><td>المجموع:</td><td class="oskar-thermal-left">₪ ${fixed3(invoice.subtotal)}</td></tr>
+              <tr><td>الخصم:</td><td class="oskar-thermal-left">₪ ${fixed3(invoice.discount)}</td></tr>
+              <tr class="oskar-thermal-total-row"><td>الإجمالي:</td><td class="oskar-thermal-left">₪ ${fixed3(invoice.total)}</td></tr>
+            </table>
 
-              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-                <span>الخصم:</span>
-                <b>${money(invoice.discount)}</b>
-              </div>
+            <div class="oskar-thermal-payment">
+              <div>طريقة الدفع: <span style="font-weight:900">${escapeHtml(paymentMethodLabel(invoice.paymentMethod))}</span></div>
+              <div>مجلد الدفع: <span style="font-weight:900">${escapeHtml(folder)}</span></div>
+            </div>
 
-              <div style="display:flex;justify-content:space-between;font-size:18px;color:#1d4ed8">
-                <span>الإجمالي:</span>
-                <b>${money(invoice.total)}</b>
+            <div class="oskar-thermal-footer">
+              <div style="font-weight:900">شكراً لتعاملكم معنا</div>
+              <div class="oskar-thermal-barcode">
+                <svg data-oskar-thermal-barcode="${escapeHtml(barcodeCode)}"></svg>
+                <div class="oskar-thermal-code">#${escapeHtml(invoice.number)} - ${escapeHtml(compactDate)}</div>
               </div>
             </div>
-          </div>
-
-          <div style="text-align:center;color:#64748b;font-size:11px;margin-top:18px">
-            شكراً لتعاملكم معنا
           </div>
         </div>
       `;
     }
+
     function openInvoiceView(invoice) {
       openModal(`فاتورة رقم #${invoice.number}`, `
         <div id="invoiceViewBox">${buildInvoiceHtml(invoice)}</div>
@@ -8712,47 +8718,7 @@
           <body>
             ${html}
           
-            
-
-<!-- oskar invoice-only-compact-fix 2026-05-01 -->
-<style id="oskar-invoice-only-compact-fix-style">
-  /* إخفاء الفاتورة العادية فوراً حتى لا تظهر لحظة ثم تختفي */
-  #invoiceViewBox>.invoice-paper,#invoiceViewBox .invoice-paper:not(.oskar-thermal-receipt){display:none!important;visibility:hidden!important;opacity:0!important;height:0!important;max-height:0!important;overflow:hidden!important}
-  .oskar-thermal-preview-wrap{overflow:auto!important;justify-content:center!important;align-items:flex-start!important;background:#f8fafc!important}
-  .oskar-thermal-receipt{font-family:Tahoma,Arial,"Cairo",sans-serif!important;width:80mm!important;min-width:80mm!important;max-width:80mm!important;padding:5mm 4mm!important;line-height:1.55!important;overflow:visible!important;direction:rtl!important;unicode-bidi:isolate!important;letter-spacing:0!important;word-spacing:0!important;text-rendering:geometricPrecision!important}
-  .oskar-thermal-receipt *{max-width:100%!important;box-sizing:border-box!important;letter-spacing:0!important;word-spacing:0!important;white-space:normal!important;overflow:visible!important}
-  .oskar-thermal-header h1{font-family:Tahoma,Arial,"Cairo",sans-serif!important;font-size:22px!important;line-height:1.15!important;margin-bottom:2px!important}
-  /* تحويل معلومات الفاتورة من جدول أعمدة إلى سطور كاملة لمنع تراكب النصوص وقص التاريخ والوقت */
-  .oskar-thermal-info,.oskar-thermal-info tbody,.oskar-thermal-info tr,.oskar-thermal-info td{display:block!important;width:100%!important;min-width:0!important;border:0!important;padding:0!important;margin:0!important;text-align:right!important;direction:rtl!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important}
-  .oskar-thermal-info tr{margin-bottom:3px!important}.oskar-thermal-left{text-align:right!important;direction:rtl!important}
-  .oskar-thermal-items{table-layout:fixed!important;width:100%!important;min-width:0!important;border-collapse:collapse!important}.oskar-thermal-items th,.oskar-thermal-items td{font-family:Tahoma,Arial,"Cairo",sans-serif!important;font-size:12px!important;line-height:1.45!important;padding:4px 1px!important;vertical-align:top!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important}.oskar-thermal-items th:nth-child(1),.oskar-thermal-items td:nth-child(1){width:40%!important}.oskar-thermal-items th:nth-child(2),.oskar-thermal-items td:nth-child(2){width:14%!important;text-align:center!important}.oskar-thermal-items th:nth-child(3),.oskar-thermal-items td:nth-child(3){width:23%!important;text-align:center!important;direction:ltr!important;unicode-bidi:isolate!important}.oskar-thermal-items th:nth-child(4),.oskar-thermal-items td:nth-child(4){width:23%!important;text-align:left!important;direction:ltr!important;unicode-bidi:isolate!important}
-  .oskar-thermal-totals,.oskar-thermal-totals tbody,.oskar-thermal-totals tr{width:100%!important;min-width:0!important}.oskar-thermal-totals tr{display:flex!important;justify-content:space-between!important;gap:8px!important}.oskar-thermal-totals td{display:block!important;border:0!important;width:auto!important;white-space:normal!important}.oskar-thermal-total-row td{font-size:18px!important;font-weight:900!important}
-  .oskar-thermal-payment{display:grid!important;gap:3px!important;line-height:1.7!important}.oskar-thermal-barcode{width:62mm!important;max-width:62mm!important;height:18mm!important;margin:8px auto 0!important}.oskar-thermal-barcode svg{width:62mm!important;height:16mm!important}.oskar-thermal-code{direction:ltr!important;unicode-bidi:isolate!important;text-align:center!important;font-size:10px!important}
-  @media(max-width:520px){.oskar-thermal-preview-wrap{padding:10px 0!important;margin-inline:-4px!important;width:calc(100% + 8px)!important}.oskar-thermal-receipt{width:80mm!important;min-width:80mm!important;max-width:80mm!important;padding:5mm 4mm!important}}
-</style>
-<script id="oskar-invoice-only-compact-fix-script">
-(function(){
-  "use strict";
-  const $=id=>document.getElementById(id);
-  function fixLabels(){
-    const p=$("thermalPrintInvoiceBtn"); if(p) p.innerHTML='<i class="fa-solid fa-print"></i> طباعة';
-    const pdf=$("thermalPdfInvoiceBtn"); if(pdf) pdf.innerHTML='<i class="fa-solid fa-file-pdf"></i> PDF';
-    const t=$("modalTitle"); if(t) t.textContent=(t.textContent||"").replace(/فاتورة\s+حرارية/g,"فاتورة");
-  }
-  function hideNormalImmediately(){
-    const box=$("invoiceViewBox");
-    if(!box) return;
-    const paper=box.querySelector('.invoice-paper:not(.oskar-thermal-receipt)');
-    if(paper){paper.style.cssText+=';display:none!important;visibility:hidden!important;height:0!important;max-height:0!important;overflow:hidden!important;opacity:0!important';}
-  }
-  function run(){hideNormalImmediately();fixLabels();}
-  const obs=new MutationObserver(()=>{run();setTimeout(run,0);setTimeout(run,40)});
-  function init(){const body=$("modalBody")||document.body;obs.observe(body,{childList:true,subtree:true});run();}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-})();
-</script>
-
-</body>
+            </body>
         </html>
       `;
 
@@ -14857,8 +14823,56 @@
     .oskar-thermal-receipt{width:80mm!important;max-width:80mm!important;min-width:80mm!important;padding:5mm!important;font-size:12px!important}
     .oskar-thermal-actions{justify-content:stretch}.oskar-thermal-actions button{flex:1 1 42%}
   }
+  /* إصلاح تداخل/قص نص الفاتورة، ومنع ظهور القالب العادي قبل استبداله */
+  #invoiceViewBox:not([data-oskar-thermalized="1"]) .invoice-paper{display:none!important;visibility:hidden!important}
+  .oskar-thermal-receipt{
+    font-family:"Tahoma","Arial",sans-serif!important;
+    width:80mm!important;
+    max-width:80mm!important;
+    min-width:80mm!important;
+    padding:4mm!important;
+    overflow:visible!important;
+    line-height:1.55!important;
+  }
+  .oskar-thermal-receipt *{
+    max-width:100%!important;
+    overflow-wrap:anywhere!important;
+    word-break:normal!important;
+    letter-spacing:0!important;
+  }
+  .oskar-thermal-info,
+  .oskar-thermal-items,
+  .oskar-thermal-totals{
+    table-layout:fixed!important;
+  }
+  .oskar-thermal-info td{
+    width:50%!important;
+    line-height:1.55!important;
+    vertical-align:top!important;
+  }
+  .oskar-thermal-items th,
+  .oskar-thermal-items td{
+    font-size:11px!important;
+    line-height:1.45!important;
+    vertical-align:top!important;
+    overflow:visible!important;
+    white-space:normal!important;
+  }
+  .oskar-thermal-items th:nth-child(1),
+  .oskar-thermal-items td:nth-child(1){width:28mm!important;text-align:right!important}
+  .oskar-thermal-items th:nth-child(2),
+  .oskar-thermal-items td:nth-child(2){width:9mm!important;text-align:center!important;direction:ltr!important;white-space:nowrap!important}
+  .oskar-thermal-items th:nth-child(3),
+  .oskar-thermal-items td:nth-child(3){width:15mm!important;text-align:center!important;direction:ltr!important;white-space:nowrap!important}
+  .oskar-thermal-items th:nth-child(4),
+  .oskar-thermal-items td:nth-child(4){width:17mm!important;text-align:left!important;direction:ltr!important;white-space:nowrap!important}
+  .oskar-thermal-left{direction:ltr!important;text-align:left!important;unicode-bidi:plaintext!important}
+  .oskar-thermal-totals td{width:50%!important;line-height:1.55!important}
+  .oskar-thermal-total-row td{font-size:17px!important;line-height:1.45!important}
+  .oskar-thermal-barcode{width:62mm!important;height:auto!important;min-height:16mm!important;overflow:visible!important}
+  .oskar-thermal-barcode svg{width:62mm!important;height:16mm!important;overflow:visible!important}
   @media print{
-    .oskar-thermal-receipt{box-shadow:none!important;margin:0!important}
+    .oskar-thermal-receipt{box-shadow:none!important;margin:0!important;font-family:"Tahoma","Arial",sans-serif!important;overflow:visible!important}
   }
 </style>
 <script id="oskar-thermal-receipt-scanner-final-patch">
@@ -14973,6 +14987,7 @@
           </div>
 
           <table class="oskar-thermal-info">
+            <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
             <tr>
               <td>الرقم: <span style="font-weight:900">#${esc(invoice.number)}</span></td>
               <td class="oskar-thermal-left">التاريخ: ${esc(dp.date)}</td>
@@ -14987,6 +15002,12 @@
           </table>
 
           <table class="oskar-thermal-items">
+            <colgroup>
+              <col style="width:28mm">
+              <col style="width:9mm">
+              <col style="width:15mm">
+              <col style="width:17mm">
+            </colgroup>
             <thead>
               <tr>
                 <th>المادة</th>
@@ -15008,9 +15029,10 @@
           </table>
 
           <table class="oskar-thermal-totals">
-            <tr><td>المجموع:</td><td class="oskar-thermal-left">${fixed3(invoice.subtotal)} ₪</td></tr>
-            <tr><td>الخصم:</td><td class="oskar-thermal-left">${fixed3(invoice.discount)} ₪</td></tr>
-            <tr class="oskar-thermal-total-row"><td>الإجمالي:</td><td class="oskar-thermal-left">${fixed3(invoice.total)} ₪</td></tr>
+            <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+            <tr><td>المجموع:</td><td class="oskar-thermal-left">₪ ${fixed3(invoice.subtotal)}</td></tr>
+            <tr><td>الخصم:</td><td class="oskar-thermal-left">₪ ${fixed3(invoice.discount)}</td></tr>
+            <tr class="oskar-thermal-total-row"><td>الإجمالي:</td><td class="oskar-thermal-left">₪ ${fixed3(invoice.total)}</td></tr>
           </table>
 
           <div class="oskar-thermal-payment">
@@ -15105,7 +15127,7 @@
     try{
       const canvas = await receiptCanvas();
       const a = document.createElement("a");
-      a.download = invoiceName() + "-receipt.png";
+      a.download = invoiceName() + ".png";
       a.href = canvas.toDataURL("image/png");
       document.body.appendChild(a); a.click(); a.remove();
       toast("تم تنزيل صورة الفاتورة");
@@ -15123,7 +15145,7 @@
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({orientation:"p", unit:"mm", format:[widthMm, heightMm], compress:true});
       pdf.addImage(img, "JPEG", 0, 0, widthMm, heightMm, undefined, "FAST");
-      pdf.save(invoiceName() + "-receipt.pdf");
+      pdf.save(invoiceName() + ".pdf");
       toast("تم تجهيز PDF");
     }catch(err){ console.error(err); toast("تعذر تجهيز PDF الآن"); }
     finally{ setBusy(btn, false); }
@@ -15141,7 +15163,7 @@
       const doc = frame.contentWindow.document;
       doc.open();
       doc.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة</title><style>
-        @page{size:80mm auto;margin:0}*{box-sizing:border-box!important}html,body{margin:0!important;padding:0!important;background:#fff!important;color:#000!important;direction:rtl!important}.oskar-thermal-receipt{width:80mm!important;max-width:80mm!important;min-width:80mm!important;margin:0!important;padding:5mm!important;background:#fff!important;color:#000!important;font-family:"Courier New",Courier,monospace!important;font-size:12px!important;line-height:1.42!important;box-shadow:none!important;border:0!important;border-radius:0!important}.oskar-thermal-receipt *{color:#000!important;box-shadow:none!important;text-shadow:none!important;filter:none!important;transform:none!important}.oskar-thermal-header{text-align:center;border-bottom:1px dashed #000;padding-bottom:10px;margin-bottom:10px}.oskar-thermal-header h1{margin:0;font-size:20px!important;font-weight:900!important;text-transform:uppercase}.oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{width:100%!important;border-collapse:collapse!important;margin:0 0 10px!important;min-width:0!important}.oskar-thermal-info td{vertical-align:top!important;padding:1px 0!important;border:0!important;background:#fff!important;font-size:12px!important}.oskar-thermal-left{text-align:left!important}.oskar-thermal-items th{border:0!important;border-bottom:1px solid #000!important;background:#fff!important;text-align:right!important;padding:5px 0!important;font-size:12px!important;font-weight:900!important}.oskar-thermal-items td{border:0!important;border-bottom:1px dotted #000!important;background:#fff!important;padding:5px 0!important;font-size:12px!important}.center{text-align:center!important}.left{text-align:left!important}.oskar-thermal-totals td{border:0!important;background:#fff!important;padding:2px 0!important;font-size:12px!important}.oskar-thermal-total-row td{font-weight:900!important;font-size:16px!important;border-top:1px double #000!important;border-bottom:1px double #000!important;padding:5px 0!important}.oskar-thermal-payment{margin-top:10px;font-size:12px!important}.oskar-thermal-footer{text-align:center;margin-top:20px;font-size:10px!important;border-top:1px dashed #000;padding-top:10px}.oskar-thermal-barcode{display:block;margin:8px auto 0!important;width:62mm!important;max-width:62mm!important;height:18mm!important;overflow:hidden!important}.oskar-thermal-barcode svg{width:62mm!important;height:16mm!important;display:block!important;margin:0 auto!important}.oskar-thermal-code{font-size:10px!important;text-align:center!important;direction:ltr!important;margin-top:2px!important}.oskar-thermal-preview-wrap{display:block!important;background:#fff!important;border:0!important;padding:0!important}
+        @page{size:80mm auto;margin:0}*{box-sizing:border-box!important}html,body{margin:0!important;padding:0!important;background:#fff!important;color:#000!important;direction:rtl!important}.oskar-thermal-receipt{width:80mm!important;max-width:80mm!important;min-width:80mm!important;margin:0!important;padding:5mm!important;background:#fff!important;color:#000!important;font-family:"Courier New",Courier,monospace!important;font-size:12px!important;line-height:1.42!important;box-shadow:none!important;border:0!important;border-radius:0!important}.oskar-thermal-receipt *{color:#000!important;box-shadow:none!important;text-shadow:none!important;filter:none!important;transform:none!important}.oskar-thermal-header{text-align:center;border-bottom:1px dashed #000;padding-bottom:10px;margin-bottom:10px}.oskar-thermal-header h1{margin:0;font-size:20px!important;font-weight:900!important;text-transform:uppercase}.oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{width:100%!important;border-collapse:collapse!important;margin:0 0 10px!important;min-width:0!important}.oskar-thermal-info td{vertical-align:top!important;padding:1px 0!important;border:0!important;background:#fff!important;font-size:12px!important}.oskar-thermal-left{text-align:left!important}.oskar-thermal-items th{border:0!important;border-bottom:1px solid #000!important;background:#fff!important;text-align:right!important;padding:5px 0!important;font-size:12px!important;font-weight:900!important}.oskar-thermal-items td{border:0!important;border-bottom:1px dotted #000!important;background:#fff!important;padding:5px 0!important;font-size:12px!important}.center{text-align:center!important}.left{text-align:left!important}.oskar-thermal-totals td{border:0!important;background:#fff!important;padding:2px 0!important;font-size:12px!important}.oskar-thermal-total-row td{font-weight:900!important;font-size:16px!important;border-top:1px double #000!important;border-bottom:1px double #000!important;padding:5px 0!important}.oskar-thermal-payment{margin-top:10px;font-size:12px!important}.oskar-thermal-footer{text-align:center;margin-top:20px;font-size:10px!important;border-top:1px dashed #000;padding-top:10px}.oskar-thermal-barcode{display:block;margin:8px auto 0!important;width:62mm!important;max-width:62mm!important;height:18mm!important;overflow:hidden!important}.oskar-thermal-barcode svg{width:62mm!important;height:16mm!important;display:block!important;margin:0 auto!important}.oskar-thermal-code{font-size:10px!important;text-align:center!important;direction:ltr!important;margin-top:2px!important}.oskar-thermal-preview-wrap{display:block!important;background:#fff!important;border:0!important;padding:0!important}.oskar-thermal-receipt{font-family:"Tahoma","Arial",sans-serif!important;padding:4mm!important;line-height:1.55!important;overflow:visible!important}.oskar-thermal-receipt *{max-width:100%!important;overflow-wrap:anywhere!important;word-break:normal!important;letter-spacing:0!important}.oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{table-layout:fixed!important}.oskar-thermal-info td{width:50%!important;line-height:1.55!important;vertical-align:top!important}.oskar-thermal-items th,.oskar-thermal-items td{font-size:11px!important;line-height:1.45!important;vertical-align:top!important;overflow:visible!important;white-space:normal!important}.oskar-thermal-items th:nth-child(1),.oskar-thermal-items td:nth-child(1){width:28mm!important;text-align:right!important}.oskar-thermal-items th:nth-child(2),.oskar-thermal-items td:nth-child(2){width:9mm!important;text-align:center!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-items th:nth-child(3),.oskar-thermal-items td:nth-child(3){width:15mm!important;text-align:center!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-items th:nth-child(4),.oskar-thermal-items td:nth-child(4){width:17mm!important;text-align:left!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-left{direction:ltr!important;text-align:left!important;unicode-bidi:plaintext!important}.oskar-thermal-totals td{width:50%!important;line-height:1.55!important}.oskar-thermal-total-row td{font-size:17px!important;line-height:1.45!important}.oskar-thermal-barcode{width:62mm!important;height:auto!important;min-height:16mm!important;overflow:visible!important}.oskar-thermal-barcode svg{width:62mm!important;height:16mm!important;overflow:visible!important}
       </style></head><body>${receipt.outerHTML}</body></html>`);
       doc.close();
       setTimeout(() => { try{ frame.contentWindow.focus(); frame.contentWindow.print(); } finally{ setTimeout(()=>frame.remove(), 900); } }, 90);
