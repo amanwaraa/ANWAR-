@@ -8611,7 +8611,8 @@
           <body>
             ${html}
           
-            </body>
+            
+</body>
         </html>
       `;
 
@@ -11611,7 +11612,7 @@
   }
 
   const scanSound = new Audio(QR_SOUND_SRC); scanSound.preload="auto"; scanSound.volume=1;
-  function unlockSound(){ scanSound.play().then(()=>{scanSound.pause();scanSound.currentTime=0;}).catch(()=>{}); }
+  function unlockSound(){ try{ scanSound.pause(); scanSound.currentTime=0; }catch(e){} }
   document.addEventListener("click", unlockSound, {once:true, passive:true});
   document.addEventListener("touchstart", unlockSound, {once:true, passive:true});
   function playSound(){ try{ scanSound.pause(); scanSound.currentTime=0; scanSound.play().catch(()=>{}); }catch{} }
@@ -12386,7 +12387,7 @@
   function keepCameraOpen(){ return localStorage.getItem(KEEP_CAMERA_KEY)==="1"; }
 
   const scanSound=new Audio(QR_SOUND_SRC); scanSound.preload="auto"; scanSound.volume=1;
-  function unlockSound(){ scanSound.play().then(()=>{scanSound.pause(); scanSound.currentTime=0;}).catch(()=>{}); }
+  function unlockSound(){ try{ scanSound.pause(); scanSound.currentTime=0; }catch(e){} }
   document.addEventListener("click",unlockSound,{once:true,passive:true}); document.addEventListener("touchstart",unlockSound,{once:true,passive:true});
   function playSound(){ try{scanSound.pause(); scanSound.currentTime=0; scanSound.play().catch(()=>{});}catch{} }
   function vibrate(){ try{ if(navigator.vibrate) navigator.vibrate([45,25,45]); }catch{} }
@@ -14591,7 +14592,8 @@
       const doc = frame.contentWindow.document;
       doc.open();
       doc.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة الفاتورة</title><style>
-        @page{size:auto;margin:8mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#0f172a;direction:rtl;font-family:Cairo,Arial,Tahoma,sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.invoice-paper{width:100%!important;max-width:100%!important;margin:0!important;box-shadow:none!important;background:#fff!important}.invoice-header{background:#eff6ff!important}.invoice-logo{width:46px!important;height:46px!important;object-fit:cover!important;border-radius:14px!important}table{width:100%!important;min-width:0!important;border-collapse:collapse!important}th,td{border:1px solid #e5e7eb!important}.no-print{display:none!important}</style></head><body>${html}</body></html>`);
+        @page{size:auto;margin:8mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#0f172a;direction:rtl;font-family:Cairo,Arial,Tahoma,sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.invoice-paper{width:100%!important;max-width:100%!important;margin:0!important;box-shadow:none!important;background:#fff!important}.invoice-header{background:#eff6ff!important}.invoice-logo{width:46px!important;height:46px!important;object-fit:cover!important;border-radius:14px!important}table{width:100%!important;min-width:0!important;border-collapse:collapse!important}th,td{border:1px solid #e5e7eb!important}.no-print{display:none!important}</style></head><body>${html}
+</body></html>`);
       doc.close();
       await Promise.all(Array.from(doc.images || []).map(img => waitOneImage(img, 450)));
       setTimeout(() => {
@@ -15074,7 +15076,8 @@
       doc.open();
       doc.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet"><style>
         @page{size:80mm auto;margin:0}*{box-sizing:border-box!important}html,body{margin:0!important;padding:0!important;background:#fff!important;color:#000!important;direction:rtl!important}.oskar-thermal-receipt{width:80mm!important;max-width:80mm!important;min-width:80mm!important;margin:0!important;padding:5mm!important;background:#fff!important;color:#000!important;font-family:"Cairo","Tahoma","Arial",sans-serif!important;font-size:12px!important;line-height:1.42!important;box-shadow:none!important;border:0!important;border-radius:0!important}.oskar-thermal-receipt *{color:#000!important;box-shadow:none!important;text-shadow:none!important;filter:none!important;transform:none!important}.oskar-thermal-header{text-align:center;border-bottom:1px dashed #000;padding-bottom:10px;margin-bottom:10px}.oskar-thermal-header h1{margin:0;font-size:20px!important;font-weight:900!important;text-transform:uppercase}.oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{width:100%!important;border-collapse:collapse!important;margin:0 0 10px!important;min-width:0!important}.oskar-thermal-info td{vertical-align:top!important;padding:1px 0!important;border:0!important;background:#fff!important;font-size:12px!important}.oskar-thermal-left{text-align:left!important}.oskar-thermal-items th{border:0!important;border-bottom:1px solid #000!important;background:#fff!important;text-align:right!important;padding:5px 0!important;font-size:12px!important;font-weight:900!important}.oskar-thermal-items td{border:0!important;border-bottom:1px dotted #000!important;background:#fff!important;padding:5px 0!important;font-size:12px!important}.center{text-align:center!important}.left{text-align:left!important}.oskar-thermal-totals td{border:0!important;background:#fff!important;padding:2px 0!important;font-size:12px!important}.oskar-thermal-total-row td{font-weight:900!important;font-size:16px!important;border-top:1px double #000!important;border-bottom:1px double #000!important;padding:5px 0!important}.oskar-thermal-payment{margin-top:10px;font-size:12px!important}.oskar-thermal-footer{text-align:center;margin-top:20px;font-size:10px!important;border-top:1px dashed #000;padding-top:10px}.oskar-thermal-barcode{display:block;margin:8px auto 0!important;width:50mm!important;max-width:50mm!important;height:13mm!important;overflow:hidden!important}.oskar-thermal-barcode svg{width:50mm!important;height:11mm!important;display:block!important;margin:0 auto!important}.oskar-thermal-code{font-size:10px!important;text-align:center!important;direction:ltr!important;margin-top:2px!important}.oskar-thermal-preview-wrap{display:block!important;background:#fff!important;border:0!important;padding:0!important}.oskar-thermal-receipt{font-family:"Cairo","Tahoma","Arial",sans-serif!important;padding:4mm!important;line-height:1.55!important;overflow:visible!important}.oskar-thermal-receipt *{max-width:100%!important;overflow-wrap:anywhere!important;word-break:normal!important;letter-spacing:0!important}.oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{table-layout:fixed!important}.oskar-thermal-info td{width:50%!important;line-height:1.55!important;vertical-align:top!important}.oskar-thermal-items th,.oskar-thermal-items td{font-size:11px!important;line-height:1.45!important;vertical-align:top!important;overflow:visible!important;white-space:normal!important}.oskar-thermal-items th:nth-child(1),.oskar-thermal-items td:nth-child(1){width:28mm!important;text-align:right!important}.oskar-thermal-items th:nth-child(2),.oskar-thermal-items td:nth-child(2){width:9mm!important;text-align:center!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-items th:nth-child(3),.oskar-thermal-items td:nth-child(3){width:15mm!important;text-align:center!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-items th:nth-child(4),.oskar-thermal-items td:nth-child(4){width:17mm!important;text-align:left!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-left{direction:ltr!important;text-align:left!important;unicode-bidi:plaintext!important}.oskar-thermal-totals td{width:50%!important;line-height:1.55!important}.oskar-thermal-total-row td{font-size:17px!important;line-height:1.45!important}.oskar-thermal-barcode{width:50mm!important;height:auto!important;min-height:12mm!important;overflow:visible!important}.oskar-thermal-barcode svg{width:50mm!important;height:11mm!important;overflow:visible!important}
-      </style></head><body>${receipt.outerHTML}</body></html>`);
+      </style></head><body>${receipt.outerHTML}
+</body></html>`);
       doc.close();
       setTimeout(() => { try{ frame.contentWindow.focus(); frame.contentWindow.print(); } finally{ setTimeout(()=>frame.remove(), 1200); } }, 380);
     }catch(err){ console.error(err); toast("تعذر فتح الطباعة الآن"); }
@@ -16466,11 +16469,12 @@
 })();
 </script>
 
-<script id="oskar-shipping-cbm-final-2026-05-02">
+
+<script id="oskar-shipping-cbm-final-2026-05-02-fixed-v2">
 (function(){
   "use strict";
 
-  const PATCH_VERSION = "2026-05-02-shipping-cbm-v1";
+  const PATCH_VERSION = "2026-05-02-shipping-cbm-v2-report-logo-autocbm";
   const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   const $ = (id) => document.getElementById(id);
   const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
@@ -16719,8 +16723,9 @@
         .ship-report-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.ship-report-panel{background:#fff;border:1px solid #e2e8f0;border-radius:24px;padding:14px;overflow:auto}
         .ship-status-paid{background:#dcfce7!important;color:#15803d!important}.ship-status-partial{background:#fef3c7!important;color:#b45309!important}.ship-status-later{background:#fee2e2!important;color:#b91c1c!important}
         .ship-report-page{width:794px;max-width:100%;margin:0 auto;background:#fff;color:#111827;font-family:Cairo,Arial,sans-serif;direction:rtl;padding:20px;font-size:12px;line-height:1.6}
-        .ship-report-topline{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:#111827;margin-bottom:4px}.ship-report-head{border:1px solid #d1d5db;border-radius:8px;padding:20px 22px;display:grid;grid-template-columns:1fr 2fr 86px;gap:18px;align-items:center;margin-bottom:18px}.ship-report-logo{width:82px;height:82px;border:1px solid #e5e7eb;border-radius:8px;object-fit:cover;background:#fff}.ship-report-brand{text-align:center}.ship-report-brand h2{margin:0;font-size:22px;font-weight:900;color:#1f2937}.ship-report-brand p{margin:4px 0 0;color:#374151;font-weight:800}.ship-report-label{color:#c06f38;font-weight:900;letter-spacing:1px}.ship-card{border:1px solid #d1d5db;border-radius:8px;margin:16px 0;padding:18px 20px;page-break-inside:avoid}.ship-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}.ship-card-code{font-size:18px;font-weight:900;color:#111827}.ship-card-small{font-size:11px;color:#4b5563}.ship-report-table{width:100%;border-collapse:collapse;min-width:0!important}.ship-report-table th{background:#fff;color:#374151;font-size:12px;border-bottom:1px solid #e5e7eb;padding:10px;text-align:right;white-space:nowrap}.ship-report-table td{font-size:12px;padding:9px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap;font-weight:800;color:#1f2937}.ship-report-total-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}.ship-report-total-box{border:1px solid #e5e7eb;border-radius:6px;padding:10px;text-align:right;background:#fff}.ship-report-total-box span{display:block;font-size:10px;color:#4b5563;font-weight:800}.ship-report-total-box b{display:block;margin-top:4px;font-size:16px;font-weight:900;direction:ltr;text-align:right}.ship-report-total-box .orange{color:#d97706}.ship-report-footer{display:flex;justify-content:space-between;margin-top:28px;font-size:10px;color:#111827;direction:ltr}
-        @media(max-width:720px){.ship-cbm-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.ship-payment-grid{grid-template-columns:1fr}.ship-report-head{grid-template-columns:1fr;text-align:center}.ship-report-logo{margin:auto}.ship-report-total-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        .ship-report-topline{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;font-size:10px;color:#111827;margin-bottom:4px}.ship-report-top-date{text-align:left;direction:ltr}.ship-report-top-title{text-align:center;font-weight:800}.ship-report-top-blank{text-align:right}
+        .ship-report-head{border:1px solid #d1d5db;border-radius:8px;padding:20px 22px;display:flex;flex-direction:row;gap:18px;align-items:center;justify-content:space-between;margin-bottom:18px;background:#fff}.ship-report-logo-holder{width:86px;flex:0 0 86px;display:flex;align-items:center;justify-content:center}.ship-report-logo{width:82px;height:82px;border:1px solid #e5e7eb;border-radius:8px;object-fit:cover;background:#fff;display:block}.ship-report-logo-empty{display:flex!important;align-items:center;justify-content:center;color:#cbd5e1;font-size:12px;font-weight:900}.ship-report-brand{text-align:center;flex:1;min-width:0}.ship-report-brand h2{margin:0;font-size:22px;font-weight:900;color:#1f2937;line-height:1.35}.ship-report-brand p{margin:4px 0 0;color:#374151;font-weight:800}.ship-report-meta{width:190px;flex:0 0 190px;text-align:right}.ship-report-label{color:#c06f38;font-weight:900;letter-spacing:1px;direction:ltr;text-align:left}.ship-card{border:1px solid #d1d5db;border-radius:8px;margin:16px 0;padding:18px 20px;page-break-inside:avoid}.ship-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}.ship-card-code{font-size:18px;font-weight:900;color:#111827}.ship-card-small{font-size:11px;color:#4b5563}.ship-report-table{width:100%;border-collapse:collapse;min-width:0!important}.ship-report-table th{background:#fff;color:#374151;font-size:12px;border-bottom:1px solid #e5e7eb;padding:10px;text-align:right;white-space:nowrap}.ship-report-table td{font-size:12px;padding:9px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap;font-weight:800;color:#1f2937}.ship-report-total-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}.ship-report-total-box{border:1px solid #e5e7eb;border-radius:6px;padding:10px;text-align:right;background:#fff}.ship-report-total-box span{display:block;font-size:10px;color:#4b5563;font-weight:800}.ship-report-total-box b{display:block;margin-top:4px;font-size:16px;font-weight:900;direction:ltr;text-align:right}.ship-report-total-box .orange{color:#d97706}.ship-report-footer{display:flex;justify-content:space-between;margin-top:28px;font-size:10px;color:#111827;direction:ltr}
+        @media(max-width:720px){.ship-cbm-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.ship-payment-grid{grid-template-columns:1fr}.ship-report-head{flex-direction:column;text-align:center}.ship-report-logo-holder{width:auto;flex:auto}.ship-report-logo{margin:auto}.ship-report-meta{width:auto;flex:auto;text-align:center}.ship-report-label{text-align:center}.ship-report-total-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
         @media print{#printArea .ship-report-page{width:100%!important;max-width:none!important;padding:12mm!important}.ship-card{break-inside:avoid;page-break-inside:avoid}}
       </style>
     `);
@@ -16883,7 +16888,7 @@
       return `
         <div class="ship-cbm-carton" data-carton-id="${esc(c.id)}" data-carton-index="${i}">
           <div class="ship-cbm-carton-head">
-            <div class="ship-cbm-carton-title"><i class="fa-solid fa-box"></i> كرتونة رقم ${i+1} <span class="badge blue">${fmt(calc.totalCbm)} م³</span></div>
+            <div class="ship-cbm-carton-title"><i class="fa-solid fa-box"></i> كرتونة رقم ${i+1} <span class="badge blue ship-cbm-volume-badge">${fmt(calc.totalCbm)} م³</span></div>
             <div style="display:flex;gap:7px;flex-wrap:wrap">
               <button class="ghost-btn" type="button" data-carton-repeat="${i}" style="padding:8px 10px;border-radius:13px"><i class="fa-solid fa-copy"></i> تكرار</button>
               <button class="danger-btn" type="button" data-carton-remove="${i}" style="padding:8px 10px;border-radius:13px"><i class="fa-solid fa-trash"></i></button>
@@ -16904,6 +16909,11 @@
   function updateCalcSummary(){
     readCartonsFromDom();
     const calc = calcShipment(draft.cartons, $("shipCbmPrice")?.value || 0);
+    $$(".ship-cbm-carton").forEach((card, i) => {
+      const line = calc.lines[i] || calcLine({});
+      const badge = card.querySelector(".ship-cbm-volume-badge");
+      if (badge) badge.textContent = `${fmt(line.totalCbm)} م³`;
+    });
     if ($("shipSumCartons")) $("shipSumCartons").textContent = String(calc.totalCartons);
     if ($("shipSumCbm")) $("shipSumCbm").textContent = fmt(calc.totalCbm);
     if ($("shipSumPrice")) $("shipSumPrice").textContent = money(calc.cbmPrice);
@@ -17132,16 +17142,29 @@
   }
 
   function shopLogo(){
-    return window.state?.settings?.localLogo || window.state?.settings?.logo || "";
+    const s = window.state?.settings || {};
+    const candidates = [
+      s.localLogo, s.logoData, s.logoBase64, s.logo, s.shopLogo, s.storeLogo, s.companyLogo,
+      $("topShopLogo")?.currentSrc, $("topShopLogo")?.src,
+      $("sideShopLogo")?.currentSrc, $("sideShopLogo")?.src,
+      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhc2-SIvoXM037iekfqFFgG9ScPFkd2OYmDCTxAsulO8-UYIByWI5H7pAhaNRr3OkT-WR5h-RrPQfjsWpv4RCPLDIauhevT3RdNQIAICh-ZgdTMWn8ZL8oabWZL-sttvTQ2EAk6LckmOIa2lEdSyjHW9_jrjbMpnItLw9TzulLth5MoEQxj3un_cLoqHL9C/s759/1000002395.jpg"
+    ];
+    return String(candidates.find(x => x && String(x).trim() && !String(x).startsWith("blob:null")) || "").trim();
+  }
+
+  function reportLogoHtml(){
+    const logo = shopLogo();
+    if (!logo) return `<div class="ship-report-logo ship-report-logo-empty">شعار</div>`;
+    return `<img class="ship-report-logo" src="${esc(logo)}" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="ship-report-logo ship-report-logo-empty" style="display:none">شعار</div>`;
   }
 
   function shopName(){
-    return window.state?.settings?.shopName || "مجموعة إيلاف للشحن والتجارة الدولية";
+    const s = window.state?.settings || {};
+    return s.shopName || s.storeName || s.companyName || $("topShopName")?.textContent?.trim() || "مجموعة إيلاف للشحن والتجارة الدولية";
   }
 
   function buildDetailedReport(rows){
     const t = totals(rows);
-    const logo = shopLogo();
     const cards = rows.map((s, idx) => {
       const calc = calcShipment(s.cartons, s.cbmPrice);
       return `
@@ -17165,11 +17188,11 @@
     }).join("");
     return `
       <div class="ship-report-page">
-        <div class="ship-report-topline"><span>${formatDate(Date.now())}</span><span>CBM - حاسبة طرود الشحن</span></div>
+        <div class="ship-report-topline"><span class="ship-report-top-date">${formatDate(Date.now())}</span><span class="ship-report-top-title">CBM - حاسبة طرود الشحن</span><span class="ship-report-top-blank"></span></div>
         <div class="ship-report-head">
-          <div><div class="ship-report-label">DETAILED REPORT</div><div style="font-weight:900;margin-top:8px">تقرير تفصيلي كامل</div><div class="ship-card-small">${formatDate(Date.now())}</div></div>
+          <div class="ship-report-logo-holder">${reportLogoHtml()}</div>
           <div class="ship-report-brand"><h2>${esc(shopName())}</h2><p>International Trading · شحن وتجارة</p><div style="margin-top:18px;color:#4b5563;font-weight:800">عدد الشحنات في التقرير: <b style="font-size:18px;color:#111827">${rows.length}</b></div></div>
-          <div>${logo ? `<img class="ship-report-logo" src="${esc(logo)}" crossorigin="anonymous">` : `<div class="ship-report-logo"></div>`}</div>
+          <div class="ship-report-meta"><div class="ship-report-label">DETAILED REPORT</div><div style="font-weight:900;margin-top:8px">تقرير تفصيلي كامل</div><div class="ship-card-small">${formatDate(Date.now())}</div></div>
         </div>
         ${cards || `<div class="ship-card" style="text-align:center;font-weight:900">لا توجد بيانات</div>`}
         <div class="ship-card"><div class="ship-report-total-grid"><div class="ship-report-total-box"><span>الشحنات</span><b>${t.count}</b></div><div class="ship-report-total-box"><span>الكراتين</span><b>${t.cartons}</b></div><div class="ship-report-total-box"><span>CBM</span><b>${fmt(t.cbm)}</b></div><div class="ship-report-total-box"><span>إجمالي المبيعات</span><b class="orange">${money(t.sales)}</b></div></div></div>
@@ -17179,7 +17202,7 @@
 
   function buildSummaryReport(rows){
     const t = totals(rows);
-    return `<div class="ship-report-page"><div class="ship-report-topline"><span>${formatDate(Date.now())}</span><span>تقرير شامل للشحنات</span></div><div class="ship-report-head"><div><div class="ship-report-label">SUMMARY REPORT</div><div style="font-weight:900;margin-top:8px">حسابات المبيعات والشحنات</div></div><div class="ship-report-brand"><h2>${esc(shopName())}</h2><p>تقرير شامل</p></div><div>${shopLogo() ? `<img class="ship-report-logo" src="${esc(shopLogo())}" crossorigin="anonymous">` : `<div class="ship-report-logo"></div>`}</div></div><div class="ship-card"><div class="ship-report-total-grid"><div class="ship-report-total-box"><span>عدد الشحنات</span><b>${t.count}</b></div><div class="ship-report-total-box"><span>الكراتين</span><b>${t.cartons}</b></div><div class="ship-report-total-box"><span>CBM</span><b>${fmt(t.cbm)}</b></div><div class="ship-report-total-box"><span>إجمالي المبيعات</span><b class="orange">${money(t.sales)}</b></div><div class="ship-report-total-box"><span>المدفوع</span><b>${money(t.paid)}</b></div><div class="ship-report-total-box"><span>المتبقي</span><b>${money(t.remaining)}</b></div><div class="ship-report-total-box"><span>دفع كاش</span><b>${money(t.cash)}</b></div><div class="ship-report-total-box"><span>تحويلات بنكية</span><b>${money(t.bank)}</b></div><div class="ship-report-total-box"><span>دفع لاحق</span><b>${money(t.later)}</b></div></div></div><div class="ship-card"><table class="ship-report-table"><thead><tr><th>التاريخ</th><th>الكود</th><th>العميل</th><th>كراتين</th><th>CBM</th><th>إجمالي</th><th>مدفوع</th><th>متبقي</th></tr></thead><tbody>${rows.map(s => `<tr><td>${formatDate(s.createdAt)}</td><td>${esc(s.code)}</td><td>${esc(s.customerName || "-")}</td><td>${s.totalCartons}</td><td>${fmt(s.totalCbm)}</td><td>${money(s.totalPrice)}</td><td>${money(s.paidAmount)}</td><td>${money(s.remaining)}</td></tr>`).join("") || `<tr><td colspan="8">لا توجد بيانات</td></tr>`}</tbody></table></div></div>`;
+    return `<div class="ship-report-page"><div class="ship-report-topline"><span class="ship-report-top-date">${formatDate(Date.now())}</span><span class="ship-report-top-title">تقرير شامل للشحنات</span><span class="ship-report-top-blank"></span></div><div class="ship-report-head"><div class="ship-report-logo-holder">${reportLogoHtml()}</div><div class="ship-report-brand"><h2>${esc(shopName())}</h2><p>تقرير شامل</p></div><div class="ship-report-meta"><div class="ship-report-label">SUMMARY REPORT</div><div style="font-weight:900;margin-top:8px">حسابات المبيعات والشحنات</div><div class="ship-card-small">${formatDate(Date.now())}</div></div></div><div class="ship-card"><div class="ship-report-total-grid"><div class="ship-report-total-box"><span>عدد الشحنات</span><b>${t.count}</b></div><div class="ship-report-total-box"><span>الكراتين</span><b>${t.cartons}</b></div><div class="ship-report-total-box"><span>CBM</span><b>${fmt(t.cbm)}</b></div><div class="ship-report-total-box"><span>إجمالي المبيعات</span><b class="orange">${money(t.sales)}</b></div><div class="ship-report-total-box"><span>المدفوع</span><b>${money(t.paid)}</b></div><div class="ship-report-total-box"><span>المتبقي</span><b>${money(t.remaining)}</b></div><div class="ship-report-total-box"><span>دفع كاش</span><b>${money(t.cash)}</b></div><div class="ship-report-total-box"><span>تحويلات بنكية</span><b>${money(t.bank)}</b></div><div class="ship-report-total-box"><span>دفع لاحق</span><b>${money(t.later)}</b></div></div></div><div class="ship-card"><table class="ship-report-table"><thead><tr><th>التاريخ</th><th>الكود</th><th>العميل</th><th>كراتين</th><th>CBM</th><th>إجمالي</th><th>مدفوع</th><th>متبقي</th></tr></thead><tbody>${rows.map(s => `<tr><td>${formatDate(s.createdAt)}</td><td>${esc(s.code)}</td><td>${esc(s.customerName || "-")}</td><td>${s.totalCartons}</td><td>${fmt(s.totalCbm)}</td><td>${money(s.totalPrice)}</td><td>${money(s.paidAmount)}</td><td>${money(s.remaining)}</td></tr>`).join("") || `<tr><td colspan="8">لا توجد بيانات</td></tr>`}</tbody></table></div></div>`;
   }
 
   function modal(title, html, large=true){
@@ -17401,6 +17424,5 @@
   init();
 })();
 </script>
-
 </body>
 </html>
