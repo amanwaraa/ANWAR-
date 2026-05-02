@@ -16474,7 +16474,7 @@
 (function(){
   "use strict";
 
-  const PATCH_VERSION = "2026-05-02-shipping-cbm-v2-report-logo-autocbm";
+  const PATCH_VERSION = "2026-05-02-shipping-cbm-v3-right-report-loading";
   const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   const $ = (id) => document.getElementById(id);
   const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
@@ -16725,7 +16725,14 @@
         .ship-report-page{width:794px;max-width:100%;margin:0 auto;background:#fff;color:#111827;font-family:Cairo,Arial,sans-serif;direction:rtl;padding:20px;font-size:12px;line-height:1.6}
         .ship-report-topline{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;font-size:10px;color:#111827;margin-bottom:4px}.ship-report-top-date{text-align:left;direction:ltr}.ship-report-top-title{text-align:center;font-weight:800}.ship-report-top-blank{text-align:right}
         .ship-report-head{border:1px solid #d1d5db;border-radius:8px;padding:20px 22px;display:flex;flex-direction:row;gap:18px;align-items:center;justify-content:space-between;margin-bottom:18px;background:#fff}.ship-report-logo-holder{width:86px;flex:0 0 86px;display:flex;align-items:center;justify-content:center}.ship-report-logo{width:82px;height:82px;border:1px solid #e5e7eb;border-radius:8px;object-fit:cover;background:#fff;display:block}.ship-report-logo-empty{display:flex!important;align-items:center;justify-content:center;color:#cbd5e1;font-size:12px;font-weight:900}.ship-report-brand{text-align:center;flex:1;min-width:0}.ship-report-brand h2{margin:0;font-size:22px;font-weight:900;color:#1f2937;line-height:1.35}.ship-report-brand p{margin:4px 0 0;color:#374151;font-weight:800}.ship-report-meta{width:190px;flex:0 0 190px;text-align:right}.ship-report-label{color:#c06f38;font-weight:900;letter-spacing:1px;direction:ltr;text-align:left}.ship-card{border:1px solid #d1d5db;border-radius:8px;margin:16px 0;padding:18px 20px;page-break-inside:avoid}.ship-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}.ship-card-code{font-size:18px;font-weight:900;color:#111827}.ship-card-small{font-size:11px;color:#4b5563}.ship-report-table{width:100%;border-collapse:collapse;min-width:0!important}.ship-report-table th{background:#fff;color:#374151;font-size:12px;border-bottom:1px solid #e5e7eb;padding:10px;text-align:right;white-space:nowrap}.ship-report-table td{font-size:12px;padding:9px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap;font-weight:800;color:#1f2937}.ship-report-total-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}.ship-report-total-box{border:1px solid #e5e7eb;border-radius:6px;padding:10px;text-align:right;background:#fff}.ship-report-total-box span{display:block;font-size:10px;color:#4b5563;font-weight:800}.ship-report-total-box b{display:block;margin-top:4px;font-size:16px;font-weight:900;direction:ltr;text-align:right}.ship-report-total-box .orange{color:#d97706}.ship-report-footer{display:flex;justify-content:space-between;margin-top:28px;font-size:10px;color:#111827;direction:ltr}
-        @media(max-width:720px){.ship-cbm-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.ship-payment-grid{grid-template-columns:1fr}.ship-report-head{flex-direction:column;text-align:center}.ship-report-logo-holder{width:auto;flex:auto}.ship-report-logo{margin:auto}.ship-report-meta{width:auto;flex:auto;text-align:center}.ship-report-label{text-align:center}.ship-report-total-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media(max-width:720px){.ship-cbm-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.ship-payment-grid{grid-template-columns:1fr}.ship-report-total-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        .ship-report-page .ship-report-head{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;text-align:initial!important;gap:16px!important;padding:18px 20px!important;min-height:116px!important}
+        .ship-report-brand-wrap{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:14px!important;min-width:0!important;flex:1 1 auto!important;text-align:right!important}
+        .ship-report-brand{text-align:right!important;flex:0 1 auto!important;min-width:0!important}.ship-report-brand h2{font-size:22px!important;margin:0!important}.ship-report-brand p{margin:4px 0 0!important}
+        .ship-report-logo-holder{width:auto!important;min-width:0!important;flex:0 0 auto!important;display:flex!important;align-items:center!important;justify-content:center!important}.ship-report-logo-holder:empty{display:none!important}.ship-report-logo{width:74px!important;height:74px!important;margin:0!important}
+        .ship-report-meta{width:210px!important;flex:0 0 210px!important;text-align:left!important}.ship-report-label{text-align:left!important}.ship-report-count-line{margin-top:14px;color:#4b5563;font-weight:800}.ship-report-count-line b{font-size:18px;color:#111827}
+        .ship-export-loading{position:fixed;inset:0;z-index:999999;background:rgba(15,23,42,.48);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;font-family:Cairo,Arial,sans-serif;direction:rtl}.ship-export-loading.show{display:flex}.ship-export-loading-card{background:#fff;border:1px solid #e2e8f0;border-radius:28px;box-shadow:0 30px 80px rgba(15,23,42,.28);padding:22px 26px;min-width:230px;text-align:center;font-weight:900;color:#0f172a}.ship-export-spinner{width:54px;height:54px;border-radius:999px;border:5px solid #e2e8f0;border-top-color:#2563eb;margin:0 auto 12px;animation:shipSpin .8s linear infinite}@keyframes shipSpin{to{transform:rotate(360deg)}}
+        @media(max-width:720px){.ship-report-page .ship-report-head{flex-direction:row!important;text-align:initial!important}.ship-report-brand-wrap{justify-content:flex-start!important;text-align:right!important}.ship-report-meta{width:170px!important;flex-basis:170px!important;text-align:left!important}.ship-report-brand h2{font-size:18px!important}.ship-report-logo{width:58px!important;height:58px!important}}
         @media print{#printArea .ship-report-page{width:100%!important;max-width:none!important;padding:12mm!important}.ship-card{break-inside:avoid;page-break-inside:avoid}}
       </style>
     `);
@@ -16900,6 +16907,7 @@
             <div><label class="field-label">الارتفاع (سم)</label><input class="input" type="number" inputmode="decimal" min="0" step="0.001" data-field="height" value="${esc(c.height)}" placeholder="60"></div>
             <div><label class="field-label">العدد</label><input class="input" type="number" inputmode="numeric" min="1" step="1" data-field="qty" value="${esc(c.qty || 1)}"></div>
             <div class="full-row"><label class="field-label">ملاحظات للكرتونة</label><input class="input" data-field="notes" value="${esc(c.notes || "")}" placeholder="اختياري"></div>
+            <div class="full-row"><button class="gold-btn" type="button" data-carton-add-after="${i}" style="width:100%;margin-top:2px"><i class="fa-solid fa-plus"></i> إضافة كرتونة تحت هذه</button></div>
           </div>
         </div>`;
     }).join("");
@@ -17143,19 +17151,20 @@
 
   function shopLogo(){
     const s = window.state?.settings || {};
-    const candidates = [
-      s.localLogo, s.logoData, s.logoBase64, s.logo, s.shopLogo, s.storeLogo, s.companyLogo,
-      $("topShopLogo")?.currentSrc, $("topShopLogo")?.src,
-      $("sideShopLogo")?.currentSrc, $("sideShopLogo")?.src,
-      "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhc2-SIvoXM037iekfqFFgG9ScPFkd2OYmDCTxAsulO8-UYIByWI5H7pAhaNRr3OkT-WR5h-RrPQfjsWpv4RCPLDIauhevT3RdNQIAICh-ZgdTMWn8ZL8oabWZL-sttvTQ2EAk6LckmOIa2lEdSyjHW9_jrjbMpnItLw9TzulLth5MoEQxj3un_cLoqHL9C/s759/1000002395.jpg"
-    ];
-    return String(candidates.find(x => x && String(x).trim() && !String(x).startsWith("blob:null")) || "").trim();
+    const bad = (x) => {
+      const v = String(x || "").trim();
+      return !v || v === "undefined" || v === "null" || v.startsWith("blob:null") || /blogger\.googleusercontent\.com\/img\/b\/R29vZ2xl\/AVvXsEhc2-SIvoXM037iekfqFFgG9ScPFkd2OYmDCTxAsulO8-UYIByWI5H7pAhaNRr3OkT-WR5h-RrPQfjsWpv4RCPLDIauhevT3RdNQIAICh-ZgdTMWn8ZL8oabWZL-sttvTQ2EAk6LckmOIa2lEdSyjHW9_jrjbMpnItLw9TzulLth5MoEQxj3un_cLoqHL9C/i.test(v);
+    };
+    const localCandidates = [s.localLogo, s.logoData, s.logoBase64, s.companyLogo, s.storeLogo, s.shopLogo].filter(x => !bad(x));
+    if (localCandidates.length) return String(localCandidates[0]).trim();
+    if ((s.logoMode === "url" || s.logoMode === "remote") && !bad(s.logo)) return String(s.logo).trim();
+    return "";
   }
 
   function reportLogoHtml(){
     const logo = shopLogo();
-    if (!logo) return `<div class="ship-report-logo ship-report-logo-empty">شعار</div>`;
-    return `<img class="ship-report-logo" src="${esc(logo)}" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="ship-report-logo ship-report-logo-empty" style="display:none">شعار</div>`;
+    if (!logo) return "";
+    return `<img class="ship-report-logo" src="${esc(logo)}" referrerpolicy="no-referrer" onerror="this.remove()">`;
   }
 
   function shopName(){
@@ -17190,8 +17199,7 @@
       <div class="ship-report-page">
         <div class="ship-report-topline"><span class="ship-report-top-date">${formatDate(Date.now())}</span><span class="ship-report-top-title">CBM - حاسبة طرود الشحن</span><span class="ship-report-top-blank"></span></div>
         <div class="ship-report-head">
-          <div class="ship-report-logo-holder">${reportLogoHtml()}</div>
-          <div class="ship-report-brand"><h2>${esc(shopName())}</h2><p>International Trading · شحن وتجارة</p><div style="margin-top:18px;color:#4b5563;font-weight:800">عدد الشحنات في التقرير: <b style="font-size:18px;color:#111827">${rows.length}</b></div></div>
+          <div class="ship-report-brand-wrap"><div class="ship-report-logo-holder">${reportLogoHtml()}</div><div class="ship-report-brand"><h2>${esc(shopName())}</h2><p>International Trading · شحن وتجارة</p><div class="ship-report-count-line">عدد الشحنات في التقرير: <b>${rows.length}</b></div></div></div>
           <div class="ship-report-meta"><div class="ship-report-label">DETAILED REPORT</div><div style="font-weight:900;margin-top:8px">تقرير تفصيلي كامل</div><div class="ship-card-small">${formatDate(Date.now())}</div></div>
         </div>
         ${cards || `<div class="ship-card" style="text-align:center;font-weight:900">لا توجد بيانات</div>`}
@@ -17202,7 +17210,7 @@
 
   function buildSummaryReport(rows){
     const t = totals(rows);
-    return `<div class="ship-report-page"><div class="ship-report-topline"><span class="ship-report-top-date">${formatDate(Date.now())}</span><span class="ship-report-top-title">تقرير شامل للشحنات</span><span class="ship-report-top-blank"></span></div><div class="ship-report-head"><div class="ship-report-logo-holder">${reportLogoHtml()}</div><div class="ship-report-brand"><h2>${esc(shopName())}</h2><p>تقرير شامل</p></div><div class="ship-report-meta"><div class="ship-report-label">SUMMARY REPORT</div><div style="font-weight:900;margin-top:8px">حسابات المبيعات والشحنات</div><div class="ship-card-small">${formatDate(Date.now())}</div></div></div><div class="ship-card"><div class="ship-report-total-grid"><div class="ship-report-total-box"><span>عدد الشحنات</span><b>${t.count}</b></div><div class="ship-report-total-box"><span>الكراتين</span><b>${t.cartons}</b></div><div class="ship-report-total-box"><span>CBM</span><b>${fmt(t.cbm)}</b></div><div class="ship-report-total-box"><span>إجمالي المبيعات</span><b class="orange">${money(t.sales)}</b></div><div class="ship-report-total-box"><span>المدفوع</span><b>${money(t.paid)}</b></div><div class="ship-report-total-box"><span>المتبقي</span><b>${money(t.remaining)}</b></div><div class="ship-report-total-box"><span>دفع كاش</span><b>${money(t.cash)}</b></div><div class="ship-report-total-box"><span>تحويلات بنكية</span><b>${money(t.bank)}</b></div><div class="ship-report-total-box"><span>دفع لاحق</span><b>${money(t.later)}</b></div></div></div><div class="ship-card"><table class="ship-report-table"><thead><tr><th>التاريخ</th><th>الكود</th><th>العميل</th><th>كراتين</th><th>CBM</th><th>إجمالي</th><th>مدفوع</th><th>متبقي</th></tr></thead><tbody>${rows.map(s => `<tr><td>${formatDate(s.createdAt)}</td><td>${esc(s.code)}</td><td>${esc(s.customerName || "-")}</td><td>${s.totalCartons}</td><td>${fmt(s.totalCbm)}</td><td>${money(s.totalPrice)}</td><td>${money(s.paidAmount)}</td><td>${money(s.remaining)}</td></tr>`).join("") || `<tr><td colspan="8">لا توجد بيانات</td></tr>`}</tbody></table></div></div>`;
+    return `<div class="ship-report-page"><div class="ship-report-topline"><span class="ship-report-top-date">${formatDate(Date.now())}</span><span class="ship-report-top-title">تقرير شامل للشحنات</span><span class="ship-report-top-blank"></span></div><div class="ship-report-head"><div class="ship-report-brand-wrap"><div class="ship-report-logo-holder">${reportLogoHtml()}</div><div class="ship-report-brand"><h2>${esc(shopName())}</h2><p>تقرير شامل</p></div></div><div class="ship-report-meta"><div class="ship-report-label">SUMMARY REPORT</div><div style="font-weight:900;margin-top:8px">حسابات المبيعات والشحنات</div><div class="ship-card-small">${formatDate(Date.now())}</div></div></div><div class="ship-card"><div class="ship-report-total-grid"><div class="ship-report-total-box"><span>عدد الشحنات</span><b>${t.count}</b></div><div class="ship-report-total-box"><span>الكراتين</span><b>${t.cartons}</b></div><div class="ship-report-total-box"><span>CBM</span><b>${fmt(t.cbm)}</b></div><div class="ship-report-total-box"><span>إجمالي المبيعات</span><b class="orange">${money(t.sales)}</b></div><div class="ship-report-total-box"><span>المدفوع</span><b>${money(t.paid)}</b></div><div class="ship-report-total-box"><span>المتبقي</span><b>${money(t.remaining)}</b></div><div class="ship-report-total-box"><span>دفع كاش</span><b>${money(t.cash)}</b></div><div class="ship-report-total-box"><span>تحويلات بنكية</span><b>${money(t.bank)}</b></div><div class="ship-report-total-box"><span>دفع لاحق</span><b>${money(t.later)}</b></div></div></div><div class="ship-card"><table class="ship-report-table"><thead><tr><th>التاريخ</th><th>الكود</th><th>العميل</th><th>كراتين</th><th>CBM</th><th>إجمالي</th><th>مدفوع</th><th>متبقي</th></tr></thead><tbody>${rows.map(s => `<tr><td>${formatDate(s.createdAt)}</td><td>${esc(s.code)}</td><td>${esc(s.customerName || "-")}</td><td>${s.totalCartons}</td><td>${fmt(s.totalCbm)}</td><td>${money(s.totalPrice)}</td><td>${money(s.paidAmount)}</td><td>${money(s.remaining)}</td></tr>`).join("") || `<tr><td colspan="8">لا توجد بيانات</td></tr>`}</tbody></table></div></div>`;
   }
 
   function modal(title, html, large=true){
@@ -17219,6 +17227,26 @@
   function closeModal(){
     $("modalBackdrop")?.classList.remove("show");
     $("modalBox")?.classList.remove("large");
+  }
+
+  function ensureExportLoading(){
+    let el = $("shipExportLoading");
+    if (!el) {
+      document.body.insertAdjacentHTML("beforeend", `<div id="shipExportLoading" class="ship-export-loading"><div class="ship-export-loading-card"><div class="ship-export-spinner"></div><div id="shipExportLoadingText">جاري تجهيز الملف...</div></div></div>`);
+      el = $("shipExportLoading");
+    }
+    return el;
+  }
+
+  function showExportLoading(text="جاري تجهيز الملف..."){
+    const el = ensureExportLoading();
+    const t = $("shipExportLoadingText");
+    if (t) t.textContent = text;
+    el.classList.add("show");
+  }
+
+  function hideExportLoading(){
+    $("shipExportLoading")?.classList.remove("show");
   }
 
   function openReport(type="detailed", rows=filteredShipments()){
@@ -17244,8 +17272,11 @@
 
   async function exportImage(type="detailed", rows=filteredShipments()){
     if (!window.html2canvas) return toast("مكتبة الصور لم تحمل بعد");
-    const holder = await renderReportOffscreen(type, rows);
+    showExportLoading("جاري تجهيز الصورة...");
+    let holder = null;
     try{
+      await wait(60);
+      holder = await renderReportOffscreen(type, rows);
       const canvas = await html2canvas(holder.querySelector(".ship-report-page"), {scale:2, backgroundColor:"#ffffff", useCORS:true});
       const a = document.createElement("a");
       a.download = `${type === "summary" ? "summary" : "detailed"}-shipments-${dateKey(Date.now())}.png`;
@@ -17253,13 +17284,16 @@
       a.click();
       toast("تم تنزيل صورة التقرير");
     }catch(e){ console.error(e); toast("تعذر تنزيل الصورة"); }
-    finally{ holder.remove(); }
+    finally{ if (holder) holder.remove(); hideExportLoading(); }
   }
 
   async function exportPdf(type="detailed", rows=filteredShipments()){
     if (!window.html2canvas || !window.jspdf?.jsPDF) return toast("مكتبة PDF لم تحمل بعد");
-    const holder = await renderReportOffscreen(type, rows);
+    showExportLoading("جاري تجهيز PDF...");
+    let holder = null;
     try{
+      await wait(60);
+      holder = await renderReportOffscreen(type, rows);
       const el = holder.querySelector(".ship-report-page");
       const canvas = await html2canvas(el, {scale:2, backgroundColor:"#ffffff", useCORS:true});
       const pdf = new window.jspdf.jsPDF("p", "mm", "a4");
@@ -17279,7 +17313,7 @@
       pdf.save(`${type === "summary" ? "summary" : "detailed"}-shipments-${dateKey(Date.now())}.pdf`);
       toast("تم تنزيل PDF");
     }catch(e){ console.error(e); toast("تعذر تنزيل PDF"); }
-    finally{ holder.remove(); }
+    finally{ if (holder) holder.remove(); hideExportLoading(); }
   }
 
   function printReport(type="detailed", rows=filteredShipments()){
@@ -17290,18 +17324,23 @@
     setTimeout(() => { window.print(); setTimeout(() => { area.style.display = "none"; area.innerHTML = ""; }, 600); }, 100);
   }
 
-  function exportExcel(rows=filteredShipments()){
+  async function exportExcel(rows=filteredShipments()){
     if (!window.XLSX) return toast("مكتبة Excel لم تحمل بعد");
-    const summary = rows.map(s => ({
-      "التاريخ": formatDate(s.createdAt), "كود الشحن": s.code, "العميل": s.customerName || "", "الكراتين": s.totalCartons, "CBM": s.totalCbm, "سعر CBM": s.cbmPrice, "الإجمالي": s.totalPrice, "المدفوع": s.paidAmount, "المتبقي": s.remaining, "طريقة الدفع": shipPaymentLabel(s), "حساب التحويل": s.paymentAccountName || "", "الحالة": s.paymentStatus, "ملاحظات": s.notes || ""
-    }));
-    const details = [];
-    rows.forEach(s => s.cartons.forEach((c,i) => { const l = calcLine(c); details.push({"كود الشحن":s.code,"العميل":s.customerName || "","#":i+1,"الطول سم":l.length,"العرض سم":l.width,"الارتفاع سم":l.height,"العدد":l.qty,"حجم الكرتونة م3":l.unitCbm,"إجمالي م3":l.totalCbm}); }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "الشحنات");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(details), "تفصيلي الكراتين");
-    XLSX.writeFile(wb, `shipments-${dateKey(Date.now())}.xlsx`);
-    toast("تم تنزيل ملف Excel");
+    showExportLoading("جاري تجهيز Excel...");
+    try{
+      await wait(60);
+      const summary = rows.map(s => ({
+        "التاريخ": formatDate(s.createdAt), "كود الشحن": s.code, "العميل": s.customerName || "", "الكراتين": s.totalCartons, "CBM": s.totalCbm, "سعر CBM": s.cbmPrice, "الإجمالي": s.totalPrice, "المدفوع": s.paidAmount, "المتبقي": s.remaining, "طريقة الدفع": shipPaymentLabel(s), "حساب التحويل": s.paymentAccountName || "", "الحالة": s.paymentStatus, "ملاحظات": s.notes || ""
+      }));
+      const details = [];
+      rows.forEach(s => s.cartons.forEach((c,i) => { const l = calcLine(c); details.push({"كود الشحن":s.code,"العميل":s.customerName || "","#":i+1,"الطول سم":l.length,"العرض سم":l.width,"الارتفاع سم":l.height,"العدد":l.qty,"حجم الكرتونة م3":l.unitCbm,"إجمالي م3":l.totalCbm}); }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "الشحنات");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(details), "تفصيلي الكراتين");
+      XLSX.writeFile(wb, `shipments-${dateKey(Date.now())}.xlsx`);
+      toast("تم تنزيل ملف Excel");
+    }catch(e){ console.error(e); toast("تعذر تنزيل Excel"); }
+    finally{ hideExportLoading(); }
   }
 
   function whatsappText(rows=filteredShipments()){
@@ -17343,6 +17382,16 @@
       if (ev.target.closest("#shipNewBtn")) { ev.preventDefault(); resetDraft(); return; }
       if (ev.target.closest("#shipApplyCountBtn")) { ev.preventDefault(); applyCount(); return; }
       if (ev.target.closest("#shipAddCartonBtn")) { ev.preventDefault(); readCartonsFromDom(); draft.cartons.push({ id: uid("carton"), length:"", width:"", height:"", qty:1, notes:"" }); renderCalcPage(); return; }
+
+      const addAfter = ev.target.closest("[data-carton-add-after]");
+      if (addAfter) {
+        ev.preventDefault();
+        readCartonsFromDom();
+        const i = Number(addAfter.dataset.cartonAddAfter);
+        draft.cartons.splice(i + 1, 0, { id: uid("carton"), length:"", width:"", height:"", qty:1, notes:"" });
+        renderCalcPage();
+        return;
+      }
 
       const repeat = ev.target.closest("[data-carton-repeat]");
       if (repeat) { ev.preventDefault(); readCartonsFromDom(); const i = Number(repeat.dataset.cartonRepeat); const base = draft.cartons[i] || {}; draft.cartons.splice(i+1, 0, {...base, id:uid("carton")}); renderCalcPage(); return; }
