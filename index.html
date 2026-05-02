@@ -215,7 +215,7 @@
     }
 
     .icon-btn.syncing i{
-      animation:syncSpin 1.25s linear infinite;
+      animation:syncSpin 1.6s linear infinite;
       color:#1d4ed8;
     }
 
@@ -3069,7 +3069,7 @@
     window.OSKAR_TRIAL_FIREBASE_ALLOWED = !OSKAR_TRIAL_ACTIVE;
     const FALLBACK_ROOTS = OSKAR_TRIAL_ACTIVE ? [] : (Array.isArray(externalFirebase.fallbackRoots) ? externalFirebase.fallbackRoots : []);
     const DB_NAME = `cashier_units_pro_${DB_NAMESPACE}_db_v16`;
-    const DB_VERSION = 15;
+    const DB_VERSION = 120;
 
     const STORE_NAMES = [
       "products",
@@ -3940,22 +3940,60 @@
       });
     }
 
+    function ensureDbStores(database) {
+      STORE_NAMES.forEach((name) => {
+        if (!database.objectStoreNames.contains(name)) {
+          database.createObjectStore(name, { keyPath: "id" });
+        }
+      });
+    }
+
+    function openIndexedDbWithVersion(version, resolve, reject, retryDepth = 0) {
+      const safeVersion = Math.max(Number(version || DB_VERSION) || DB_VERSION, DB_VERSION);
+      const req = indexedDB.open(DB_NAME, safeVersion);
+
+      req.onupgradeneeded = () => {
+        ensureDbStores(req.result);
+      };
+
+      req.onsuccess = () => {
+        const database = req.result;
+        const missingStores = STORE_NAMES.some((name) => !database.objectStoreNames.contains(name));
+
+        if (missingStores && retryDepth < 3) {
+          const nextVersion = Math.max(Number(database.version || safeVersion) + 1, safeVersion + 1);
+          database.close();
+          openIndexedDbWithVersion(nextVersion, resolve, reject, retryDepth + 1);
+          return;
+        }
+
+        resolve(database);
+      };
+
+      req.onerror = () => {
+        const err = req.error;
+        const isVersionError = err && (err.name === "VersionError" || String(err.message || "").includes("less than the existing version"));
+
+        if (isVersionError && retryDepth < 3) {
+          const probe = indexedDB.open(DB_NAME);
+
+          probe.onsuccess = () => {
+            const currentVersion = Number(probe.result?.version || DB_VERSION) || DB_VERSION;
+            try { probe.result.close(); } catch {}
+            openIndexedDbWithVersion(Math.max(currentVersion, DB_VERSION), resolve, reject, retryDepth + 1);
+          };
+
+          probe.onerror = () => reject(err || probe.error);
+          return;
+        }
+
+        reject(err);
+      };
+    }
+
     function openDB() {
       return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, DB_VERSION);
-
-        req.onupgradeneeded = () => {
-          const database = req.result;
-
-          STORE_NAMES.forEach((name) => {
-            if (!database.objectStoreNames.contains(name)) {
-              database.createObjectStore(name, { keyPath: "id" });
-            }
-          });
-        };
-
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
+        openIndexedDbWithVersion(DB_VERSION, resolve, reject);
       });
     }
 
@@ -14156,7 +14194,7 @@
     .oskar-prime-method{grid-template-columns:74px minmax(0,1fr)!important;padding:14px!important}
   }
   #syncNowBtn.syncing i,
-  .icon-btn.syncing i{animation-duration:1.25s!important}
+  .icon-btn.syncing i{animation-duration:1.6s!important}
   .fa-spin,
   .oskar-prime-safe-spinner{animation-duration:.70s!important}
   .oskar-prime-safe-select.best:before,
@@ -14362,7 +14400,7 @@
   }
   function speedSpinners(){
     $$('.fa-spin,.icon-btn.syncing i,.oskar-prime-safe-spinner').forEach(el => {
-      if(el.closest && el.closest('#syncNowBtn')) el.style.setProperty('animation-duration', '1.25s', 'important');
+      if(el.closest && el.closest('#syncNowBtn')) el.style.setProperty('animation-duration', '1.6s', 'important');
       else el.style.setProperty('animation-duration', '.70s', 'important');
     });
   }
@@ -14463,7 +14501,7 @@
     margin-inline-start:6px;
   }
   #syncNowBtn.syncing i,
-  .icon-btn.syncing i{animation-duration:1.25s!important}
+  .icon-btn.syncing i{animation-duration:1.6s!important}
   .fa-spin,
   .oskar-prime-safe-spinner,
   .oskar-mini-loader{animation-duration:.70s!important}
@@ -15567,7 +15605,7 @@
 <!-- OSKAR_SYNC_STOCK_FIX_2026_05_02 -->
 <style id="oskar-sync-stock-fix-2026-05-02-style">
   #syncNowBtn.syncing i,
-  .icon-btn.syncing i{animation-duration:1.25s!important}
+  .icon-btn.syncing i{animation-duration:1.6s!important}
 </style>
 <script id="oskar-sync-stock-fix-2026-05-02-script">
 (function(){
@@ -15576,7 +15614,7 @@
     var btn = document.getElementById("syncNowBtn");
     if(!btn) return;
     var icon = btn.querySelector("i");
-    if(icon) icon.style.setProperty("animation-duration", "1.25s", "important");
+    if(icon) icon.style.setProperty("animation-duration", "1.6s", "important");
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", slowSyncIcon, {once:true});
   else slowSyncIcon();
