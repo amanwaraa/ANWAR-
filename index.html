@@ -16867,5 +16867,421 @@
 })();
 </script>
 
+
+<!-- OSKAR_LOGO_SYNC_STABILITY_FIX_2026_05_03 -->
+<style id="oskar-logo-sync-stability-fix-2026-05-03-style">
+  img.shop-logo,
+  img.invoice-logo,
+  img.oskar-thermal-logo,
+  img.ship-report-logo,
+  #topShopLogo,
+  #sideShopLogo,
+  #settingLogoPreview{
+    opacity:1!important;
+    visibility:visible!important;
+    background:#fff!important;
+    object-fit:cover!important;
+    object-position:center!important;
+    transition:none!important;
+    animation:none!important;
+  }
+
+  #syncNowBtn.syncing i,
+  .icon-btn.syncing i{
+    animation-duration:1.35s!important;
+  }
+
+  #syncNowBtn:not(.syncing) .sync-dot{
+    display:none!important;
+  }
+</style>
+<script id="oskar-logo-sync-stability-fix-2026-05-03-script">
+(function(){
+  "use strict";
+
+  const FIXED_LOGO = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg";
+  const CACHE_KEY = "oskar_stable_logo_src_v3";
+  const LEGACY_CACHE_KEY = "oskar_fast_logo_cache_src_v1";
+  const SYNC_MAX_MS = 45000;
+  const REALTIME_SPIN_MAX_MS = 2600;
+
+  const $ = id => document.getElementById(id);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  const bad = src => {
+    const v = String(src || "").trim();
+    return !v || /undefined|null|about:blank|blob:null/i.test(v);
+  };
+  const isDataLogo = src => /^data:image\//i.test(String(src || ""));
+
+  let stableLogo = "";
+  let logoWriteLock = false;
+  let syncSpinStartedAt = 0;
+  let syncStateStartedAt = 0;
+  let queueCheckRunning = false;
+  let lastQueueCheck = 0;
+
+  function readCache(key){
+    try{ return localStorage.getItem(key) || ""; }catch(e){ return ""; }
+  }
+
+  function writeCache(src){
+    if(bad(src)) return;
+    try{ localStorage.setItem(CACHE_KEY, src); }catch(e){}
+    try{ localStorage.setItem(LEGACY_CACHE_KEY, src); }catch(e){}
+  }
+
+  function fallbackSvg(){
+    const name = String(window.state?.settings?.shopName || $("topShopName")?.textContent || "Oskar").trim();
+    const t = (name[0] || "O").replace(/[<>&"']/g, "");
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2563eb"/><stop offset=".55" stop-color="#7c3aed"/><stop offset="1" stop-color="#0891b2"/></linearGradient></defs><rect width="220" height="220" rx="54" fill="url(#g)"/><text x="50%" y="58%" text-anchor="middle" font-size="88" font-family="Arial" font-weight="900" fill="white">'+t+'</text></svg>';
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  }
+
+  function logoCandidates(){
+    const s = window.state?.settings || {};
+    return [
+      s.localLogo,
+      isDataLogo(readCache(CACHE_KEY)) ? readCache(CACHE_KEY) : "",
+      isDataLogo(readCache(LEGACY_CACHE_KEY)) ? readCache(LEGACY_CACHE_KEY) : "",
+      s.logoData,
+      s.logoBase64,
+      s.companyLogo,
+      s.storeLogo,
+      s.shopLogo,
+      s.logoUrl,
+      s.logo,
+      readCache(CACHE_KEY),
+      readCache(LEGACY_CACHE_KEY),
+      window.OSKAR_FIXED_SITE_LOGO_URL,
+      FIXED_LOGO,
+      fallbackSvg()
+    ].filter(src => !bad(src));
+  }
+
+  function getStableLogo(){
+    const chosen = logoCandidates()[0] || fallbackSvg();
+    if(!stableLogo || stableLogo !== chosen) stableLogo = chosen;
+    return stableLogo;
+  }
+
+  function isLogoImage(img){
+    if(!img || img.nodeType !== 1) return false;
+    const id = String(img.id || "");
+    const cls = String(img.className || "");
+    return /^(topShopLogo|sideShopLogo|settingLogoPreview)$/i.test(id) ||
+      /(^|\s)(shop-logo|invoice-logo|oskar-thermal-logo|ship-report-logo)(\s|$)/i.test(cls);
+  }
+
+  function normalizeForCompare(src){
+    const v = String(src || "").trim();
+    if(!v || /^data:/i.test(v)) return v;
+    try{ return new URL(v, location.href).href; }catch(e){ return v; }
+  }
+
+  function sameSrc(a,b){
+    return normalizeForCompare(a) === normalizeForCompare(b);
+  }
+
+  function setImgSrc(img, src){
+    if(!img || bad(src)) return;
+    logoWriteLock = true;
+    try{
+      img.loading = "eager";
+      img.decoding = "async";
+      img.referrerPolicy = "no-referrer";
+      try{ img.fetchPriority = "high"; }catch(e){}
+      img.onerror = function(){
+        this.onerror = null;
+        const fb = getStableLogo() || FIXED_LOGO || fallbackSvg();
+        if(!sameSrc(this.getAttribute("src"), fb)) setImgSrc(this, fb);
+      };
+      if(!sameSrc(img.getAttribute("src"), src) || !sameSrc(img.src, src)) img.src = src;
+    }finally{
+      logoWriteLock = false;
+    }
+  }
+
+  function applyStableLogo(force=false){
+    const src = getStableLogo();
+    if(bad(src)) return;
+    stableLogo = src;
+    writeCache(src);
+
+    if(window.state){
+      window.state.settings = { id:"main", ...(window.state.settings || {}) };
+      const s = window.state.settings;
+      if(isDataLogo(src)){
+        s.localLogo = src;
+        s.logo = "";
+        s.logoMode = "local";
+      }else if(!s.localLogo){
+        s.logo = src;
+        s.logoMode = src === FIXED_LOGO ? "fixed" : "url";
+      }
+    }
+
+    $$('img.shop-logo,img.invoice-logo,img.oskar-thermal-logo,img.ship-report-logo,#topShopLogo,#sideShopLogo,#settingLogoPreview').forEach(img => {
+      if(force || !sameSrc(img.getAttribute("src"), src) || (img.complete && img.naturalWidth === 0)) setImgSrc(img, src);
+    });
+
+    const del = $("deleteLocalLogoBtn");
+    if(del) del.disabled = !(window.state?.settings?.localLogo);
+  }
+
+  function patchImageSetters(){
+    if(window.__oskarStableLogoImageSetters) return;
+    window.__oskarStableLogoImageSetters = true;
+
+    const proto = HTMLImageElement.prototype;
+    const srcDesc = Object.getOwnPropertyDescriptor(proto, "src");
+    if(srcDesc && srcDesc.configurable && srcDesc.set && srcDesc.get){
+      Object.defineProperty(proto, "src", {
+        configurable:true,
+        enumerable:srcDesc.enumerable,
+        get:function(){ return srcDesc.get.call(this); },
+        set:function(value){
+          if(!logoWriteLock && isLogoImage(this)){
+            const chosen = getStableLogo();
+            if(!bad(chosen) && !sameSrc(value, chosen)) return srcDesc.set.call(this, chosen);
+          }
+          return srcDesc.set.call(this, value);
+        }
+      });
+    }
+
+    const oldSetAttribute = proto.setAttribute;
+    proto.setAttribute = function(name, value){
+      if(String(name || "").toLowerCase() === "src" && !logoWriteLock && isLogoImage(this)){
+        const chosen = getStableLogo();
+        if(!bad(chosen) && !sameSrc(value, chosen)) value = chosen;
+      }
+      return oldSetAttribute.call(this, name, value);
+    };
+  }
+
+  function downscaleLogoFile(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const raw = String(reader.result || "");
+        if(!raw) return resolve("");
+        const img = new Image();
+        img.onload = () => {
+          try{
+            const max = 520;
+            const ratio = Math.min(1, max / Math.max(img.width || max, img.height || max));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round((img.width || max) * ratio));
+            canvas.height = Math.max(1, Math.round((img.height || max) * ratio));
+            const ctx = canvas.getContext("2d", { alpha:true });
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            ctx.drawImage(img,0,0,canvas.width,canvas.height);
+            resolve(canvas.toDataURL("image/png"));
+          }catch(e){ resolve(raw); }
+        };
+        img.onerror = () => resolve(raw);
+        img.src = raw;
+      };
+      reader.onerror = () => reject(reader.error || new Error("تعذر قراءة الصورة"));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function saveUploadedLogo(file){
+    if(!file) return;
+    const dataUrl = await downscaleLogoFile(file);
+    if(!isDataLogo(dataUrl)) return;
+
+    stableLogo = dataUrl;
+    writeCache(dataUrl);
+    window.state = window.state || {};
+    window.state.settings = { id:"main", ...(window.state.settings || {}), localLogo:dataUrl, logo:"", logoUrl:"", shopLogo:"", storeLogo:"", logoMode:"local", updatedAt:Date.now() };
+
+    try{ if(typeof window.idbPut === "function") await window.idbPut("settings", window.state.settings); }catch(e){ console.warn("logo idb save failed", e); }
+    try{ if($("settingLogoFile")) $("settingLogoFile").value = ""; }catch(e){}
+    applyStableLogo(true);
+    if(typeof window.toast === "function") window.toast("تم تثبيت شعار الجهاز ومنع رفرفة الصورة");
+  }
+
+  document.addEventListener("change", function(e){
+    const input = e.target && e.target.closest && e.target.closest("#settingLogoFile");
+    if(!input) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const file = input.files && input.files[0];
+    if(file) saveUploadedLogo(file).catch(err => { console.warn(err); if(typeof window.toast === "function") window.toast("تعذر حفظ صورة الموقع"); });
+  }, true);
+
+  document.addEventListener("click", function(e){
+    const del = e.target && e.target.closest && e.target.closest("#deleteLocalLogoBtn");
+    if(!del) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    try{ localStorage.removeItem(CACHE_KEY); localStorage.removeItem(LEGACY_CACHE_KEY); }catch(err){}
+    stableLogo = window.OSKAR_FIXED_SITE_LOGO_URL || FIXED_LOGO || fallbackSvg();
+    if(window.state){
+      window.state.settings = { id:"main", ...(window.state.settings || {}), localLogo:"", logo:stableLogo, logoUrl:"", shopLogo:"", storeLogo:"", logoMode:"fixed", updatedAt:Date.now() };
+      try{ if(typeof window.idbPut === "function") window.idbPut("settings", window.state.settings); }catch(err){}
+    }
+    applyStableLogo(true);
+    if(typeof window.toast === "function") window.toast("تم الرجوع لشعار الموقع الثابت");
+  }, true);
+
+  function patchCloudLogoPayloads(){
+    if(window.enqueueSync && !window.enqueueSync.__oskarStableLogoCloudClean){
+      const old = window.enqueueSync;
+      window.enqueueSync = function(action){
+        if(action && action.store === "settings" && action.data){
+          action = { ...action, data:{ ...(action.data || {}), localLogo:"" } };
+          if(action.data.logoMode === "local") action.data.logoMode = action.data.logo ? "url" : "fixed";
+        }
+        return old.call(this, action);
+      };
+      window.enqueueSync.__oskarStableLogoCloudClean = true;
+    }
+    if(window.set && !window.set.__oskarStableLogoCloudClean){
+      const oldSet = window.set;
+      window.set = function(refObj, data){
+        if(data && typeof data === "object" && ("localLogo" in data || "logoMode" in data || "shopName" in data) && (data.id === "main" || "currency" in data || "lowStock" in data)){
+          data = { ...data, localLogo:"" };
+          if(data.logoMode === "local") data.logoMode = data.logo ? "url" : "fixed";
+        }
+        return oldSet.call(this, refObj, data);
+      };
+      window.set.__oskarStableLogoCloudClean = true;
+    }
+  }
+
+  function clearSyncSpinner(message){
+    const btn = $("syncNowBtn");
+    if(btn) btn.classList.remove("syncing");
+    if(window.state){
+      window.state.syncing = false;
+      if(window.state.syncUi){
+        window.state.syncUi.progress = Math.max(0, Math.min(100, Number(window.state.syncUi.progress || 0)));
+        if(message) window.state.syncUi.status = message;
+      }
+    }
+    const dot = document.querySelector("#syncNowBtn .sync-dot");
+    if(dot) dot.style.display = "none";
+    syncSpinStartedAt = 0;
+    syncStateStartedAt = 0;
+  }
+
+  async function refreshQueueBadgeSafe(){
+    const now = Date.now();
+    if(queueCheckRunning || now - lastQueueCheck < 3500) return;
+    if(typeof window.idbGetAll !== "function") return;
+    queueCheckRunning = true;
+    lastQueueCheck = now;
+    try{
+      const queue = await window.idbGetAll("syncQueue");
+      const count = Array.isArray(queue) ? queue.length : 0;
+      const badge = $("syncCountBadge");
+      if(badge){
+        badge.textContent = String(count);
+        badge.style.display = count ? "flex" : "none";
+      }
+      if(!count && !window.state?.syncing) clearSyncSpinner();
+    }catch(e){}
+    finally{ queueCheckRunning = false; }
+  }
+
+  function patchSyncRuntime(){
+    if(window.syncNow && !window.syncNow.__oskarStableSyncGuard){
+      const old = window.syncNow;
+      window.syncNow = async function(showPopover){
+        const now = Date.now();
+        if(window.state?.syncing && syncStateStartedAt && now - syncStateStartedAt > SYNC_MAX_MS){
+          clearSyncSpinner("تم إيقاف مؤشر مزامنة عالق، اضغط المزامنة للمحاولة من جديد");
+        }
+        syncSpinStartedAt = Date.now();
+        try{
+          return await old.call(this, showPopover);
+        }finally{
+          setTimeout(() => {
+            if(!window.state?.syncing) clearSyncSpinner();
+            refreshQueueBadgeSafe();
+          }, 900);
+        }
+      };
+      window.syncNow.__oskarStableSyncGuard = true;
+    }
+
+    if(window.updateSyncUi && !window.updateSyncUi.__oskarStableSyncUiGuard){
+      const oldUi = window.updateSyncUi;
+      window.updateSyncUi = function(opts){
+        if(opts && opts.spin === true) syncSpinStartedAt = Date.now();
+        const out = oldUi.apply(this, arguments);
+        if(opts && opts.spin === false) setTimeout(() => clearSyncSpinner(), 0);
+        return out;
+      };
+      window.updateSyncUi.__oskarStableSyncUiGuard = true;
+    }
+  }
+
+  document.addEventListener("click", function(e){
+    const sync = e.target && e.target.closest && e.target.closest("#syncNowBtn");
+    if(!sync) return;
+    const now = Date.now();
+    if(window.state?.syncing && syncStateStartedAt && now - syncStateStartedAt > SYNC_MAX_MS){
+      clearSyncSpinner("تم تحرير المزامنة العالقة، أعد الضغط للمزامنة");
+    }
+  }, true);
+
+  function syncWatchdog(){
+    patchSyncRuntime();
+    const btn = $("syncNowBtn");
+    const now = Date.now();
+
+    if(window.state?.syncing){
+      if(!syncStateStartedAt) syncStateStartedAt = now;
+      if(now - syncStateStartedAt > SYNC_MAX_MS){
+        clearSyncSpinner("تم إيقاف مؤشر مزامنة عالق. بياناتك بقيت محفوظة محليًا.");
+        if(typeof window.toast === "function") window.toast("تم إيقاف مؤشر مزامنة عالق، اضغط المزامنة للمحاولة من جديد");
+      }
+    }else{
+      syncStateStartedAt = 0;
+    }
+
+    if(btn && btn.classList.contains("syncing")){
+      if(!syncSpinStartedAt) syncSpinStartedAt = now;
+      const limit = window.state?.syncing ? SYNC_MAX_MS : REALTIME_SPIN_MAX_MS;
+      if(now - syncSpinStartedAt > limit) clearSyncSpinner();
+    }else{
+      syncSpinStartedAt = 0;
+    }
+
+    refreshQueueBadgeSafe();
+  }
+
+  function tick(){
+    patchImageSetters();
+    patchCloudLogoPayloads();
+    applyStableLogo(false);
+    syncWatchdog();
+  }
+
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => { applyStableLogo(true); tick(); }, {once:true});
+  else { applyStableLogo(true); tick(); }
+
+  window.addEventListener("load", () => { applyStableLogo(true); tick(); }, {once:true});
+
+  try{
+    new MutationObserver(mutations => {
+      let logoTouched = false;
+      for(const m of mutations){
+        if(m.type === "attributes" && m.attributeName === "src" && isLogoImage(m.target)) logoTouched = true;
+        if(m.type === "childList") logoTouched = true;
+        if(logoTouched) break;
+      }
+      if(logoTouched) setTimeout(() => applyStableLogo(false), 0);
+    }).observe(document.documentElement, { subtree:true, childList:true, attributes:true, attributeFilter:["src"] });
+  }catch(e){}
+
+  setInterval(tick, 1400);
+})();
+</script>
+
 </body>
 </html>
