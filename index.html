@@ -2232,6 +2232,7 @@
                   <th>الجملة</th>
                   <th>البيع</th>
                   <th>الإجمالي</th>
+                  <th>حساب الدفع</th>
                   <th>ملاحظات</th>
                   <th>الإجراءات</th>
                 </tr>
@@ -2307,6 +2308,7 @@
                   <th>التاريخ</th>
                   <th>نوع المصروف</th>
                   <th>المبلغ</th>
+                  <th>حساب الدفع</th>
                   <th>ملاحظات</th>
                   <th>الإجراءات</th>
                 </tr>
@@ -2437,8 +2439,10 @@
                 <thead>
                   <tr>
                     <th>الحساب</th>
-                    <th>الرصيد من المبيعات</th>
-                    <th>عدد العمليات</th>
+                    <th>الداخل</th>
+                    <th>الخارج</th>
+                    <th>الرصيد النهائي</th>
+                    <th>العمليات</th>
                   </tr>
                 </thead>
                 <tbody id="accountsReportTable"></tbody>
@@ -2785,6 +2789,11 @@
           <label class="field-label">سيضاف للمخزون</label>
           <input id="purchaseUnitsPreview" class="input" value="1" disabled>
         </div>
+
+        <div>
+          <label class="field-label">حساب الدفع</label>
+          <select id="purchaseAccountId" class="select"></select>
+        </div>
       </div>
 
       <div class="full-row" style="margin-top:12px">
@@ -2863,6 +2872,11 @@
         <div>
           <label class="field-label">المبلغ</label>
           <input id="expenseAmount" type="number" inputmode="decimal" class="input" required min="0" step="0.01">
+        </div>
+
+        <div>
+          <label class="field-label">من حساب الدفع</label>
+          <select id="expenseAccountId" class="select"></select>
         </div>
       </div>
 
@@ -6237,6 +6251,7 @@
             <td>${money(p.cost)}</td>
             <td>${money(p.salePrice)}</td>
             <td class="money">${money(p.total)}</td>
+            <td>${escapeHtml((state.paymentAccounts.find(a => a.id === (p.accountId || "cash"))?.name) || "الصندوق")}</td>
             <td>${escapeHtml(p.notes || "-")}</td>
             <td>
               <button class="ghost-btn" data-edit-purchase="${p.id}">
@@ -6251,7 +6266,7 @@
 
       $("purchasesTable").innerHTML =
         rows ||
-        `<tr><td colspan="12" class="muted" style="text-align:center">لا توجد مشتريات</td></tr>`;
+        `<tr><td colspan="13" class="muted" style="text-align:center">لا توجد مشتريات</td></tr>`;
     }
 
     function renderSupplierPayments() {
@@ -6308,6 +6323,7 @@
             <td>${formatDate(e.createdAt)}</td>
             <td><b>${escapeHtml(e.type)}</b></td>
             <td class="money">${money(e.amount)}</td>
+            <td>${escapeHtml((state.paymentAccounts.find(a => a.id === (e.accountId || "cash"))?.name) || "الصندوق")}</td>
             <td>${escapeHtml(e.notes || "-")}</td>
             <td>
               <button class="ghost-btn" data-edit-expense="${e.id}">
@@ -6322,7 +6338,7 @@
 
       $("expensesTable").innerHTML =
         rows ||
-        `<tr><td colspan="5" class="muted" style="text-align:center">لا توجد مصروفات</td></tr>`;
+        `<tr><td colspan="6" class="muted" style="text-align:center">لا توجد مصروفات</td></tr>`;
     }
 
     function getFilteredReportData() {
@@ -6744,6 +6760,11 @@
 
       const oldPurchase = purchaseId ? state.purchases.find(p => p.id === purchaseId) : null;
 
+      if ($("purchaseAccountId")) {
+        $("purchaseAccountId").innerHTML = paymentAccountsOptions(true);
+        $("purchaseAccountId").value = oldPurchase?.accountId || "cash";
+      }
+
       function selectPurchaseProduct(product) {
         const p = normalizeProduct(product);
 
@@ -6812,6 +6833,7 @@
         $("purchaseSalePrice").value = cleanNumber(oldPurchase.salePrice, 0);
         $("purchaseCartonUnits").value = cleanNumber(oldPurchase.cartonUnits, 1);
         $("purchaseNotes").value = oldPurchase.notes || "";
+        if ($("purchaseAccountId")) $("purchaseAccountId").value = oldPurchase.accountId || "cash";
 
         const prod = getProductById(oldPurchase.productId);
         if (prod) selectPurchaseProduct(prod);
@@ -6862,6 +6884,7 @@
           cost: enteredCost,
           salePrice: enteredSale || product.displaySalePrice || product.salePrice,
           total: enteredCost,
+          accountId: $("purchaseAccountId")?.value || oldPurchase?.accountId || "cash",
           notes: $("purchaseNotes").value.trim(),
           createdAt: oldPurchase?.createdAt || Date.now(),
           updatedAt: Date.now()
@@ -6947,11 +6970,17 @@
 
       const old = expenseId ? state.expenses.find(e => e.id === expenseId) : null;
 
+      if ($("expenseAccountId")) {
+        $("expenseAccountId").innerHTML = paymentAccountsOptions(true);
+        $("expenseAccountId").value = old?.accountId || "cash";
+      }
+
       if (old) {
         $("expenseId").value = old.id;
         $("expenseType").value = old.type || "";
         $("expenseAmount").value = cleanNumber(old.amount, 0);
         $("expenseNotes").value = old.notes || "";
+        if ($("expenseAccountId")) $("expenseAccountId").value = old.accountId || "cash";
       }
 
       $("expenseForm").onsubmit = async (e) => {
@@ -6961,6 +6990,7 @@
           id: old?.id || uid("exp"),
           type: $("expenseType").value.trim(),
           amount: cleanNumber($("expenseAmount").value, 0),
+          accountId: $("expenseAccountId")?.value || old?.accountId || "cash",
           notes: $("expenseNotes").value.trim(),
           createdAt: old?.createdAt || Date.now(),
           updatedAt: Date.now()
@@ -8784,7 +8814,10 @@
           <body>
             ${html}
           
-            </body>
+            
+
+
+</body>
         </html>
       `;
 
@@ -9584,6 +9617,10 @@
         supplierPayments: state.supplierPayments,
         paymentAccounts: state.paymentAccounts,
         employees: state.employees,
+        suppliers: state.suppliers || [],
+        workers: state.workers || [],
+        workerWages: state.workerWages || [],
+        accountMovements: state.accountMovements || [],
         settings: state.settings
       };
 
@@ -15623,5 +15660,560 @@
 })();
 </script>
 
+
+<script id="oskar-payment-accounts-full-balance-patch-2026-05-03">
+(function(){
+  "use strict";
+  if(window.__OSKAR_PAYMENT_FULL_BALANCE_PATCH_20260503__) return;
+  window.__OSKAR_PAYMENT_FULL_BALANCE_PATCH_20260503__ = true;
+
+  const $ = (id) => document.getElementById(id);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+  const esc = (v) => String(v ?? "").replace(/[&<>\"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;","'":"&#039;"}[m]));
+  const clean = (v, f=0) => {
+    const n = Number(String(v ?? "").replace(",", ".").replace(/[^0-9.\-]/g, ""));
+    return Number.isFinite(n) ? n : f;
+  };
+  const money = (v) => typeof window.money === "function" ? window.money(v) : "₪ " + clean(v).toFixed(2);
+  const toast = (msg, ms=2600) => typeof window.toast === "function" ? window.toast(msg, ms) : console.log(msg);
+  const uid = (p="id") => p + "_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+  const root = () => window.FIREBASE_ROOT || window.CASHIER_FIREBASE_CONFIG?.firebaseRoot || "cashier_units_pro_default";
+  const storageKey = () => "oskar_account_movements_2026_05_03_" + root();
+  const extraStorageKey = () => "cashier_extra_final_2026_04_29_" + root();
+  let lastPurchaseEditId = "";
+  let lastExpenseEditId = "";
+
+  function state(){ window.state = window.state || {}; return window.state; }
+  function accounts(){
+    const st = state();
+    if(!Array.isArray(st.paymentAccounts)) st.paymentAccounts = [];
+    if(!st.paymentAccounts.length) st.paymentAccounts = [{id:"cash", name:"الصندوق", number:"", type:"cash"}];
+    return st.paymentAccounts;
+  }
+  function accountName(id){
+    const a = accounts().find(x => String(x.id) === String(id || "cash"));
+    return a?.name || (String(id || "cash") === "cash" ? "الصندوق" : String(id || "-"));
+  }
+  function options(selected="cash"){
+    return accounts().map(a => `<option value="${esc(a.id)}" ${String(selected)===String(a.id)?"selected":""}>${esc(a.name || "حساب")} ${a.number ? " - " + esc(a.number) : ""}</option>`).join("");
+  }
+
+  function loadMovements(){
+    const st = state();
+    try{
+      const list = JSON.parse(localStorage.getItem(storageKey()) || "[]");
+      st.accountMovements = Array.isArray(list) ? list.filter(Boolean) : [];
+    }catch{ st.accountMovements = []; }
+    return st.accountMovements;
+  }
+  function saveMovements(){
+    const st = state();
+    const list = Array.isArray(st.accountMovements) ? st.accountMovements : [];
+    localStorage.setItem(storageKey(), JSON.stringify(list));
+  }
+  async function pushMovement(item){
+    try{
+      if(navigator.onLine && window.db && window.ref && window.set){
+        await window.set(window.ref(window.db, root() + "/accountMovements/" + item.id), item);
+      }
+    }catch(err){ console.warn("account movement firebase set", err); }
+  }
+  async function removeMovementRemote(id){
+    try{
+      if(navigator.onLine && window.db && window.ref && window.remove){
+        await window.remove(window.ref(window.db, root() + "/accountMovements/" + id));
+      }
+    }catch(err){ console.warn("account movement firebase remove", err); }
+  }
+  async function pullMovements(){
+    try{
+      if(!(navigator.onLine && window.db && window.ref && window.get)) return;
+      const snap = await window.get(window.ref(window.db, root() + "/accountMovements"));
+      if(snap && snap.exists && snap.exists()){
+        state().accountMovements = Object.values(snap.val() || {}).filter(Boolean);
+        saveMovements();
+      }
+    }catch(err){ console.warn("pull account movements", err); }
+  }
+
+  function loadExtra(){
+    try{
+      const data = JSON.parse(localStorage.getItem(extraStorageKey()) || "{}");
+      for(const key of ["suppliers","workers","workerWages"]){
+        if(Array.isArray(data[key]) && !Array.isArray(state()[key])) state()[key] = data[key];
+        else if(Array.isArray(data[key]) && !state()[key].length) state()[key] = data[key];
+      }
+    }catch{}
+  }
+  function saveExtra(){
+    try{
+      const st = state();
+      const old = JSON.parse(localStorage.getItem(extraStorageKey()) || "{}");
+      localStorage.setItem(extraStorageKey(), JSON.stringify({
+        ...old,
+        suppliers: Array.isArray(st.suppliers) ? st.suppliers : [],
+        workers: Array.isArray(st.workers) ? st.workers : [],
+        workerWages: Array.isArray(st.workerWages) ? st.workerWages : []
+      }));
+    }catch{}
+  }
+
+  function inPeriod(row, period, custom){
+    if(period === "all") return true;
+    const t = clean(row?.createdAt || row?.updatedAt || row?.paidAt || row?.date || 0);
+    if(!t) return false;
+    const now = new Date(), start = new Date(), end = new Date();
+    if(period === "today") { start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+    else if(period === "week") { start.setDate(now.getDate()-7); start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+    else if(period === "month") { start.setMonth(now.getMonth()-1); start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+    else if(period === "year") { start.setFullYear(now.getFullYear()-1); start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+    else if(period === "custom") { if(!custom) return false; const d = new Date(custom); start.setTime(d.getTime()); start.setHours(0,0,0,0); end.setTime(d.getTime()); end.setHours(23,59,59,999); }
+    return t >= start.getTime() && t <= end.getTime();
+  }
+
+  function rowsForPeriod(){
+    loadExtra(); loadMovements();
+    const st = state();
+    const period = $("reportsPeriod")?.value || "today";
+    const custom = $("reportsCustomDate")?.value || "";
+    return {
+      period, custom,
+      invoices: (st.invoices || []).filter(x => inPeriod(x, period, custom)),
+      expenses: (st.expenses || []).filter(x => inPeriod(x, period, custom)),
+      purchases: (st.purchases || []).filter(x => inPeriod(x, period, custom)),
+      supplierPayments: (st.supplierPayments || []).filter(x => inPeriod(x, period, custom)),
+      wages: (st.workerWages || []).filter(x => inPeriod(x, period, custom)),
+      movements: (st.accountMovements || []).filter(x => inPeriod(x, period, custom))
+    };
+  }
+
+  function accountBalances(periodRows = null){
+    const data = periodRows || rowsForPeriod();
+    const map = {};
+    accounts().forEach(a => map[a.id] = {id:a.id, name:a.name, in:0, out:0, sales:0, expenses:0, purchases:0, wages:0, supplierPayments:0, manualIn:0, manualOut:0, count:0, balance:0});
+    const ensure = (id) => map[id || "cash"] || (map[id || "cash"] = {id:id||"cash", name:accountName(id||"cash"), in:0, out:0, sales:0, expenses:0, purchases:0, wages:0, supplierPayments:0, manualIn:0, manualOut:0, count:0, balance:0});
+
+    data.invoices.filter(inv => inv.paymentMethod === "cash" || inv.paymentMethod === "instant_app").forEach(inv => {
+      const id = inv.paymentAccountId || (inv.paymentMethod === "cash" ? "cash" : "app");
+      const r = ensure(id); const val = clean(inv.total);
+      r.in += val; r.sales += val; r.count++;
+    });
+    data.expenses.forEach(e => { const r=ensure(e.accountId || "cash"); const val=clean(e.amount); r.out+=val; r.expenses+=val; r.count++; });
+    data.purchases.forEach(p => { const r=ensure(p.accountId || "cash"); const val=clean(p.total || p.cost); r.out+=val; r.purchases+=val; r.count++; });
+    data.wages.forEach(w => { const r=ensure(w.accountId || "cash"); const val=clean(w.amount || w.bonus); r.out+=val; r.wages+=val; r.count++; });
+    data.supplierPayments.forEach(sp => { const r=ensure(sp.accountId || "cash"); const val=clean(sp.amount); r.out+=val; r.supplierPayments+=val; r.count++; });
+    data.movements.forEach(m => {
+      const r = ensure(m.accountId || "cash"); const val = clean(m.amount);
+      if((m.kind || m.type) === "withdraw") { r.out += val; r.manualOut += val; }
+      else { r.in += val; r.manualIn += val; }
+      r.count++;
+    });
+    Object.values(map).forEach(r => r.balance = r.in - r.out);
+    return map;
+  }
+
+  function ensureStyle(){
+    if($("oskarPaymentFullBalanceStyle")) return;
+    const st = document.createElement("style");
+    st.id = "oskarPaymentFullBalanceStyle";
+    st.textContent = `
+      .oskar-balance-positive{color:#16a34a!important;font-weight:900}.oskar-balance-negative{color:#dc2626!important;font-weight:900}
+      .oskar-account-actions{display:flex;gap:6px;flex-wrap:wrap}.oskar-small-note{font-size:11px;color:#64748b;line-height:1.7;margin-top:3px}
+      .oskar-account-details{font-size:11px;color:#64748b;line-height:1.8;white-space:normal;min-width:230px}.oskar-account-details b{color:#0f172a}
+    `;
+    document.head.appendChild(st);
+  }
+
+  function ensureFormDropdowns(){
+    const pur = $("purchaseForm");
+    if(pur){
+      let sel = $("purchaseAccountId");
+      if(!sel){
+        const host = $("purchaseUnitsPreview")?.closest("div") || pur.querySelector(".form-grid-compact");
+        host?.insertAdjacentHTML("afterend", `<div><label class="field-label">حساب الدفع</label><select id="purchaseAccountId" class="select"></select></div>`);
+        sel = $("purchaseAccountId");
+      }
+      const old = lastPurchaseEditId ? (state().purchases || []).find(p => p.id === lastPurchaseEditId) : null;
+      const val = sel.value || old?.accountId || "cash";
+      sel.innerHTML = options(val);
+      sel.value = val;
+    }
+    const exp = $("expenseForm");
+    if(exp){
+      let sel = $("expenseAccountId");
+      if(!sel){
+        const grid = exp.querySelector(".form-grid-compact");
+        grid?.insertAdjacentHTML("beforeend", `<div><label class="field-label">من حساب الدفع</label><select id="expenseAccountId" class="select"></select></div>`);
+        sel = $("expenseAccountId");
+      }
+      const old = lastExpenseEditId ? (state().expenses || []).find(e => e.id === lastExpenseEditId) : null;
+      const val = sel.value || old?.accountId || "cash";
+      sel.innerHTML = options(val);
+      sel.value = val;
+    }
+    const wage = $("finalWageAccount");
+    if(wage){ const val=wage.value||"cash"; wage.innerHTML=options(val); wage.value=val; }
+  }
+
+  async function saveOfficial(store, item){
+    if(!item || !item.id) return;
+    try{ if(typeof window.saveLocal === "function") await window.saveLocal(store, item, true); }
+    catch(err){
+      try{ if(typeof window.idbPut === "function") await window.idbPut(store, item); }catch(e){ console.warn("save official fallback", e); }
+    }
+  }
+
+  function rememberEditTargets(){
+    document.addEventListener("click", e => {
+      const ep = e.target.closest("[data-edit-purchase]");
+      const ap = e.target.closest("#addPurchaseBtn");
+      const ee = e.target.closest("[data-edit-expense]");
+      const ae = e.target.closest("#addExpenseBtn");
+      if(ep) lastPurchaseEditId = ep.dataset.editPurchase || "";
+      if(ap) lastPurchaseEditId = "";
+      if(ee) lastExpenseEditId = ee.dataset.editExpense || "";
+      if(ae) lastExpenseEditId = "";
+    }, true);
+
+    document.addEventListener("submit", e => {
+      if(e.target?.id === "purchaseForm"){
+        const acc = $("purchaseAccountId")?.value || "cash";
+        const editId = lastPurchaseEditId;
+        setTimeout(async () => {
+          const list = state().purchases || [];
+          const item = editId ? list.find(p => p.id === editId) : [...list].sort((a,b)=>clean(b.createdAt)-clean(a.createdAt))[0];
+          if(item && item.accountId !== acc){ item.accountId = acc; item.updatedAt = Date.now(); await saveOfficial("purchases", item); try{window.renderAll?.();}catch{} renderFinancialReports(); }
+        }, 420);
+      }
+      if(e.target?.id === "expenseForm"){
+        const acc = $("expenseAccountId")?.value || "cash";
+        const editId = lastExpenseEditId;
+        setTimeout(async () => {
+          const list = state().expenses || [];
+          const item = editId ? list.find(x => x.id === editId) : [...list].sort((a,b)=>clean(b.createdAt)-clean(a.createdAt))[0];
+          if(item && item.accountId !== acc){ item.accountId = acc; item.updatedAt = Date.now(); await saveOfficial("expenses", item); try{window.renderAll?.();}catch{} renderFinancialReports(); }
+        }, 420);
+      }
+    }, true);
+  }
+
+  function renderTablesAccountColumns(){
+    // مشتريات: الإصدار الأصلي تم تعديله، وهذا يحمي النسخ القديمة داخل نفس الملف.
+    const purHead = $("purchasesTable")?.closest("table")?.querySelector("thead tr");
+    if(purHead && !Array.from(purHead.children).some(th => (th.textContent||"").includes("حساب الدفع"))){
+      const th = document.createElement("th"); th.textContent = "حساب الدفع"; purHead.insertBefore(th, purHead.children[purHead.children.length-2] || null);
+    }
+    const expHead = $("expensesTable")?.closest("table")?.querySelector("thead tr");
+    if(expHead && !Array.from(expHead.children).some(th => (th.textContent||"").includes("حساب الدفع"))){
+      const th = document.createElement("th"); th.textContent = "حساب الدفع"; expHead.insertBefore(th, expHead.children[3] || null);
+    }
+  }
+
+  function ensureReportCards(data){
+    const firstGrid = $("reportsPrintArea")?.querySelector(".stat-grid");
+    if(!firstGrid) return;
+    const addCard = (id, title, icon, cls, beforeNet=true) => {
+      let el = $(id);
+      if(el) return el;
+      const card = document.createElement("div");
+      card.className = "stat " + (cls || "dark");
+      card.innerHTML = `<div class="stat-title"><i class="fa-solid ${icon}"></i> ${title}</div><div id="${id}" class="stat-value">₪ 0.00</div>`;
+      const netCard = $("reportNet")?.closest(".stat");
+      if(beforeNet && netCard) firstGrid.insertBefore(card, netCard); else firstGrid.appendChild(card);
+      return $(id);
+    };
+    const wageEl = addCard("reportWorkersWages", "أجور العمال", "fa-users-gear", "red");
+    const purEl = addCard("reportPurchasesTotal", "إجمالي المشتريات", "fa-truck-ramp-box", "gold");
+    if(wageEl) wageEl.textContent = money(data.wages.reduce((s,w)=>s+clean(w.amount||w.bonus),0));
+    if(purEl) purEl.textContent = money(data.purchases.reduce((s,p)=>s+clean(p.total||p.cost),0));
+  }
+
+  function renderFinancialReports(){
+    const table = $("accountsReportTable");
+    if(!table) return;
+    loadExtra(); loadMovements();
+    const data = rowsForPeriod();
+    const balances = Object.values(accountBalances(data));
+
+    ensureReportCards(data);
+    const expensesTotal = data.expenses.reduce((s,e)=>s+clean(e.amount),0);
+    const wagesTotal = data.wages.reduce((s,w)=>s+clean(w.amount||w.bonus),0);
+    const purchasesTotal = data.purchases.reduce((s,p)=>s+clean(p.total||p.cost),0);
+    const profitTotal = data.invoices.reduce((s,inv)=>s+clean(inv.profit),0);
+    if($("reportExpenses")) $("reportExpenses").textContent = money(expensesTotal);
+    if($("reportWorkersWages")) $("reportWorkersWages").textContent = money(wagesTotal);
+    if($("reportPurchasesTotal")) $("reportPurchasesTotal").textContent = money(purchasesTotal);
+    // الربح الصافي هنا بعد المصاريف وأجور العمال فقط؛ المشتريات تخص رصيد الحساب لأنها تدخل مخزونًا وقد تم احتساب كلفتها داخل ربح الفواتير.
+    if($("reportNet")) $("reportNet").textContent = money(profitTotal - expensesTotal - wagesTotal);
+
+    const head = table.closest("table")?.querySelector("thead tr");
+    if(head){
+      head.innerHTML = `<th>الحساب</th><th>الداخل</th><th>الخارج</th><th>تفصيل الخارج</th><th>الرصيد النهائي</th><th>العمليات</th>`;
+    }
+    table.innerHTML = balances.map(r => {
+      const cls = r.balance < 0 ? "oskar-balance-negative" : "oskar-balance-positive";
+      return `<tr>
+        <td><b>${esc(r.name || accountName(r.id))}</b><div class="oskar-small-note">${esc(r.id)}</div></td>
+        <td class="money">${money(r.in)}</td>
+        <td class="oskar-balance-negative">${money(r.out)}</td>
+        <td class="oskar-account-details">
+          <b>مشتريات:</b> ${money(r.purchases)} · <b>مصاريف:</b> ${money(r.expenses)} · <b>أجور:</b> ${money(r.wages)}<br>
+          <b>دفعات تجار:</b> ${money(r.supplierPayments)} · <b>حركات يدوية:</b> +${money(r.manualIn)} / -${money(r.manualOut)}
+        </td>
+        <td class="${cls}">${money(r.balance)}</td>
+        <td><div class="oskar-account-actions">
+          <button class="success-btn" data-add-account-movement="${esc(r.id)}"><i class="fa-solid fa-plus"></i> إضافة دفعة</button>
+          <button class="ghost-btn" data-open-account-log="${esc(r.id)}"><i class="fa-solid fa-list"></i> السجل</button>
+        </div></td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="6" class="muted" style="text-align:center">لا توجد أرصدة</td></tr>`;
+    renderAccountMovementLog();
+  }
+
+  function renderSettingsAccountsEnhanced(){
+    const box = $("paymentAccountsList");
+    if(!box || box.dataset.oskarRendering === "1") return;
+    const allBalances = accountBalances({
+      period:"all", custom:"",
+      invoices: state().invoices || [],
+      expenses: state().expenses || [],
+      purchases: state().purchases || [],
+      supplierPayments: state().supplierPayments || [],
+      wages: state().workerWages || [],
+      movements: loadMovements()
+    });
+    box.dataset.oskarRendering = "1";
+    box.innerHTML = accounts().map(a => {
+      const b = allBalances[a.id] || {balance:0,in:0,out:0};
+      const cls = b.balance < 0 ? "oskar-balance-negative" : "oskar-balance-positive";
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1px solid #e5e7eb;border-radius:18px;margin-bottom:8px;background:#fff;flex-wrap:wrap">
+        <div>
+          <b>${esc(a.name)}</b>
+          <div class="muted">${esc(a.number || "بدون رقم")}</div>
+          <div class="oskar-small-note">الرصيد الحالي: <span class="${cls}">${money(b.balance)}</span> · الداخل ${money(b.in)} · الخارج ${money(b.out)}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="success-btn" data-add-account-movement="${esc(a.id)}"><i class="fa-solid fa-plus"></i> إضافة دفعة</button>
+          <button class="ghost-btn" data-open-account-log="${esc(a.id)}"><i class="fa-solid fa-list"></i> السجل</button>
+          <button class="ghost-btn" data-edit-account="${esc(a.id)}"><i class="fa-solid fa-pen"></i> تعديل</button>
+          <button class="danger-btn" data-delete-account="${esc(a.id)}"><i class="fa-solid fa-trash"></i> حذف</button>
+        </div>
+      </div>`;
+    }).join("") || `<div class="muted">لا توجد حسابات</div>`;
+    setTimeout(()=>{ delete box.dataset.oskarRendering; }, 0);
+  }
+
+  function ensureAccountLogCard(){
+    const table = $("accountsReportTable");
+    if(!table || $("oskarAccountMovementCard")) return;
+    const card = document.createElement("div");
+    card.id = "oskarAccountMovementCard";
+    card.className = "card";
+    card.style.marginTop = "14px";
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <h2 style="margin:0;font-size:19px;font-weight:900"><i class="fa-solid fa-clock-rotate-left"></i> سجل أرصدة حسابات الدفع</h2>
+        <button class="primary-btn" data-add-account-movement="cash"><i class="fa-solid fa-plus"></i> إضافة حركة رصيد</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الحساب</th><th>النوع</th><th>المبلغ</th><th>ملاحظات</th><th>الإجراءات</th></tr></thead><tbody id="oskarAccountMovementsRows"></tbody></table></div>`;
+    table.closest(".card")?.insertAdjacentElement("afterend", card);
+  }
+
+  function renderAccountMovementLog(filterAccount=""){
+    ensureAccountLogCard();
+    const body = $("oskarAccountMovementsRows");
+    if(!body) return;
+    const data = rowsForPeriod();
+    let list = [...(data.movements || [])].sort((a,b)=>clean(b.createdAt)-clean(a.createdAt));
+    if(filterAccount) list = list.filter(x => String(x.accountId || "cash") === String(filterAccount));
+    body.innerHTML = list.map(m => {
+      const out = (m.kind || m.type) === "withdraw";
+      return `<tr>
+        <td>${new Date(m.createdAt || Date.now()).toLocaleString("ar")}</td>
+        <td><b>${esc(accountName(m.accountId || "cash"))}</b></td>
+        <td><span class="badge ${out ? "red" : "green"}">${out ? "سحب / خصم" : "إضافة رصيد"}</span></td>
+        <td class="${out ? "oskar-balance-negative" : "oskar-balance-positive"}">${money(m.amount)}</td>
+        <td>${esc(m.notes || "-")}</td>
+        <td><div class="oskar-account-actions"><button class="ghost-btn" data-edit-account-movement="${esc(m.id)}"><i class="fa-solid fa-pen"></i> تعديل</button><button class="danger-btn" data-delete-account-movement="${esc(m.id)}"><i class="fa-solid fa-trash"></i> حذف</button></div></td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="6" class="muted" style="text-align:center">لا توجد حركات يدوية ضمن الفترة المحددة</td></tr>`;
+  }
+
+  function openMovementModal(accountId="cash", movementId=""){
+    loadMovements();
+    const old = movementId ? (state().accountMovements || []).find(x => x.id === movementId) : null;
+    const selected = old?.accountId || accountId || "cash";
+    const title = old ? "تعديل حركة حساب" : "إضافة دفعة / حركة حساب";
+    const bodyHtml = `<form id="oskarAccountMovementForm">
+      <div class="form-grid-compact">
+        <div><label class="field-label">الحساب</label><select id="oskarMoveAccount" class="select">${options(selected)}</select></div>
+        <div><label class="field-label">نوع الحركة</label><select id="oskarMoveKind" class="select"><option value="deposit" ${!old || (old.kind||old.type)!=="withdraw"?"selected":""}>إضافة رصيد / دفعة داخلة</option><option value="withdraw" ${(old?.kind||old?.type)==="withdraw"?"selected":""}>سحب / خصم من الحساب</option></select></div>
+        <div><label class="field-label">المبلغ</label><input id="oskarMoveAmount" type="number" inputmode="decimal" min="0" step="0.01" class="input" value="${esc(old?.amount || "")}" required></div>
+        <div><label class="field-label">ملاحظات</label><input id="oskarMoveNotes" class="input" value="${esc(old?.notes || "")}" placeholder="اختياري"></div>
+      </div>
+      <button class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-floppy-disk"></i> حفظ الحركة</button>
+    </form>`;
+    const titleEl = $("modalTitle"), modalBody = $("modalBody"), back = $("modalBackdrop"), box = $("modalBox");
+    if(!titleEl || !modalBody || !back){ return toast("تعذر فتح النافذة"); }
+    titleEl.textContent = title;
+    if(box) box.classList.remove("large");
+    modalBody.innerHTML = bodyHtml;
+    back.classList.add("show");
+    $("oskarAccountMovementForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const amount = clean($("oskarMoveAmount")?.value, 0);
+      if(amount <= 0) return toast("أدخل مبلغ صحيح");
+      const item = {
+        ...(old || {}),
+        id: old?.id || uid("move"),
+        accountId: $("oskarMoveAccount")?.value || "cash",
+        kind: $("oskarMoveKind")?.value || "deposit",
+        amount,
+        notes: $("oskarMoveNotes")?.value.trim() || "",
+        createdAt: old?.createdAt || Date.now(),
+        updatedAt: Date.now()
+      };
+      const list = state().accountMovements || [];
+      const idx = list.findIndex(x => x.id === item.id);
+      if(idx >= 0) list[idx] = item; else list.push(item);
+      state().accountMovements = list;
+      saveMovements();
+      await pushMovement(item);
+      back.classList.remove("show");
+      renderFinancialReports();
+      renderSettingsAccountsEnhanced();
+      toast(old ? "تم تعديل حركة الحساب" : "تمت إضافة حركة الحساب");
+    };
+  }
+
+  async function deleteMovement(id){
+    if(!confirm("حذف حركة الحساب؟")) return;
+    state().accountMovements = (loadMovements() || []).filter(x => x.id !== id);
+    saveMovements();
+    await removeMovementRemote(id);
+    renderFinancialReports();
+    renderSettingsAccountsEnhanced();
+    toast("تم حذف حركة الحساب");
+  }
+
+  function bindMovementEvents(){
+    document.addEventListener("click", e => {
+      const add = e.target.closest("[data-add-account-movement]");
+      if(add){ e.preventDefault(); e.stopPropagation(); openMovementModal(add.dataset.addAccountMovement || "cash"); return; }
+      const open = e.target.closest("[data-open-account-log]");
+      if(open){ e.preventDefault(); e.stopPropagation(); renderAccountMovementLog(open.dataset.openAccountLog || ""); toast("تم عرض سجل هذا الحساب ضمن الفترة المحددة"); return; }
+      const edit = e.target.closest("[data-edit-account-movement]");
+      if(edit){ e.preventDefault(); e.stopPropagation(); const item=(loadMovements()||[]).find(x=>x.id===edit.dataset.editAccountMovement); openMovementModal(item?.accountId || "cash", edit.dataset.editAccountMovement); return; }
+      const del = e.target.closest("[data-delete-account-movement]");
+      if(del){ e.preventDefault(); e.stopPropagation(); deleteMovement(del.dataset.deleteAccountMovement); return; }
+    }, true);
+  }
+
+  function fullBackupData(){
+    loadExtra(); loadMovements();
+    const st = state();
+    const officialStores = ["products","invoices","customers","expenses","purchases","supplierPayments","paymentAccounts","employees"];
+    const data = {
+      version: "full-oskar-2026-05-03",
+      exportedAt: Date.now(),
+      firebaseRoot: root(),
+      settings: st.settings || null,
+      suppliers: Array.isArray(st.suppliers) ? st.suppliers : [],
+      workers: Array.isArray(st.workers) ? st.workers : [],
+      workerWages: Array.isArray(st.workerWages) ? st.workerWages : [],
+      accountMovements: Array.isArray(st.accountMovements) ? st.accountMovements : []
+    };
+    officialStores.forEach(k => data[k] = Array.isArray(st[k]) ? st[k] : []);
+    return data;
+  }
+
+  function downloadJson(data){
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const d = new Date();
+    const day = d.toISOString().slice(0,10);
+    a.download = `oskar-full-backup-${day}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  }
+
+  async function importFullBackup(file){
+    if(!file) return;
+    try{
+      const data = JSON.parse(await file.text());
+      const st = state();
+      const officialStores = ["products","invoices","customers","expenses","purchases","supplierPayments","paymentAccounts","employees"];
+      for(const store of officialStores){
+        if(Array.isArray(data[store])){
+          st[store] = data[store];
+          if(typeof window.idbClear === "function") { try{ await window.idbClear(store); }catch{} }
+          if(typeof window.idbPut === "function"){
+            for(const item of data[store]) if(item && item.id) await window.idbPut(store, item);
+          }
+        }
+      }
+      if(data.settings){
+        st.settings = {...(st.settings||{}), ...data.settings, id:"main"};
+        if(typeof window.idbPut === "function") await window.idbPut("settings", st.settings);
+      }
+      st.suppliers = Array.isArray(data.suppliers) ? data.suppliers : (st.suppliers || []);
+      st.workers = Array.isArray(data.workers) ? data.workers : (st.workers || []);
+      st.workerWages = Array.isArray(data.workerWages) ? data.workerWages : (st.workerWages || []);
+      st.accountMovements = Array.isArray(data.accountMovements) ? data.accountMovements : (st.accountMovements || []);
+      saveExtra(); saveMovements();
+      try{ if(typeof window.loadLocalData === "function") await window.loadLocalData(true); }catch{}
+      loadExtra(); loadMovements();
+      try{ if(typeof window.renderAll === "function") window.renderAll(); }catch{}
+      renderFinancialReports(); renderSettingsAccountsEnhanced();
+      toast("تم استيراد النسخة الاحتياطية الشاملة");
+    }catch(err){ console.error(err); toast("فشل استيراد النسخة الاحتياطية"); }
+    if($("importBackupInput")) $("importBackupInput").value = "";
+  }
+
+  function bindFullBackup(){
+    document.addEventListener("click", e => {
+      const btn = e.target.closest("#exportBackupBtn");
+      if(!btn) return;
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      downloadJson(fullBackupData());
+      toast("تم تجهيز نسخة احتياطية تشمل كل أقسام الموقع");
+    }, true);
+    document.addEventListener("change", e => {
+      if(e.target?.id !== "importBackupInput") return;
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      importFullBackup(e.target.files && e.target.files[0]);
+    }, true);
+  }
+
+  function tick(){
+    ensureStyle();
+    loadExtra(); loadMovements();
+    ensureFormDropdowns();
+    renderTablesAccountColumns();
+    renderFinancialReports();
+    renderSettingsAccountsEnhanced();
+  }
+
+  async function init(){
+    for(let i=0;i<120;i++){ if(window.state && document.body) break; await wait(80); }
+    ensureStyle();
+    loadMovements(); loadExtra();
+    await pullMovements();
+    rememberEditTargets();
+    bindMovementEvents();
+    bindFullBackup();
+    tick();
+    document.addEventListener("click", () => setTimeout(tick, 120), true);
+    document.addEventListener("change", e => { if(["reportsPeriod","reportsCustomDate"].includes(e.target?.id)) setTimeout(tick, 80); }, true);
+    document.addEventListener("input", e => { if(["expenseAmount","purchaseCost","finalWageAmount"].includes(e.target?.id)) setTimeout(tick, 120); }, true);
+    window.addEventListener("online", () => pullMovements().then(tick));
+    setInterval(tick, 1200);
+    console.log("[oskar-payment-full-balance] ready");
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>
 </body>
 </html>
