@@ -215,7 +215,7 @@
     }
 
     .icon-btn.syncing i{
-      animation:syncSpin 1.6s linear infinite;
+      animation:syncSpin .8s linear infinite;
       color:#1d4ed8;
     }
 
@@ -1738,7 +1738,7 @@
   <style id="oskar-no-login-flash-style-2026-04-30">
     html.oskar-saved-session-boot #authLock{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
   </style>
-  <link data-oskar-default-logo-preload="1" rel="preload" as="image" href="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhc2-SIvoXM037iekfqFFgG9ScPFkd2OYmDCTxAsulO8-UYIByWI5H7pAhaNRr3OkT-WR5h-RrPQfjsWpv4RCPLDIauhevT3RdNQIAICh-ZgdTMWn8ZL8oabWZL-sttvTQ2EAk6LckmOIa2lEdSyjHW9_jrjbMpnItLw9TzulLth5MoEQxj3un_cLoqHL9C/s759/1000002395.jpg" fetchpriority="high" referrerpolicy="no-referrer">
+  <link data-oskar-default-logo-preload="1" rel="preload" as="image" href="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg" fetchpriority="high" referrerpolicy="no-referrer">
 </head>
 <body>
   <div id="authLock" class="auth-lock">
@@ -2232,7 +2232,6 @@
                   <th>الجملة</th>
                   <th>البيع</th>
                   <th>الإجمالي</th>
-                  <th>حساب الدفع</th>
                   <th>ملاحظات</th>
                   <th>الإجراءات</th>
                 </tr>
@@ -2308,7 +2307,6 @@
                   <th>التاريخ</th>
                   <th>نوع المصروف</th>
                   <th>المبلغ</th>
-                  <th>حساب الدفع</th>
                   <th>ملاحظات</th>
                   <th>الإجراءات</th>
                 </tr>
@@ -2439,10 +2437,8 @@
                 <thead>
                   <tr>
                     <th>الحساب</th>
-                    <th>الداخل</th>
-                    <th>الخارج</th>
-                    <th>الرصيد النهائي</th>
-                    <th>العمليات</th>
+                    <th>الرصيد من المبيعات</th>
+                    <th>عدد العمليات</th>
                   </tr>
                 </thead>
                 <tbody id="accountsReportTable"></tbody>
@@ -2789,11 +2785,6 @@
           <label class="field-label">سيضاف للمخزون</label>
           <input id="purchaseUnitsPreview" class="input" value="1" disabled>
         </div>
-
-        <div>
-          <label class="field-label">حساب الدفع</label>
-          <select id="purchaseAccountId" class="select"></select>
-        </div>
       </div>
 
       <div class="full-row" style="margin-top:12px">
@@ -2872,11 +2863,6 @@
         <div>
           <label class="field-label">المبلغ</label>
           <input id="expenseAmount" type="number" inputmode="decimal" class="input" required min="0" step="0.01">
-        </div>
-
-        <div>
-          <label class="field-label">من حساب الدفع</label>
-          <select id="expenseAccountId" class="select"></select>
         </div>
       </div>
 
@@ -3034,8 +3020,30 @@
     const OSKAR_TRIAL_BOOT_DURATION_MS = 12 * 60 * 60 * 1000;
     const OSKAR_TRIAL_BOOT_STARTED_AT = Number(localStorage.getItem("oskar_trial_started_at_v1") || 0);
     const OSKAR_TRIAL_BOOT_ACTIVE = localStorage.getItem("oskar_storage_mode_v1") === "trial" && OSKAR_TRIAL_BOOT_STARTED_AT && (Date.now() - OSKAR_TRIAL_BOOT_STARTED_AT) < OSKAR_TRIAL_BOOT_DURATION_MS;
-    const app = OSKAR_TRIAL_BOOT_ACTIVE ? null : initializeApp(firebaseConfig);
-    const db = OSKAR_TRIAL_BOOT_ACTIVE ? null : getDatabase(app);
+
+    function hasFirebaseConfig(cfg) {
+      return !!(cfg && cfg.apiKey && cfg.projectId && cfg.appId && cfg.databaseURL);
+    }
+
+    const FIREBASE_CONFIG_READY = !OSKAR_TRIAL_BOOT_ACTIVE && hasFirebaseConfig(firebaseConfig);
+    let app = null;
+    let db = null;
+
+    if (FIREBASE_CONFIG_READY) {
+      try {
+        app = initializeApp(firebaseConfig);
+        db = getDatabase(app);
+      } catch (e) {
+        console.warn("Firebase init failed", e);
+        window.OSKAR_FIREBASE_INIT_ERROR = String(e?.message || e || "Firebase init failed");
+      }
+    } else if (!OSKAR_TRIAL_BOOT_ACTIVE) {
+      window.OSKAR_FIREBASE_INIT_ERROR = "firebase-config.js غير موجود أو بيانات Firebase ناقصة";
+      console.warn(window.OSKAR_FIREBASE_INIT_ERROR);
+    }
+
+    const firebaseReady = () => !!(db && ref && set && get && remove);
+    window.OSKAR_FIREBASE_READY = firebaseReady();
 
     const OSKAR_TRIAL_DURATION_MS = 12 * 60 * 60 * 1000;
     const OSKAR_TRIAL_USED_KEY = "oskar_trial_used_once_v1";
@@ -3083,7 +3091,7 @@
     window.OSKAR_TRIAL_FIREBASE_ALLOWED = !OSKAR_TRIAL_ACTIVE;
     const FALLBACK_ROOTS = OSKAR_TRIAL_ACTIVE ? [] : (Array.isArray(externalFirebase.fallbackRoots) ? externalFirebase.fallbackRoots : []);
     const DB_NAME = `cashier_units_pro_${DB_NAMESPACE}_db_v16`;
-    const DB_VERSION = 120;
+    const DB_VERSION = 99;
 
     const STORE_NAMES = [
       "products",
@@ -3114,6 +3122,9 @@
       { id: "purchases", label: "المشتريات", icon: "fa-truck-ramp-box" },
       { id: "supplierPayments", label: "دفعات التجار", icon: "fa-hand-holding-dollar" },
       { id: "expenses", label: "المصروفات", icon: "fa-money-bill-wave" },
+      { id: "shippingCalc", label: "حاسبة طرود الشحن", icon: "fa-calculator" },
+      { id: "shippingCustomers", label: "عملاء الشحن", icon: "fa-users" },
+      { id: "shippingShipments", label: "الشحنات", icon: "fa-boxes-packing" },
       { id: "reports", label: "التقارير", icon: "fa-chart-line" },
       { id: "settings", label: "الإعدادات", icon: "fa-gear" }
     ];
@@ -3162,7 +3173,7 @@
       shopPhone: "",
       currency: "₪",
       lowStock: 5,
-      logo: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhc2-SIvoXM037iekfqFFgG9ScPFkd2OYmDCTxAsulO8-UYIByWI5H7pAhaNRr3OkT-WR5h-RrPQfjsWpv4RCPLDIauhevT3RdNQIAICh-ZgdTMWn8ZL8oabWZL-sttvTQ2EAk6LckmOIa2lEdSyjHW9_jrjbMpnItLw9TzulLth5MoEQxj3un_cLoqHL9C/s759/1000002395.jpg",
+      logo: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg",
       localLogo: "",
       logoMode: "url",
       adminPasswordHash: "",
@@ -3326,6 +3337,8 @@
       return Array.isArray(user.permissions) && user.permissions.includes(pageId);
     }
 
+    window.oskarHasPermission = hasPermission;
+
     function saveAuthSession(user) {
       localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({
         id: user.id,
@@ -3384,7 +3397,7 @@
     }
 
     async function fetchFreshSettingsFromFirebase() {
-      if (!navigator.onLine) return state.settings || defaultSettings;
+      if (!navigator.onLine || !firebaseReady()) return state.settings || defaultSettings;
       try {
         const snap = await get(ref(db, `${FIREBASE_ROOT}/settings/main`));
         if (snap.exists()) {
@@ -3412,7 +3425,7 @@
       const cleanSettings = stripLocalOnlySettings(settings);
       await idbPut("settings", settings);
       if (OSKAR_TRIAL_LOCAL_ONLY) return;
-      if (navigator.onLine) {
+      if (navigator.onLine && firebaseReady()) {
         await set(ref(db, `${FIREBASE_ROOT}/settings/main`), cleanSettings);
       } else {
         await enqueueSync({ type: "set", store: "settings", itemId: "main", data: cleanSettings });
@@ -3539,8 +3552,8 @@
         }
       }
 
-      document.querySelectorAll(".nav-btn[data-page], .bottom-btn[data-page]").forEach(btn => {
-        const page = btn.dataset.page;
+      document.querySelectorAll(".nav-btn[data-page], .bottom-btn[data-page], .nav-btn[data-ship-page], .bottom-btn[data-ship-page]").forEach(btn => {
+        const page = btn.dataset.page || btn.dataset.shipPage;
         btn.classList.toggle("auth-hidden", !!user && !hasPermission(page));
       });
 
@@ -3549,7 +3562,16 @@
 
       if (user && !hasPermission(getActivePage())) {
         const first = AUTH_PAGES.find(p => hasPermission(p.id));
-        if (first) switchPage(first.id);
+        if (first) {
+          if (String(first.id).startsWith("shipping")) {
+            setTimeout(() => {
+              if (typeof window.oskarShipSwitchPage === "function") window.oskarShipSwitchPage(first.id);
+              else document.querySelector(`[data-ship-page="${first.id}"]`)?.click();
+            }, 120);
+          } else {
+            switchPage(first.id);
+          }
+        }
       }
     }
 
@@ -3954,60 +3976,49 @@
       });
     }
 
-    function ensureDbStores(database) {
-      STORE_NAMES.forEach((name) => {
-        if (!database.objectStoreNames.contains(name)) {
-          database.createObjectStore(name, { keyPath: "id" });
-        }
-      });
-    }
-
-    function openIndexedDbWithVersion(version, resolve, reject, retryDepth = 0) {
-      const safeVersion = Math.max(Number(version || DB_VERSION) || DB_VERSION, DB_VERSION);
-      const req = indexedDB.open(DB_NAME, safeVersion);
-
-      req.onupgradeneeded = () => {
-        ensureDbStores(req.result);
-      };
-
-      req.onsuccess = () => {
-        const database = req.result;
-        const missingStores = STORE_NAMES.some((name) => !database.objectStoreNames.contains(name));
-
-        if (missingStores && retryDepth < 3) {
-          const nextVersion = Math.max(Number(database.version || safeVersion) + 1, safeVersion + 1);
-          database.close();
-          openIndexedDbWithVersion(nextVersion, resolve, reject, retryDepth + 1);
-          return;
-        }
-
-        resolve(database);
-      };
-
-      req.onerror = () => {
-        const err = req.error;
-        const isVersionError = err && (err.name === "VersionError" || String(err.message || "").includes("less than the existing version"));
-
-        if (isVersionError && retryDepth < 3) {
-          const probe = indexedDB.open(DB_NAME);
-
-          probe.onsuccess = () => {
-            const currentVersion = Number(probe.result?.version || DB_VERSION) || DB_VERSION;
-            try { probe.result.close(); } catch {}
-            openIndexedDbWithVersion(Math.max(currentVersion, DB_VERSION), resolve, reject, retryDepth + 1);
-          };
-
-          probe.onerror = () => reject(err || probe.error);
-          return;
-        }
-
-        reject(err);
-      };
-    }
-
     function openDB() {
       return new Promise((resolve, reject) => {
-        openIndexedDbWithVersion(DB_VERSION, resolve, reject);
+        const applyStores = (database) => {
+          STORE_NAMES.forEach((name) => {
+            if (!database.objectStoreNames.contains(name)) {
+              database.createObjectStore(name, { keyPath: "id" });
+            }
+          });
+        };
+
+        const startOpen = (version, allowRetry) => {
+          let req;
+          try {
+            req = indexedDB.open(DB_NAME, version);
+          } catch (e) {
+            reject(e);
+            return;
+          }
+
+          req.onupgradeneeded = () => applyStores(req.result);
+          req.onsuccess = () => resolve(req.result);
+          req.onblocked = () => console.warn("IndexedDB upgrade is blocked by another open tab");
+          req.onerror = () => {
+            const err = req.error;
+            if (allowRetry && err && err.name === "VersionError") {
+              try {
+                const currentReq = indexedDB.open(DB_NAME);
+                currentReq.onsuccess = () => {
+                  const currentVersion = Number(currentReq.result?.version || version || DB_VERSION);
+                  try { currentReq.result.close(); } catch (_) {}
+                  startOpen(Math.max(currentVersion, DB_VERSION), false);
+                };
+                currentReq.onerror = () => reject(err || currentReq.error);
+              } catch (_) {
+                reject(err);
+              }
+              return;
+            }
+            reject(err);
+          };
+        };
+
+        startOpen(DB_VERSION, true);
       });
     }
 
@@ -4177,23 +4188,15 @@
       }
     }
 
-    async function saveLocal(store, item, sync = true, syncMeta = {}) {
-      if (!item || !item.id) return;
-
-      const localItem = {
-        ...item,
-        updatedAt: Math.max(Number(item.updatedAt || item.createdAt || 0), Date.now())
-      };
-
-      await idbPut(store, localItem);
+    async function saveLocal(store, item, sync = true) {
+      await idbPut(store, item);
 
       if (sync) {
         await enqueueSync({
           type: "set",
           store,
-          itemId: localItem.id,
-          data: localItem,
-          syncMeta: syncMeta || {}
+          itemId: item.id,
+          data: item
         });
       }
     }
@@ -4316,7 +4319,7 @@
 
     async function loadFirebaseRoot(rootName) {
       if (OSKAR_TRIAL_LOCAL_ONLY) return 0;
-      if (!navigator.onLine) return 0;
+      if (!navigator.onLine || !firebaseReady()) return 0;
 
       try {
         updateSyncUi({
@@ -4379,7 +4382,7 @@
 
     async function loadFirebaseOnce() {
       if (OSKAR_TRIAL_LOCAL_ONLY) return;
-      if (!navigator.onLine) return;
+      if (!navigator.onLine || !firebaseReady()) return;
 
       updateSyncUi({
         visible: state.syncUi.visible,
@@ -4403,7 +4406,7 @@
 
     async function syncLocalSnapshotToFirebase() {
       if (OSKAR_TRIAL_LOCAL_ONLY) return;
-      if (!navigator.onLine) return;
+      if (!navigator.onLine || !firebaseReady()) return;
 
       const meta = await idbGet("localMeta", "snapshotUploaded");
       if (meta?.root === FIREBASE_ROOT && meta?.done) return;
@@ -4809,6 +4812,7 @@
     }
 
     async function oskarCfFetchRemoteStore(store) {
+      if (!firebaseReady()) return new Map();
       const snap = await get(ref(db, FIREBASE_ROOT + "/" + store));
       return oskarCfObjToMap(snap.exists() ? (snap.val() || {}) : {});
     }
@@ -4851,10 +4855,8 @@
       const touchedStores = new Set();
       const removals = [];
       const latestProductLocal = new Map();
-      const latestProductLocalMeta = new Map();
       const removedProducts = new Set();
       const stockDelta = new Map();
-      const absoluteStockProductIds = new Set();
 
       const sortedQueue = queue.slice().sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
 
@@ -4885,7 +4887,6 @@
 
         if (store === "products") {
           latestProductLocal.set(itemId, data);
-          latestProductLocalMeta.set(itemId, q.syncMeta || q.meta || {});
           touchedStores.add("products");
           continue;
         }
@@ -4929,34 +4930,17 @@
           delete maps.products[productId];
           return;
         }
-
         const remoteProduct = maps.products?.[productId];
-        const meta = latestProductLocalMeta.get(productId) || {};
-        const forceAbsoluteStock = meta.stockMode === "absolute" || meta.absoluteStock === true;
-        if (forceAbsoluteStock) absoluteStockProductIds.add(productId);
-        const hasInvoiceOrPurchaseDelta = stockDelta.has(productId);
-
         if (initialRemoteProductIds.has(productId) && remoteProduct) {
-          const merged = normalizeProduct({
-            ...remoteProduct,
-            ...localProduct,
-            updatedAt: Math.max(oskarCfItemTime(remoteProduct), oskarCfItemTime(localProduct), Date.now())
-          });
-
-          if (hasInvoiceOrPurchaseDelta && !forceAbsoluteStock) {
-            merged.stock = cleanNumber(remoteProduct.stock || 0);
-          } else {
-            merged.stock = cleanNumber(localProduct.stock || 0);
-          }
-
-          maps.products[productId] = normalizeProduct(merged);
+          const cloudStock = cleanNumber(remoteProduct.stock || 0);
+          maps.products[productId] = normalizeProduct({ ...remoteProduct, ...localProduct, stock: cloudStock, updatedAt: Math.max(oskarCfItemTime(remoteProduct), oskarCfItemTime(localProduct), Date.now()) });
         } else {
           maps.products[productId] = normalizeProduct(localProduct);
         }
       });
 
       stockDelta.forEach((delta, productId) => {
-        if (!maps.products || !maps.products[productId] || removedProducts.has(productId) || absoluteStockProductIds.has(productId)) return;
+        if (!maps.products || !maps.products[productId] || removedProducts.has(productId)) return;
         if (initialRemoteProductIds.has(productId)) {
           maps.products[productId] = normalizeProduct({
             ...maps.products[productId],
@@ -6251,7 +6235,6 @@
             <td>${money(p.cost)}</td>
             <td>${money(p.salePrice)}</td>
             <td class="money">${money(p.total)}</td>
-            <td>${escapeHtml((state.paymentAccounts.find(a => a.id === (p.accountId || "cash"))?.name) || "الصندوق")}</td>
             <td>${escapeHtml(p.notes || "-")}</td>
             <td>
               <button class="ghost-btn" data-edit-purchase="${p.id}">
@@ -6266,7 +6249,7 @@
 
       $("purchasesTable").innerHTML =
         rows ||
-        `<tr><td colspan="13" class="muted" style="text-align:center">لا توجد مشتريات</td></tr>`;
+        `<tr><td colspan="12" class="muted" style="text-align:center">لا توجد مشتريات</td></tr>`;
     }
 
     function renderSupplierPayments() {
@@ -6323,7 +6306,6 @@
             <td>${formatDate(e.createdAt)}</td>
             <td><b>${escapeHtml(e.type)}</b></td>
             <td class="money">${money(e.amount)}</td>
-            <td>${escapeHtml((state.paymentAccounts.find(a => a.id === (e.accountId || "cash"))?.name) || "الصندوق")}</td>
             <td>${escapeHtml(e.notes || "-")}</td>
             <td>
               <button class="ghost-btn" data-edit-expense="${e.id}">
@@ -6338,7 +6320,7 @@
 
       $("expensesTable").innerHTML =
         rows ||
-        `<tr><td colspan="6" class="muted" style="text-align:center">لا توجد مصروفات</td></tr>`;
+        `<tr><td colspan="5" class="muted" style="text-align:center">لا توجد مصروفات</td></tr>`;
     }
 
     function getFilteredReportData() {
@@ -6598,7 +6580,7 @@
           ex.category = $("productCategory").value.trim() || ex.category;
           ex.updatedAt = Date.now();
 
-          await saveLocal("products", ex, true, { stockMode: "absolute", reason: "manual-product-merge" });
+          await saveLocal("products", ex, true);
           state.products = state.products.map(p => p.id === ex.id ? ex : p);
 
           closeModal();
@@ -6628,7 +6610,7 @@
           updatedAt: Date.now()
         });
 
-        await saveLocal("products", product, true, { stockMode: "absolute", reason: "manual-product-form" });
+        await saveLocal("products", product, true);
 
         const i = state.products.findIndex(p => p.id === id);
         if (i >= 0) state.products[i] = product;
@@ -6760,11 +6742,6 @@
 
       const oldPurchase = purchaseId ? state.purchases.find(p => p.id === purchaseId) : null;
 
-      if ($("purchaseAccountId")) {
-        $("purchaseAccountId").innerHTML = paymentAccountsOptions(true);
-        $("purchaseAccountId").value = oldPurchase?.accountId || "cash";
-      }
-
       function selectPurchaseProduct(product) {
         const p = normalizeProduct(product);
 
@@ -6833,7 +6810,6 @@
         $("purchaseSalePrice").value = cleanNumber(oldPurchase.salePrice, 0);
         $("purchaseCartonUnits").value = cleanNumber(oldPurchase.cartonUnits, 1);
         $("purchaseNotes").value = oldPurchase.notes || "";
-        if ($("purchaseAccountId")) $("purchaseAccountId").value = oldPurchase.accountId || "cash";
 
         const prod = getProductById(oldPurchase.productId);
         if (prod) selectPurchaseProduct(prod);
@@ -6884,7 +6860,6 @@
           cost: enteredCost,
           salePrice: enteredSale || product.displaySalePrice || product.salePrice,
           total: enteredCost,
-          accountId: $("purchaseAccountId")?.value || oldPurchase?.accountId || "cash",
           notes: $("purchaseNotes").value.trim(),
           createdAt: oldPurchase?.createdAt || Date.now(),
           updatedAt: Date.now()
@@ -6970,17 +6945,11 @@
 
       const old = expenseId ? state.expenses.find(e => e.id === expenseId) : null;
 
-      if ($("expenseAccountId")) {
-        $("expenseAccountId").innerHTML = paymentAccountsOptions(true);
-        $("expenseAccountId").value = old?.accountId || "cash";
-      }
-
       if (old) {
         $("expenseId").value = old.id;
         $("expenseType").value = old.type || "";
         $("expenseAmount").value = cleanNumber(old.amount, 0);
         $("expenseNotes").value = old.notes || "";
-        if ($("expenseAccountId")) $("expenseAccountId").value = old.accountId || "cash";
       }
 
       $("expenseForm").onsubmit = async (e) => {
@@ -6990,7 +6959,6 @@
           id: old?.id || uid("exp"),
           type: $("expenseType").value.trim(),
           amount: cleanNumber($("expenseAmount").value, 0),
-          accountId: $("expenseAccountId")?.value || old?.accountId || "cash",
           notes: $("expenseNotes").value.trim(),
           createdAt: old?.createdAt || Date.now(),
           updatedAt: Date.now()
@@ -8814,10 +8782,7 @@
           <body>
             ${html}
           
-            
-
-
-</body>
+            </body>
         </html>
       `;
 
@@ -9617,10 +9582,6 @@
         supplierPayments: state.supplierPayments,
         paymentAccounts: state.paymentAccounts,
         employees: state.employees,
-        suppliers: state.suppliers || [],
-        workers: state.workers || [],
-        workerWages: state.workerWages || [],
-        accountMovements: state.accountMovements || [],
         settings: state.settings
       };
 
@@ -10806,7 +10767,18 @@
 
       renderAll();
 
-      if (currentUser() && navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY) {
+      window.OSKAR_FIREBASE_READY = firebaseReady();
+      if (!OSKAR_TRIAL_LOCAL_ONLY && !firebaseReady() && window.OSKAR_FIREBASE_INIT_ERROR) {
+        updateSyncUi({
+          spin: false,
+          visible: true,
+          title: "تنبيه Firebase",
+          status: "تم تشغيل التطبيق محليًا، لكن ملف firebase-config.js غير موجود أو ناقص لذلك لن تتم المزامنة حتى تضيفه بجانب ملف HTML.",
+          progress: 0
+        });
+      }
+
+      if (currentUser() && navigator.onLine && !OSKAR_TRIAL_LOCAL_ONLY && firebaseReady()) {
         await runAfterLoginSync("boot");
       } else {
         updateSyncUi({
@@ -11793,6 +11765,9 @@
     { id:"purchases", label:"المشتريات", icon:"fa-truck-ramp-box" },
     { id:"supplierPayments", label:"دفعات التجار", icon:"fa-hand-holding-dollar" },
     { id:"expenses", label:"المصروفات", icon:"fa-money-bill-wave" },
+    { id:"shippingCalc", label:"حاسبة طرود الشحن", icon:"fa-calculator" },
+    { id:"shippingCustomers", label:"عملاء الشحن", icon:"fa-users" },
+    { id:"shippingShipments", label:"الشحنات", icon:"fa-boxes-packing" },
     { id:"reports", label:"التقارير", icon:"fa-chart-line" },
     { id:"settings", label:"الإعدادات", icon:"fa-gear" }
   ];
@@ -12834,7 +12809,7 @@
   const TRIAL_MODE_KEY="oskar_storage_mode_v1";
   const TRIAL_STARTED_KEY="oskar_trial_started_at_v1";
   const TRIAL_DURATION_MS=12*60*60*1000;
-  const LOGO_URL="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhc2-SIvoXM037iekfqFFgG9ScPFkd2OYmDCTxAsulO8-UYIByWI5H7pAhaNRr3OkT-WR5h-RrPQfjsWpv4RCPLDIauhevT3RdNQIAICh-ZgdTMWn8ZL8oabWZL-sttvTQ2EAk6LckmOIa2lEdSyjHW9_jrjbMpnItLw9TzulLth5MoEQxj3un_cLoqHL9C/s759/1000002395.jpg";
+  const LOGO_URL="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg";
   const money = v => (typeof window.money==="function" ? window.money(v) : "₪ " + (Number(v||0).toFixed(2)));
   const clean = (v,f=0)=>{ const n=Number(String(v??"").replace(",",".")); return Number.isFinite(n)?n:f; };
   function toast(msg,ms=2800){ if(typeof window.toast==="function") return window.toast(msg,ms); const el=$("toast"); if(el){el.textContent=msg; el.classList.add("show"); clearTimeout(el.__t); el.__t=setTimeout(()=>el.classList.remove("show"),ms);} else alert(msg); }
@@ -14169,7 +14144,7 @@
   window.__OSKAR_FINAL_USER_REQUEST_PATCH_20260430__=true;
   const $=id=>document.getElementById(id),$$=sel=>Array.from(document.querySelectorAll(sel));
   const MODE_KEY="oskar_storage_mode_v1",START_KEY="oskar_trial_started_at_v1",TRIAL_MS=12*60*60*1000;
-  const DEFAULT_LOGO="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhc2-SIvoXM037iekfqFFgG9ScPFkd2OYmDCTxAsulO8-UYIByWI5H7pAhaNRr3OkT-WR5h-RrPQfjsWpv4RCPLDIauhevT3RdNQIAICh-ZgdTMWn8ZL8oabWZL-sttvTQ2EAk6LckmOIa2lEdSyjHW9_jrjbMpnItLw9TzulLth5MoEQxj3un_cLoqHL9C/s759/1000002395.jpg";
+  const DEFAULT_LOGO="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg";
   function clean(v,d=0){const n=parseFloat(String(v??"").replace(",",".").replace(/[^0-9+\-.]/g,""));return Number.isFinite(n)?n:d}
   function isTrial(){const st=Number(localStorage.getItem(START_KEY)||0);return localStorage.getItem(MODE_KEY)==="trial"&&st&&Date.now()-st<TRIAL_MS}
   function money(v){return typeof window.money==="function"?window.money(v):"₪ "+clean(v,0).toFixed(2)}
@@ -14230,10 +14205,9 @@
     .oskar-prime-method-card,
     .oskar-prime-method{grid-template-columns:74px minmax(0,1fr)!important;padding:14px!important}
   }
-  #syncNowBtn.syncing i,
-  .icon-btn.syncing i{animation-duration:1.6s!important}
+  .icon-btn.syncing i,
   .fa-spin,
-  .oskar-prime-safe-spinner{animation-duration:.70s!important}
+  .oskar-prime-safe-spinner{animation-duration:.36s!important}
   .oskar-prime-safe-select.best:before,
   .oskar-prime-select-card.best:before,
   .oskar-prime-plan.best:before,
@@ -14249,7 +14223,7 @@
 <script id="oskar-final-request-2026-05-01-script">
 (function(){
   "use strict";
-  const DEFAULT_LOGO = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhc2-SIvoXM037iekfqFFgG9ScPFkd2OYmDCTxAsulO8-UYIByWI5H7pAhaNRr3OkT-WR5h-RrPQfjsWpv4RCPLDIauhevT3RdNQIAICh-ZgdTMWn8ZL8oabWZL-sttvTQ2EAk6LckmOIa2lEdSyjHW9_jrjbMpnItLw9TzulLth5MoEQxj3un_cLoqHL9C/s759/1000002395.jpg";
+  const DEFAULT_LOGO = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg";
   const MODE_KEY = "oskar_storage_mode_v1";
   const START_KEY = "oskar_trial_started_at_v1";
   const DUR = 12 * 60 * 60 * 1000;
@@ -14437,8 +14411,7 @@
   }
   function speedSpinners(){
     $$('.fa-spin,.icon-btn.syncing i,.oskar-prime-safe-spinner').forEach(el => {
-      if(el.closest && el.closest('#syncNowBtn')) el.style.setProperty('animation-duration', '1.6s', 'important');
-      else el.style.setProperty('animation-duration', '.70s', 'important');
+      el.style.setProperty('animation-duration', '.36s', 'important');
     });
   }
   function updateTrialText(){
@@ -14537,11 +14510,10 @@
     animation:oskarFastSpin .32s linear infinite;
     margin-inline-start:6px;
   }
-  #syncNowBtn.syncing i,
-  .icon-btn.syncing i{animation-duration:1.6s!important}
+  .icon-btn.syncing i,
   .fa-spin,
   .oskar-prime-safe-spinner,
-  .oskar-mini-loader{animation-duration:.70s!important}
+  .oskar-mini-loader{animation-duration:.28s!important}
   @keyframes oskarFastSpin{to{transform:rotate(360deg)}}
 </style>
 <script id="oskarFastInvoiceExportTrialSyncLockScript20260501B">
@@ -15639,677 +15611,1631 @@
 </script>
 
 
-<!-- OSKAR_SYNC_STOCK_FIX_2026_05_02 -->
-<style id="oskar-sync-stock-fix-2026-05-02-style">
-  #syncNowBtn.syncing i,
-  .icon-btn.syncing i{animation-duration:1.6s!important}
-</style>
-<script id="oskar-sync-stock-fix-2026-05-02-script">
+
+<script id="oskar-shipping-cbm-final-2026-05-02-fixed-v2">
 (function(){
   "use strict";
-  function slowSyncIcon(){
-    var btn = document.getElementById("syncNowBtn");
-    if(!btn) return;
-    var icon = btn.querySelector("i");
-    if(icon) icon.style.setProperty("animation-duration", "1.6s", "important");
-  }
-  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", slowSyncIcon, {once:true});
-  else slowSyncIcon();
-  document.addEventListener("click", function(){ setTimeout(slowSyncIcon, 60); }, true);
-  setInterval(slowSyncIcon, 1200);
-})();
-</script>
 
-
-<script id="oskar-payment-accounts-linked-final-2026-05-03">
-(function(){
-  "use strict";
-  if(window.__OSKAR_PAYMENT_ACCOUNTS_LINKED_FINAL_20260503__) return;
-  window.__OSKAR_PAYMENT_ACCOUNTS_LINKED_FINAL_20260503__ = true;
-
+  const PATCH_VERSION = "2026-05-03-shipping-cbm-v5-customers-fast-reports-logo";
+  const SHIPPING_DEFAULT_LOGO = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg";
+  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   const $ = (id) => document.getElementById(id);
   const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-  const wait = (ms) => new Promise(r => setTimeout(r, ms));
-  const esc = (v) => String(v ?? "").replace(/[&<>\"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;","'":"&#039;"}[m]));
-  const num = (v, f=0) => {
-    const n = Number(String(v ?? "").replace(/,/g,".").replace(/[^0-9.\-]/g,""));
-    return Number.isFinite(n) ? n : f;
-  };
-  const money = (v) => typeof window.money === "function" ? window.money(v) : "₪ " + num(v).toFixed(2);
-  const toast = (msg, ms=2600) => typeof window.toast === "function" ? window.toast(msg, ms) : console.log(msg);
-  const uid = (p="id") => p + "_" + Date.now() + "_" + Math.random().toString(16).slice(2);
-  const root = () => window.FIREBASE_ROOT || window.CASHIER_FIREBASE_CONFIG?.firebaseRoot || "cashier_units_pro_default";
-  const movementsKey = () => "oskar_account_movements_linked_final_2026_05_03_" + root();
-  const accountsCacheKey = () => "oskar_payment_accounts_cache_2026_05_03_" + root();
-  const extraKey = () => "cashier_extra_final_2026_04_29_" + root();
 
-  const DEFAULT_ACCOUNTS = [
-    {id:"cash", name:"دفع كاش", number:"", type:"cash"},
-    {id:"bank", name:"دفع تطبيق بنك", number:"", type:"app"},
-    {id:"jawwalpay", name:"دفع تطبيق جوال بي", number:"", type:"app"}
-  ];
+  function st(){
+    window.state = window.state || {};
+    if (!Array.isArray(window.state.shipments)) window.state.shipments = [];
+    if (!Array.isArray(window.state.shipCustomers)) window.state.shipCustomers = [];
+    return window.state;
+  }
 
-  let accountsReady = false;
-  let syncingAccounts = false;
-  let lastPurchaseEditId = "";
-  let lastExpenseEditId = "";
-  let lastSupplierPaymentEditId = "";
+  function uid(prefix="ship"){
+    return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
 
-  function st(){ window.state = window.state || {}; return window.state; }
-  function normalizeAcc(a){
-    const id = String(a?.id || a?.key || a?.name || uid("acc")).trim();
+  function esc(v){
+    return String(v ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]));
+  }
+
+  function num(v, fallback=0){
+    const n = Number(String(v ?? "").trim().replace(",", "."));
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  function r3(v){
+    return Math.round((num(v) + Number.EPSILON) * 1000) / 1000;
+  }
+
+  function currency(){
+    return window.state?.settings?.currency || "₪";
+  }
+
+  function money(v){
+    const n = num(v);
+    return `${currency()} ${n.toFixed(2)}`;
+  }
+
+  function fmt(v, d=3){
+    return num(v).toFixed(d);
+  }
+
+  function toast(msg, ms=2600){
+    if (typeof window.toast === "function") return window.toast(msg, ms);
+    const el = $("toast");
+    if (!el) return alert(msg);
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(el._shipTimer);
+    el._shipTimer = setTimeout(() => el.classList.remove("show"), ms);
+  }
+
+  function formatDate(ts){
+    try{
+      return new Date(Number(ts || Date.now())).toLocaleString("ar", {year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit"});
+    }catch{ return "-"; }
+  }
+
+  function dateKey(ts){
+    const d = new Date(Number(ts || Date.now()));
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${day}`;
+  }
+
+  function startOfDay(d=new Date()){
+    const x = new Date(d);
+    x.setHours(0,0,0,0);
+    return x.getTime();
+  }
+
+  function storageKey(){
+    const root = String(window.FIREBASE_ROOT || window.OSKAR_STORAGE_PROFILE || "main").replace(/[^a-zA-Z0-9_\-]/g, "_");
+    return `oskar_shipping_cbm_${root}_v1`;
+  }
+
+  function saveLocalShipments(){
+    try{ localStorage.setItem(storageKey(), JSON.stringify(st().shipments || [])); }catch(e){ console.warn("shipping local save", e); }
+  }
+
+  function loadLocalShipments(){
+    try{
+      const rows = JSON.parse(localStorage.getItem(storageKey()) || "[]");
+      if (Array.isArray(rows)) st().shipments = rows.map(normalizeShipment).filter(Boolean);
+    }catch(e){ st().shipments = []; }
+  }
+
+  function lastCbmPriceKey(){
+    return `${storageKey()}_last_cbm_price`;
+  }
+
+  function getLastCbmPrice(){
+    try{ return String(localStorage.getItem(lastCbmPriceKey()) || "").trim(); }catch{ return ""; }
+  }
+
+  function saveLastCbmPrice(value){
+    const v = num(value, 0);
+    if (v > 0) {
+      try{ localStorage.setItem(lastCbmPriceKey(), String(v)); }catch(e){}
+    }
+  }
+
+  function ensureLastCbmPriceInInput(){
+    const input = $("shipCbmPrice");
+    if (!input) return;
+    const last = getLastCbmPrice();
+    if (!String(input.value || "").trim() && last) input.value = last;
+  }
+
+  function calcLine(line){
+    const qty = Math.max(1, Math.round(num(line.qty, 1)));
+    const length = Math.max(0, num(line.length, 0));
+    const width = Math.max(0, num(line.width, 0));
+    const height = Math.max(0, num(line.height, 0));
+    const unitCbm = (length * width * height) / 1000000;
+    const totalCbm = unitCbm * qty;
+    return { qty, length, width, height, unitCbm: r3(unitCbm), totalCbm: r3(totalCbm) };
+  }
+
+  function calcShipment(cartons, cbmPrice){
+    const lines = (Array.isArray(cartons) ? cartons : []).map(calcLine);
+    const totalCartons = lines.reduce((s, l) => s + l.qty, 0);
+    const totalCbm = r3(lines.reduce((s, l) => s + l.totalCbm, 0));
+    const price = Math.max(0, num(cbmPrice, 0));
+    const total = r3(totalCbm * price);
+    return { lines, totalCartons, totalCbm, cbmPrice: price, total };
+  }
+
+  function normalizeShipment(raw){
+    if (!raw || !raw.id) return null;
+    const cartons = Array.isArray(raw.cartons) ? raw.cartons : [];
+    const calc = calcShipment(cartons, raw.cbmPrice);
+    const paid = Math.max(0, num(raw.paidAmount ?? raw.downPayment, 0));
+    const total = num(raw.totalPrice ?? calc.total, calc.total);
+    const remaining = Math.max(0, r3(total - paid));
     return {
-      id,
-      name: String(a?.name || a?.title || (id === "cash" ? "دفع كاش" : "حساب دفع")).trim(),
-      number: String(a?.number || a?.phone || a?.accountNumber || "").trim(),
-      type: a?.type || (id === "cash" ? "cash" : "app"),
-      createdAt: num(a?.createdAt, Date.now()),
-      updatedAt: num(a?.updatedAt, Date.now())
+      id: raw.id,
+      code: String(raw.code || "").trim(),
+      customerName: String(raw.customerName || raw.customer || "").trim(),
+      customerPhone: String(raw.customerPhone || raw.phone || raw.mobile || raw.customerMobile || "").trim(),
+      customerIdNumber: String(raw.customerIdNumber || raw.idNumber || raw.identityNumber || "").replace(/\D/g, "").slice(0, 9),
+      customerShopName: String(raw.customerShopName || raw.shopName || raw.storeName || "").trim(),
+      customerAddress: String(raw.customerAddress || raw.address || "").trim(),
+      cartons: cartons.map((c, i) => ({
+        id: c.id || uid("carton"),
+        length: num(c.length, 0),
+        width: num(c.width, 0),
+        height: num(c.height, 0),
+        qty: Math.max(1, Math.round(num(c.qty, 1))),
+        notes: String(c.notes || ""),
+        index: i + 1
+      })),
+      totalCartons: calc.totalCartons,
+      totalCbm: calc.totalCbm,
+      cbmPrice: calc.cbmPrice,
+      totalPrice: total,
+      paymentMethod: raw.paymentMethod || "later",
+      paymentAccountId: raw.paymentAccountId || "",
+      paymentAccountName: raw.paymentAccountName || "",
+      partialPaymentMethod: raw.partialPaymentMethod || raw.downPaymentMethod || "",
+      partialPaymentAccountId: raw.partialPaymentAccountId || raw.downPaymentAccountId || "",
+      partialPaymentAccountName: raw.partialPaymentAccountName || raw.downPaymentAccountName || "",
+      paidAmount: paid,
+      remaining,
+      paymentStatus: remaining <= 0 ? "paid" : (paid > 0 ? "partial" : "later"),
+      notes: String(raw.notes || ""),
+      createdAt: Number(raw.createdAt || Date.now()),
+      updatedAt: Number(raw.updatedAt || raw.createdAt || Date.now()),
+      syncPending: !!raw.syncPending
     };
   }
-  function mergeById(){
-    const map = new Map();
-    Array.from(arguments).flat().filter(Boolean).forEach(a => {
-      const n = normalizeAcc(a);
-      if(!n.id) return;
-      const old = map.get(n.id) || {};
-      map.set(n.id, {...old, ...n, name:n.name || old.name});
-    });
-    const arr = Array.from(map.values());
-    arr.sort((a,b) => (a.id === "cash" ? -1 : b.id === "cash" ? 1 : num(a.createdAt)-num(b.createdAt)));
-    return arr;
-  }
-  function readAccountsCache(){
-    try{ const arr = JSON.parse(localStorage.getItem(accountsCacheKey()) || "[]"); return Array.isArray(arr) ? arr : []; }catch{ return []; }
-  }
-  function writeAccountsCache(list){
-    try{ localStorage.setItem(accountsCacheKey(), JSON.stringify(list || [])); }catch{}
-  }
-  async function refreshAccounts(){
-    if(syncingAccounts) return getAccounts();
-    syncingAccounts = true;
+
+  async function saveRemoteShipment(ship){
+    if (window.OSKAR_TRIAL_LOCAL_ONLY) return false;
+    if (!navigator.onLine || !window.db || !window.ref || !window.set || !window.FIREBASE_ROOT) return false;
     try{
-      const localState = Array.isArray(st().paymentAccounts) ? st().paymentAccounts : [];
-      const cached = readAccountsCache();
-      let idb = [];
-      if(typeof window.idbGetAll === "function"){
-        try{ idb = await window.idbGetAll("paymentAccounts") || []; }catch(err){ console.warn("payment accounts idb read failed", err); }
-      }
-      const merged = mergeById(DEFAULT_ACCOUNTS, cached, idb, localState);
-      st().paymentAccounts = merged;
-      writeAccountsCache(merged);
-      accountsReady = true;
-      return merged;
-    } finally {
-      syncingAccounts = false;
+      const clean = { ...ship, syncPending:false };
+      await window.set(window.ref(window.db, `${window.FIREBASE_ROOT}/shipments/${ship.id}`), clean);
+      const i = st().shipments.findIndex(x => x.id === ship.id);
+      if (i >= 0) st().shipments[i] = clean;
+      saveLocalShipments();
+      return true;
+    }catch(e){
+      console.warn("shipping remote save failed", e);
+      return false;
     }
-  }
-  function getAccounts(){
-    let list = mergeById(DEFAULT_ACCOUNTS, readAccountsCache(), Array.isArray(st().paymentAccounts) ? st().paymentAccounts : []);
-    if(!list.length) list = DEFAULT_ACCOUNTS.map(normalizeAcc);
-    st().paymentAccounts = list;
-    return list;
-  }
-  function accountName(id){
-    const x = getAccounts().find(a => String(a.id) === String(id || "cash"));
-    return x?.name || (String(id || "cash") === "cash" ? "دفع كاش" : String(id || "-"));
-  }
-  function accountOptions(selected="cash", includeCash=true){
-    const list = getAccounts().filter(a => includeCash || a.id !== "cash");
-    const ids = list.map(a => String(a.id));
-    const chosen = ids.includes(String(selected)) ? String(selected) : (ids.includes("cash") ? "cash" : ids[0] || "cash");
-    return list.map(a => `<option value="${esc(a.id)}" ${String(a.id)===chosen ? "selected" : ""}>${esc(a.name || "حساب دفع")}${a.number ? " - " + esc(a.number) : ""}</option>`).join("") || `<option value="cash">دفع كاش</option>`;
-  }
-  function patchSelect(id, selected, includeCash=true){
-    const sel = $(id);
-    if(!sel) return;
-    const oldVal = selected || sel.value || "cash";
-    const html = accountOptions(oldVal, includeCash);
-    const hash = html.length + "|" + getAccounts().map(a => a.id + ":" + a.name).join(",");
-    if(sel.dataset.oskarAccHash !== hash){
-      sel.innerHTML = html;
-      sel.dataset.oskarAccHash = hash;
-    }
-    const exists = Array.from(sel.options).some(o => String(o.value) === String(oldVal));
-    sel.value = exists ? oldVal : (Array.from(sel.options).some(o => o.value === "cash") ? "cash" : (sel.options[0]?.value || ""));
   }
 
-  function loadExtra(){
+  async function deleteRemoteShipment(id){
+    if (window.OSKAR_TRIAL_LOCAL_ONLY) return false;
+    if (!navigator.onLine || !window.db || !window.ref || !window.remove || !window.FIREBASE_ROOT) return false;
     try{
-      const data = JSON.parse(localStorage.getItem(extraKey()) || "{}");
-      ["suppliers","workers","workerWages"].forEach(k => {
-        if(Array.isArray(data[k])){
-          if(!Array.isArray(st()[k]) || !st()[k].length) st()[k] = data[k];
-        } else if(!Array.isArray(st()[k])) st()[k] = [];
+      await window.remove(window.ref(window.db, `${window.FIREBASE_ROOT}/shipments/${id}`));
+      return true;
+    }catch(e){ console.warn("shipping remote delete failed", e); return false; }
+  }
+
+  async function loadRemoteShipments(){
+    if (window.OSKAR_TRIAL_LOCAL_ONLY) return;
+    if (!navigator.onLine || !window.db || !window.ref || !window.get || !window.FIREBASE_ROOT) return;
+    try{
+      const snap = await window.get(window.ref(window.db, `${window.FIREBASE_ROOT}/shipments`));
+      if (!snap || !snap.exists || !snap.exists()) return;
+      const remoteRows = Object.values(snap.val() || {}).map(normalizeShipment).filter(Boolean);
+      const map = new Map((st().shipments || []).map(x => [x.id, x]));
+      remoteRows.forEach(r => {
+        const old = map.get(r.id);
+        if (!old || Number(r.updatedAt || 0) >= Number(old.updatedAt || 0)) map.set(r.id, r);
       });
-    }catch{}
-  }
-  function saveExtra(){
-    try{
-      const old = JSON.parse(localStorage.getItem(extraKey()) || "{}");
-      localStorage.setItem(extraKey(), JSON.stringify({
-        ...old,
-        suppliers: Array.isArray(st().suppliers) ? st().suppliers : [],
-        workers: Array.isArray(st().workers) ? st().workers : [],
-        workerWages: Array.isArray(st().workerWages) ? st().workerWages : []
-      }));
-    }catch{}
+      st().shipments = Array.from(map.values()).sort((a,b) => Number(b.createdAt)-Number(a.createdAt));
+      saveLocalShipments();
+      renderShipmentsPage();
+    }catch(e){ console.warn("shipping remote load", e); }
   }
 
-  function loadMovements(){
-    try{
-      const arr = JSON.parse(localStorage.getItem(movementsKey()) || "[]");
-      st().accountMovements = Array.isArray(arr) ? arr : [];
-    }catch{ st().accountMovements = []; }
-    return st().accountMovements;
-  }
-  function saveMovements(){
-    try{ localStorage.setItem(movementsKey(), JSON.stringify(st().accountMovements || [])); }catch{}
-  }
-  async function pushMovement(m){
-    if(!m || !m.id) return;
-    try{
-      if(navigator.onLine && window.db && window.ref && window.set){
-        await window.set(window.ref(window.db, root() + "/accountMovements/" + m.id), m);
-      }
-    }catch(err){ console.warn("push account movement failed", err); }
-  }
-  async function removeMovementRemote(id){
-    try{
-      if(navigator.onLine && window.db && window.ref && window.remove){
-        await window.remove(window.ref(window.db, root() + "/accountMovements/" + id));
-      }
-    }catch(err){ console.warn("delete account movement remote failed", err); }
-  }
-  async function pullMovements(){
-    loadMovements();
-    try{
-      if(navigator.onLine && window.db && window.ref && window.get){
-        const snap = await window.get(window.ref(window.db, root() + "/accountMovements"));
-        if(snap && snap.exists && snap.exists()){
-          const remote = Object.values(snap.val() || {});
-          const map = new Map((st().accountMovements || []).map(x => [x.id, x]));
-          remote.forEach(x => { if(x && x.id) map.set(x.id, {...(map.get(x.id)||{}), ...x}); });
-          st().accountMovements = Array.from(map.values()).sort((a,b)=>num(a.createdAt)-num(b.createdAt));
-          saveMovements();
-        }
-      }
-    }catch(err){ console.warn("pull account movements failed", err); }
-  }
-  async function syncAllMovements(){
-    loadMovements();
-    if(!(navigator.onLine && window.db && window.ref && window.set)) return;
-    for(const m of (st().accountMovements || [])) await pushMovement(m);
+  async function syncPendingShipments(){
+    const rows = (st().shipments || []).filter(x => x.syncPending);
+    if (!rows.length) return;
+    for (const row of rows) await saveRemoteShipment(row);
+    renderShipmentsPage();
   }
 
-  function inPeriod(row, period, custom){
-    if(period === "all") return true;
-    const t = num(row?.createdAt || row?.paidAt || row?.updatedAt || row?.date, 0);
-    if(!t) return false;
-    const start = new Date(), end = new Date(), now = new Date();
-    if(period === "today") { start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
-    else if(period === "week") { start.setDate(now.getDate()-7); start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
-    else if(period === "month") { start.setMonth(now.getMonth()-1); start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
-    else if(period === "year") { start.setFullYear(now.getFullYear()-1); start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
-    else if(period === "custom") { if(!custom) return false; const d = new Date(custom); start.setTime(d.getTime()); start.setHours(0,0,0,0); end.setTime(d.getTime()); end.setHours(23,59,59,999); }
-    return t >= start.getTime() && t <= end.getTime();
+  function accountOptions(selected=""){
+    const accounts = Array.isArray(window.state?.paymentAccounts) ? window.state.paymentAccounts : [];
+    const real = accounts.filter(a => a && a.id !== "cash");
+    if (!real.length) return `<option value="">تحويل بنكي / تطبيق</option>`;
+    return real.map(a => `<option value="${esc(a.id)}" ${String(selected)===String(a.id)?"selected":""}>${esc(a.name || "حساب")} ${a.number ? " - " + esc(a.number) : ""}</option>`).join("");
   }
-  function periodData(all=false){
-    loadExtra(); loadMovements();
-    const period = all ? "all" : ($("reportsPeriod")?.value || "today");
-    const custom = all ? "" : ($("reportsCustomDate")?.value || "");
-    const filter = (arr) => (arr || []).filter(x => inPeriod(x, period, custom));
+
+  function shipPaymentLabel(shipOrMethod){
+    const s = typeof shipOrMethod === "object" ? shipOrMethod : { paymentMethod: shipOrMethod };
+    const method = s.paymentMethod || "later";
+    if (method === "cash") return "دفع كاش";
+    if (method === "bank") return s.paymentAccountName ? `تحويل بنكي / ${s.paymentAccountName}` : "تحويل بنكي / تطبيق";
+    if (method === "later"){
+      const paid = num(s.paidAmount, 0);
+      if (paid > 0){
+        const pm = s.partialPaymentMethod || "cash";
+        const txt = pm === "bank" ? (s.partialPaymentAccountName ? `تحويل ${s.partialPaymentAccountName}` : "تحويل بنكي") : "كاش";
+        return `دفع لاحق + دفعة ${txt}`;
+      }
+      return "دفع لاحق";
+    }
+    return method;
+  }
+
+  function shipPaymentShortLabel(shipOrMethod){
+    const s = typeof shipOrMethod === "object" ? shipOrMethod : { paymentMethod: shipOrMethod };
+    if (s.paymentMethod === "cash") return "كاش";
+    if (s.paymentMethod === "bank") return "تحويل";
+    return "دفع لاحق";
+  }
+
+  const draft = {
+    editingId: "",
+    cartons: [{ id: uid("carton"), length:"", width:"", height:"", qty:1 }]
+  };
+
+  let activeShipFolder = "all";
+
+  function shippingHasPermission(pageId){
+    const user = window.state?.auth?.user;
+    if (!user) return false;
+    if (user.role === "admin" || (user.permissions || []).includes("__admin__")) return true;
+    return Array.isArray(user.permissions) && user.permissions.includes(pageId);
+  }
+
+  function applyShippingPermissionsUI(){
+    const user = window.state?.auth?.user;
+    $$('[data-ship-page]').forEach(btn => {
+      const page = btn.dataset.shipPage;
+      btn.classList.toggle("auth-hidden", !!user && !shippingHasPermission(page));
+    });
+  }
+
+  function shipCustomersKey(){
+    return `${storageKey()}_customers_v2`;
+  }
+
+  function customerMapKey(){
+    return `${storageKey()}_customers_by_code`;
+  }
+
+  function firebaseSafeKey(value){
+    return encodeURIComponent(String(value || "").trim()).replace(/[.#$\/\[\]]/g, "_") || uid("customer");
+  }
+
+  function normalizeShipCustomer(raw, fallbackCode=""){
+    if (!raw || typeof raw !== "object") raw = {};
+    const code = String(raw.code || raw.customerCode || fallbackCode || "").trim();
+    if (!code) return null;
     return {
-      period, custom,
-      invoices: filter(st().invoices),
-      expenses: filter(st().expenses),
-      purchases: filter(st().purchases),
-      supplierPayments: filter(st().supplierPayments),
-      wages: filter(st().workerWages),
-      movements: filter(st().accountMovements)
+      id: raw.id || `ship_customer_${firebaseSafeKey(code)}`,
+      code,
+      name: String(raw.name || raw.customerName || raw.customer || "").trim(),
+      idNumber: String(raw.idNumber || raw.identityNumber || raw.customerIdNumber || "").replace(/\D/g, "").slice(0, 9),
+      phone: String(raw.phone || raw.mobile || raw.customerPhone || raw.customerMobile || "").trim(),
+      shopName: String(raw.shopName || raw.storeName || raw.customerShopName || "").trim(),
+      address: String(raw.address || raw.customerAddress || "").trim(),
+      notes: String(raw.notes || "").trim(),
+      updatedAt: Number(raw.updatedAt || Date.now()),
+      syncPending: !!raw.syncPending
     };
   }
-  function emptyBalance(a){
-    return {id:a.id, name:a.name, in:0, out:0, sales:0, expenses:0, purchases:0, wages:0, supplierPayments:0, manualIn:0, manualOut:0, count:0, balance:0};
-  }
-  function accountBalances(data){
-    const map = {};
-    getAccounts().forEach(a => map[a.id] = emptyBalance(a));
-    const ensure = (id) => {
-      const key = String(id || "cash");
-      if(!map[key]) map[key] = emptyBalance({id:key, name:accountName(key)});
-      return map[key];
-    };
-    (data.invoices || []).forEach(inv => {
-      const paid = inv.status === "paid" || inv.paymentMethod === "cash" || inv.paymentMethod === "instant_app";
-      if(!paid) return;
-      const id = inv.paymentAccountId || (inv.paymentMethod === "cash" ? "cash" : "bank");
-      const r = ensure(id), v = num(inv.total, 0);
-      r.in += v; r.sales += v; r.count++;
-    });
-    (data.expenses || []).forEach(e => { const r=ensure(e.accountId || "cash"), v=num(e.amount); r.out+=v; r.expenses+=v; r.count++; });
-    (data.purchases || []).forEach(p => { const r=ensure(p.accountId || "cash"), v=num(p.total || p.cost); r.out+=v; r.purchases+=v; r.count++; });
-    (data.supplierPayments || []).forEach(p => { const r=ensure(p.accountId || "cash"), v=num(p.amount); r.out+=v; r.supplierPayments+=v; r.count++; });
-    (data.wages || []).forEach(w => { const r=ensure(w.accountId || "cash"), v=num(w.amount || w.bonus || w.salary); r.out+=v; r.wages+=v; r.count++; });
-    (data.movements || []).forEach(m => {
-      const r = ensure(m.accountId || "cash"), v = num(m.amount);
-      if((m.kind || m.type) === "withdraw") { r.out += v; r.manualOut += v; }
-      else { r.in += v; r.manualIn += v; }
-      r.count++;
-    });
-    Object.values(map).forEach(r => r.balance = r.in - r.out);
-    return map;
+
+  function sortShipCustomers(rows){
+    return (rows || []).slice().sort((a,b) => String(a.code).localeCompare(String(b.code), "ar", {numeric:true}));
   }
 
-  function ensureStyle(){
-    if($("oskarPaymentLinkedFinalStyle")) return;
-    const style = document.createElement("style");
-    style.id = "oskarPaymentLinkedFinalStyle";
-    style.textContent = `
-      .oskar-balance-positive{color:#16a34a!important;font-weight:900}.oskar-balance-negative{color:#dc2626!important;font-weight:900}
-      .oskar-account-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.oskar-account-details{font-size:11px;color:#64748b;line-height:1.8;white-space:normal;min-width:230px}.oskar-account-details b{color:#0f172a}.oskar-small-note{font-size:11px;color:#64748b;line-height:1.7;margin-top:3px}
-      .oskar-account-filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.oskar-account-filter-row .select{max-width:260px}
-    `;
-    document.head.appendChild(style);
+  function saveLocalShipCustomers(){
+    try{ localStorage.setItem(shipCustomersKey(), JSON.stringify(sortShipCustomers(st().shipCustomers || []))); }catch(e){ console.warn("shipping customers local save", e); }
   }
 
-  function ensureFormDropdowns(){
-    const pur = $("purchaseForm");
-    if(pur){
-      let sel = $("purchaseAccountId");
-      if(!sel){
-        const grid = pur.querySelector(".form-grid-compact") || pur;
-        grid.insertAdjacentHTML("beforeend", `<div><label class="field-label">من أي حساب؟</label><select id="purchaseAccountId" class="select"></select></div>`);
-        sel = $("purchaseAccountId");
-      }
-      const old = lastPurchaseEditId ? (st().purchases || []).find(x => x.id === lastPurchaseEditId) : null;
-      patchSelect("purchaseAccountId", sel.value || old?.accountId || "cash", true);
-    }
-    const exp = $("expenseForm");
-    if(exp){
-      let sel = $("expenseAccountId");
-      if(!sel){
-        const grid = exp.querySelector(".form-grid-compact") || exp;
-        grid.insertAdjacentHTML("beforeend", `<div><label class="field-label">من أي حساب؟</label><select id="expenseAccountId" class="select"></select></div>`);
-        sel = $("expenseAccountId");
-      }
-      const old = lastExpenseEditId ? (st().expenses || []).find(x => x.id === lastExpenseEditId) : null;
-      patchSelect("expenseAccountId", sel.value || old?.accountId || "cash", true);
-    }
-    const sp = $("supplierPaymentForm");
-    if(sp){
-      let sel = $("supplierPaymentAccountId");
-      if(!sel){
-        const grid = sp.querySelector(".form-grid-compact") || sp;
-        grid.insertAdjacentHTML("beforeend", `<div><label class="field-label">من أي حساب؟</label><select id="supplierPaymentAccountId" class="select"></select></div>`);
-        sel = $("supplierPaymentAccountId");
-      }
-      const old = lastSupplierPaymentEditId ? (st().supplierPayments || []).find(x => x.id === lastSupplierPaymentEditId) : null;
-      patchSelect("supplierPaymentAccountId", sel.value || old?.accountId || "cash", true);
-    }
-    if($("finalWageAccount")) patchSelect("finalWageAccount", $("finalWageAccount").value || "cash", true);
-    if($("oskarMoveAccount")) patchSelect("oskarMoveAccount", $("oskarMoveAccount").value || "cash", true);
-  }
-
-  async function saveOfficial(store, item){
-    if(!item || !item.id) return;
+  function readLegacyCustomerMap(){
     try{
-      if(typeof window.saveLocal === "function") await window.saveLocal(store, item, true);
-      else if(typeof window.idbPut === "function") await window.idbPut(store, item);
-      if(!Array.isArray(st()[store])) st()[store] = [];
-      const i = st()[store].findIndex(x => x.id === item.id);
-      if(i >= 0) st()[store][i] = {...st()[store][i], ...item}; else st()[store].push(item);
-    }catch(err){ console.warn("save account link failed", store, err); }
+      const map = JSON.parse(localStorage.getItem(customerMapKey()) || "{}");
+      return map && typeof map === "object" ? map : {};
+    }catch{ return {}; }
   }
 
-  function bindFormCapture(){
-    document.addEventListener("click", e => {
-      const p = e.target.closest("[data-edit-purchase]");
-      const pe = e.target.closest("#addPurchaseBtn");
-      const ex = e.target.closest("[data-edit-expense]");
-      const ae = e.target.closest("#addExpenseBtn");
-      const sp = e.target.closest("[data-edit-supplier-payment]");
-      const asp = e.target.closest("#addSupplierPaymentBtn");
-      if(p) lastPurchaseEditId = p.dataset.editPurchase || "";
-      if(pe) lastPurchaseEditId = "";
-      if(ex) lastExpenseEditId = ex.dataset.editExpense || "";
-      if(ae) lastExpenseEditId = "";
-      if(sp) lastSupplierPaymentEditId = sp.dataset.editSupplierPayment || "";
-      if(asp) lastSupplierPaymentEditId = "";
-      setTimeout(() => { refreshAccounts().then(ensureFormDropdowns); }, 80);
-    }, true);
-
-    document.addEventListener("submit", e => {
-      const id = e.target?.id;
-      if(!["purchaseForm","expenseForm","supplierPaymentForm"].includes(id)) return;
-      const accId = id === "purchaseForm" ? ($("purchaseAccountId")?.value || "cash") : id === "expenseForm" ? ($("expenseAccountId")?.value || "cash") : ($("supplierPaymentAccountId")?.value || "cash");
-      const store = id === "purchaseForm" ? "purchases" : id === "expenseForm" ? "expenses" : "supplierPayments";
-      const editId = id === "purchaseForm" ? lastPurchaseEditId : id === "expenseForm" ? lastExpenseEditId : lastSupplierPaymentEditId;
-      setTimeout(async () => {
-        const list = st()[store] || [];
-        const item = editId ? list.find(x => x.id === editId) : [...list].sort((a,b)=>num(b.createdAt)-num(a.createdAt))[0];
-        if(item && String(item.accountId || "cash") !== String(accId)){
-          item.accountId = accId;
-          item.updatedAt = Date.now();
-          await saveOfficial(store, item);
-        }
-        try{ window.renderAll?.(); }catch{}
-        renderEverything();
-      }, 500);
-    }, true);
-
-    document.addEventListener("click", e => {
-      if(e.target.closest("#finalModalSave") && $("finalWageAccount")){
-        const acc = $("finalWageAccount")?.value || "cash";
-        setTimeout(() => {
-          const wages = st().workerWages || [];
-          const w = [...wages].sort((a,b)=>num(b.createdAt)-num(a.createdAt))[0];
-          if(w && String(w.accountId || "cash") !== String(acc)){
-            w.accountId = acc;
-            w.updatedAt = Date.now();
-            saveExtra();
-          }
-          renderEverything();
-        }, 450);
-      }
-    }, true);
+  function saveLegacyCustomerMapFromRows(rows){
+    const map = {};
+    (rows || []).forEach(c => { if (c.code && c.name) map[c.code] = {name:c.name, phone:c.phone || "", updatedAt:c.updatedAt || Date.now()}; });
+    try{ localStorage.setItem(customerMapKey(), JSON.stringify(map)); }catch(e){}
   }
 
-  function ensureReportsExtraCards(data){
-    const grid = $("reportsPrintArea")?.querySelector(".stat-grid");
-    if(!grid) return;
-    const add = (id, title, icon, cls) => {
-      let el = $(id);
-      if(el) return el;
-      const card = document.createElement("div");
-      card.className = "stat " + (cls || "dark");
-      card.innerHTML = `<div class="stat-title"><i class="fa-solid ${icon}"></i> ${title}</div><div id="${id}" class="stat-value">₪ 0.00</div>`;
-      const netCard = $("reportNet")?.closest(".stat");
-      if(netCard) grid.insertBefore(card, netCard); else grid.appendChild(card);
-      return $(id);
+  function loadLocalShipCustomers(){
+    const map = new Map();
+    try{
+      const rows = JSON.parse(localStorage.getItem(shipCustomersKey()) || "[]");
+      if (Array.isArray(rows)) rows.map(normalizeShipCustomer).filter(Boolean).forEach(c => map.set(c.code, c));
+    }catch(e){}
+    Object.entries(readLegacyCustomerMap()).forEach(([code, old]) => {
+      const c = normalizeShipCustomer({code, name: old?.name || "", phone: old?.phone || "", updatedAt: old?.updatedAt || Date.now()});
+      if (c && !map.has(c.code)) map.set(c.code, c);
+    });
+    (st().shipments || []).forEach(s => {
+      if (!s.code) return;
+      const existing = map.get(String(s.code));
+      const c = normalizeShipCustomer({
+        code: s.code,
+        name: s.customerName,
+        phone: s.customerPhone,
+        idNumber: s.customerIdNumber,
+        shopName: s.customerShopName,
+        address: s.customerAddress,
+        updatedAt: s.updatedAt || s.createdAt || Date.now()
+      });
+      if (!c) return;
+      if (!existing || Number(c.updatedAt) >= Number(existing.updatedAt || 0)) map.set(c.code, {...existing, ...c, syncPending: existing?.syncPending || false});
+    });
+    st().shipCustomers = sortShipCustomers(Array.from(map.values()));
+    saveLocalShipCustomers();
+    saveLegacyCustomerMapFromRows(st().shipCustomers);
+  }
+
+  async function saveRemoteShipCustomer(customer){
+    if (window.OSKAR_TRIAL_LOCAL_ONLY) return false;
+    if (!navigator.onLine || !window.db || !window.ref || !window.set || !window.FIREBASE_ROOT) return false;
+    const clean = normalizeShipCustomer({...customer, syncPending:false});
+    if (!clean) return false;
+    try{
+      await window.set(window.ref(window.db, `${window.FIREBASE_ROOT}/shippingCustomers/${firebaseSafeKey(clean.code)}`), clean);
+      const idx = (st().shipCustomers || []).findIndex(c => String(c.code) === String(clean.code));
+      if (idx >= 0) st().shipCustomers[idx] = clean;
+      saveLocalShipCustomers();
+      saveLegacyCustomerMapFromRows(st().shipCustomers);
+      return true;
+    }catch(e){ console.warn("shipping customer remote save failed", e); return false; }
+  }
+
+  async function deleteRemoteShipCustomer(code){
+    if (window.OSKAR_TRIAL_LOCAL_ONLY) return false;
+    if (!navigator.onLine || !window.db || !window.ref || !window.remove || !window.FIREBASE_ROOT) return false;
+    try{
+      await window.remove(window.ref(window.db, `${window.FIREBASE_ROOT}/shippingCustomers/${firebaseSafeKey(code)}`));
+      return true;
+    }catch(e){ console.warn("shipping customer remote delete failed", e); return false; }
+  }
+
+  async function loadRemoteShipCustomers(){
+    if (window.OSKAR_TRIAL_LOCAL_ONLY) return;
+    if (!navigator.onLine || !window.db || !window.ref || !window.get || !window.FIREBASE_ROOT) return;
+    try{
+      const snap = await window.get(window.ref(window.db, `${window.FIREBASE_ROOT}/shippingCustomers`));
+      if (!snap || !snap.exists || !snap.exists()) return;
+      const remote = Object.values(snap.val() || {}).map(normalizeShipCustomer).filter(Boolean);
+      const map = new Map((st().shipCustomers || []).map(c => [c.code, c]));
+      remote.forEach(c => {
+        const old = map.get(c.code);
+        if (!old || Number(c.updatedAt || 0) >= Number(old.updatedAt || 0)) map.set(c.code, c);
+      });
+      st().shipCustomers = sortShipCustomers(Array.from(map.values()));
+      saveLocalShipCustomers();
+      saveLegacyCustomerMapFromRows(st().shipCustomers);
+      renderShipCustomersPage();
+    }catch(e){ console.warn("shipping customer remote load", e); }
+  }
+
+  async function syncPendingShipCustomers(){
+    const rows = (st().shipCustomers || []).filter(c => c.syncPending);
+    for (const c of rows) await saveRemoteShipCustomer(c);
+  }
+
+  function findShipCustomerByCode(code){
+    const c = String(code || "").trim();
+    if (!c) return null;
+    const direct = (st().shipCustomers || []).find(x => String(x.code || "").trim() === c);
+    if (direct) return direct;
+    const rows = (st().shipments || [])
+      .filter(s => String(s.code || "").trim() === c && (String(s.customerName || "").trim() || String(s.customerPhone || "").trim()))
+      .sort((a,b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
+    if (rows[0]) return normalizeShipCustomer({
+      code:c,
+      name:rows[0].customerName,
+      phone:rows[0].customerPhone,
+      idNumber:rows[0].customerIdNumber,
+      shopName:rows[0].customerShopName,
+      address:rows[0].customerAddress,
+      updatedAt:rows[0].updatedAt || rows[0].createdAt
+    });
+    const old = readLegacyCustomerMap()[c];
+    return old ? normalizeShipCustomer({code:c, name:old.name, phone:old.phone, updatedAt:old.updatedAt}) : null;
+  }
+
+  function upsertShipCustomer(raw, markPending=true){
+    const incoming = normalizeShipCustomer(raw);
+    if (!incoming) return null;
+    const arr = st().shipCustomers || [];
+    const idx = arr.findIndex(c => String(c.code) === String(incoming.code));
+    const old = idx >= 0 ? arr[idx] : null;
+    const merged = normalizeShipCustomer({
+      ...old,
+      ...incoming,
+      name: incoming.name || old?.name || "",
+      phone: incoming.phone || old?.phone || "",
+      idNumber: incoming.idNumber || old?.idNumber || "",
+      shopName: incoming.shopName || old?.shopName || "",
+      address: incoming.address || old?.address || "",
+      updatedAt: Date.now(),
+      syncPending: markPending || !!old?.syncPending
+    });
+    if (idx >= 0) arr[idx] = merged; else arr.push(merged);
+    st().shipCustomers = sortShipCustomers(arr);
+    saveLocalShipCustomers();
+    saveLegacyCustomerMapFromRows(st().shipCustomers);
+    renderShipCustomersPage();
+    return merged;
+  }
+
+  function rememberShipCustomer(code, name, phone="", idNumber="", shopName="", address=""){
+    const c = String(code || "").trim();
+    if (!c) return null;
+    if (!String(name || phone || idNumber || shopName || address || "").trim()) return null;
+    return upsertShipCustomer({code:c, name, phone, idNumber, shopName, address}, true);
+  }
+
+  function updateShipCustomerInfoBox(customer){
+    const box = $("shipCustomerInfoBox");
+    if (!box) return;
+    if (!customer){ box.classList.remove("show"); box.style.display = "none"; return; }
+    const set = (id, value) => { const el = $(id); if (el) el.textContent = value || "-"; };
+    set("shipInfoCode", customer.code);
+    set("shipInfoName", customer.name);
+    set("shipInfoPhone", customer.phone);
+    set("shipInfoId", customer.idNumber);
+    set("shipInfoShop", customer.shopName);
+    set("shipInfoAddress", customer.address);
+    box.style.display = "block";
+    box.classList.add("show");
+  }
+
+  function autoFillShipCustomer(force=false){
+    const codeInput = $("shipCode");
+    const customerInput = $("shipCustomer");
+    const phoneInput = $("shipCustomerPhone");
+    if (!codeInput) return;
+    const customer = findShipCustomerByCode(codeInput.value);
+    updateShipCustomerInfoBox(customer);
+    if (!customer) return;
+    if (customerInput && (force || !String(customerInput.value || "").trim())) {
+      customerInput.value = customer.name || "";
+      customerInput.dataset.autofilled = "1";
+    }
+    if (phoneInput && (force || !String(phoneInput.value || "").trim())) {
+      phoneInput.value = customer.phone || "";
+      phoneInput.dataset.autofilled = "1";
+    }
+    if (force || customer.name || customer.phone) toast(`تم تعبئة بيانات العميل: ${customer.name || customer.code}`, 1600);
+  }
+
+  function readShipDateTime(id, endOfDay=false){
+    const v = String($(id)?.value || "").trim();
+    if (!v) return endOfDay ? Infinity : 0;
+    let ts;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) ts = new Date(v + (endOfDay ? "T23:59:59" : "T00:00:00")).getTime();
+    else ts = new Date(v).getTime();
+    return Number.isFinite(ts) ? ts : (endOfDay ? Infinity : 0);
+  }
+
+  function shipFolderMatches(s, folder){
+    if (!folder || folder === "all") return true;
+    if (folder === "cash") return s.paymentMethod === "cash" || (s.paymentMethod === "later" && s.partialPaymentMethod !== "bank" && num(s.paidAmount) > 0);
+    if (folder === "bank") return s.paymentMethod === "bank" || (s.paymentMethod === "later" && s.partialPaymentMethod === "bank" && num(s.paidAmount) > 0);
+    if (folder === "later") return s.paymentMethod === "later";
+    if (folder === "debt") return num(s.remaining) > 0;
+    if (folder === "partial") return s.paymentStatus === "partial";
+    if (folder === "paid") return s.paymentStatus === "paid";
+    return true;
+  }
+
+  function shipFolderCounts(rows){
+    return {
+      all: rows.length,
+      cash: rows.filter(s => shipFolderMatches(s, "cash")).length,
+      bank: rows.filter(s => shipFolderMatches(s, "bank")).length,
+      later: rows.filter(s => shipFolderMatches(s, "later")).length,
+      debt: rows.filter(s => shipFolderMatches(s, "debt")).length,
+      partial: rows.filter(s => shipFolderMatches(s, "partial")).length,
+      paid: rows.filter(s => shipFolderMatches(s, "paid")).length
     };
-    const wages = (data.wages || []).reduce((s,w)=>s+num(w.amount || w.bonus || w.salary),0);
-    const purchases = (data.purchases || []).reduce((s,p)=>s+num(p.total || p.cost),0);
-    const supplierPays = (data.supplierPayments || []).reduce((s,p)=>s+num(p.amount),0);
-    const wageEl = add("reportWorkersWages", "أجور العمال", "fa-users-gear", "red");
-    const purEl = add("reportPurchasesTotal", "إجمالي المشتريات", "fa-truck-ramp-box", "gold");
-    const supEl = add("reportSupplierPaymentsTotal", "دفعات التجار", "fa-hand-holding-dollar", "red");
-    if(wageEl) wageEl.textContent = money(wages);
-    if(purEl) purEl.textContent = money(purchases);
-    if(supEl) supEl.textContent = money(supplierPays);
-    const profit = (data.invoices || []).reduce((s,i)=>s+num(i.profit),0);
-    const expenses = (data.expenses || []).reduce((s,e)=>s+num(e.amount),0);
-    if($("reportNet")) $("reportNet").textContent = money(profit - expenses - wages - supplierPays);
   }
 
-  function ensureAccountLogCard(){
-    const table = $("accountsReportTable");
-    if(!table || $("oskarAccountMovementCard")) return;
-    const card = document.createElement("div");
-    card.id = "oskarAccountMovementCard";
-    card.className = "card";
-    card.style.marginTop = "14px";
-    card.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-        <h2 style="margin:0;font-size:19px;font-weight:900"><i class="fa-solid fa-clock-rotate-left"></i> سجل أرصدة حسابات الدفع</h2>
-        <div class="oskar-account-actions">
-          <button class="success-btn" data-oskar-move-add="deposit"><i class="fa-solid fa-plus"></i> إضافة دفعة</button>
-          <button class="danger-btn" data-oskar-move-add="withdraw"><i class="fa-solid fa-minus"></i> سحب دفعة</button>
+  function renderShipPaymentFolders(baseRows){
+    const box = $("shipPaymentFolders");
+    if (!box) return;
+    const counts = shipFolderCounts(baseRows || []);
+    const folders = [
+      ["all", "fa-folder-open", "الكل"],
+      ["cash", "fa-money-bill-wave", "كاش"],
+      ["bank", "fa-building-columns", "تحويل / تطبيق"],
+      ["later", "fa-clock", "دفع لاحق"],
+      ["debt", "fa-user-clock", "ديون / متبقي"],
+      ["partial", "fa-circle-half-stroke", "جزئي"],
+      ["paid", "fa-circle-check", "مدفوع"]
+    ];
+    box.innerHTML = folders.map(([id, icon, label]) => `
+      <button class="folder-tab ${activeShipFolder === id ? "active" : ""}" type="button" data-ship-folder="${id}">
+        <i class="fa-solid ${icon}"></i> ${label} <small>${counts[id] || 0}</small>
+      </button>
+    `).join("");
+  }
+
+  function ensureStyles(){
+    if ($("oskarShippingCbmStyle")) return;
+    document.head.insertAdjacentHTML("beforeend", `
+      <style id="oskarShippingCbmStyle">
+        .ship-cbm-page-title{font-size:24px;font-weight:900;margin:0;display:flex;align-items:center;gap:9px}
+        .ship-cbm-soft{background:linear-gradient(180deg,#fff,#f8fbff);border:1px solid rgba(226,232,240,.95);border-radius:24px;padding:14px;box-shadow:0 12px 34px rgba(15,23,42,.05)}
+        .ship-cbm-carton-list{display:grid;gap:10px;margin-top:12px}
+        .ship-cbm-carton{border:1px solid #e2e8f0;background:#fff;border-radius:22px;padding:12px;box-shadow:0 10px 24px rgba(15,23,42,.04)}
+        .ship-cbm-carton-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+        .ship-cbm-carton-title{font-weight:900;color:#0f172a;display:flex;align-items:center;gap:7px}
+        .ship-cbm-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+        .ship-cbm-sum-box{border:1px solid #e2e8f0;background:#f8fafc;border-radius:18px;padding:12px;min-height:78px;display:flex;flex-direction:column;justify-content:center;gap:5px}
+        .ship-cbm-sum-box span{font-size:12px;color:#64748b;font-weight:900}.ship-cbm-sum-box b{font-size:20px;font-weight:900;color:#1d4ed8;direction:ltr;text-align:right}
+        .ship-payment-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.ship-payment-method-card{border:1px solid #e2e8f0;background:#fff;border-radius:18px;padding:12px;display:flex;align-items:center;gap:8px;font-weight:900;cursor:pointer}.ship-payment-method-card input{width:18px;height:18px;accent-color:#2563eb}
+        .ship-report-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.ship-report-panel{background:#fff;border:1px solid #e2e8f0;border-radius:24px;padding:14px;overflow:auto}
+        .ship-status-paid{background:#dcfce7!important;color:#15803d!important}.ship-status-partial{background:#fef3c7!important;color:#b45309!important}.ship-status-later{background:#fee2e2!important;color:#b91c1c!important}
+        .ship-report-page{width:794px;max-width:100%;margin:0 auto;background:#fff;color:#111827;font-family:Cairo,Arial,sans-serif;direction:rtl;padding:20px;font-size:12px;line-height:1.6}
+        .ship-report-topline{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;font-size:10px;color:#111827;margin-bottom:4px}.ship-report-top-date{text-align:left;direction:ltr}.ship-report-top-title{text-align:center;font-weight:800}.ship-report-top-blank{text-align:right}
+        .ship-report-head{border:1px solid #d1d5db;border-radius:8px;padding:20px 22px;display:flex;flex-direction:row;gap:18px;align-items:center;justify-content:space-between;margin-bottom:18px;background:#fff}.ship-report-logo-holder{width:86px;flex:0 0 86px;display:flex;align-items:center;justify-content:center}.ship-report-logo{width:82px;height:82px;border:1px solid #e5e7eb;border-radius:8px;object-fit:cover;background:#fff;display:block}.ship-report-logo-empty{display:flex!important;align-items:center;justify-content:center;color:#cbd5e1;font-size:12px;font-weight:900}.ship-report-brand{text-align:center;flex:1;min-width:0}.ship-report-brand h2{margin:0;font-size:22px;font-weight:900;color:#1f2937;line-height:1.35}.ship-report-brand p{margin:4px 0 0;color:#374151;font-weight:800}.ship-report-meta{width:190px;flex:0 0 190px;text-align:right}.ship-report-label{color:#c06f38;font-weight:900;letter-spacing:1px;direction:ltr;text-align:left}.ship-card{border:1px solid #d1d5db;border-radius:8px;margin:16px 0;padding:18px 20px;page-break-inside:avoid}.ship-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}.ship-card-code{font-size:18px;font-weight:900;color:#111827}.ship-card-small{font-size:11px;color:#4b5563}.ship-report-table{width:100%;border-collapse:collapse;min-width:0!important}.ship-report-table th{background:#fff;color:#374151;font-size:12px;border-bottom:1px solid #e5e7eb;padding:10px;text-align:right;white-space:nowrap}.ship-report-table td{font-size:12px;padding:9px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap;font-weight:800;color:#1f2937}.ship-report-total-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}.ship-report-total-grid.compact{grid-template-columns:repeat(3,minmax(0,1fr))}.ship-report-total-box{border:1px solid #e5e7eb;border-radius:6px;padding:10px;text-align:right;background:#fff}.ship-report-total-box span{display:block;font-size:10px;color:#4b5563;font-weight:800}.ship-report-total-box b{display:block;margin-top:4px;font-size:16px;font-weight:900;direction:ltr;text-align:right}.ship-report-total-box .orange{color:#d97706}.ship-report-footer{display:flex;justify-content:space-between;margin-top:28px;font-size:10px;color:#111827;direction:ltr}
+        @media(max-width:720px){.ship-cbm-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.ship-payment-grid{grid-template-columns:1fr}.ship-report-total-grid,.ship-report-total-grid.compact{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        .ship-report-page .ship-report-head{display:grid!important;grid-template-columns:minmax(0,1fr) 172px!important;align-items:center!important;gap:14px!important;padding:16px 18px!important;min-height:106px!important;text-align:initial!important;overflow:hidden!important}
+        .ship-report-brand-wrap{display:grid!important;grid-template-columns:auto minmax(0,1fr)!important;align-items:center!important;justify-content:start!important;gap:12px!important;min-width:0!important;text-align:right!important;overflow:hidden!important}
+        .ship-report-brand{text-align:right!important;min-width:0!important;overflow:hidden!important}.ship-report-brand h2{font-size:18px!important;margin:0!important;line-height:1.45!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important}.ship-report-brand p{margin:3px 0 0!important;font-size:11px!important;white-space:normal!important}.ship-report-count-line{margin-top:8px;color:#4b5563;font-weight:800;font-size:11px!important}.ship-report-count-line b{font-size:15px;color:#111827}
+        .ship-report-logo-holder{width:auto!important;min-width:0!important;display:flex!important;align-items:center!important;justify-content:center!important}.ship-report-logo-holder:empty{display:none!important}.ship-report-logo{width:66px!important;height:66px!important;margin:0!important;object-fit:contain!important;background:#fff!important}
+        .ship-report-meta{width:auto!important;min-width:0!important;text-align:left!important;line-height:1.55!important;overflow:hidden!important}.ship-report-label{text-align:left!important;font-size:11px!important}.ship-report-total-box b{white-space:normal!important;overflow-wrap:anywhere!important}.ship-report-grand-title{font-size:15px;font-weight:900;margin:0 0 10px;color:#0f172a;display:flex;align-items:center;gap:7px}.ship-report-grand{background:#f8fafc!important;border-width:2px!important}
+        .ship-date-range-box{display:none;grid-column:1/-1;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.ship-date-range-box.show{display:grid}.ship-date-range-box>div{min-width:0}.ship-customer-info{grid-column:1/-1;border:1px solid #bfdbfe;background:#eff6ff;border-radius:18px;padding:12px;display:none}.ship-customer-info.show{display:block}.ship-customer-info-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.ship-customer-info-item{background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:8px}.ship-customer-info-item span{display:block;color:#64748b;font-size:11px;font-weight:900}.ship-customer-info-item b{display:block;margin-top:2px;color:#0f172a;font-size:13px;font-weight:900;white-space:normal;overflow-wrap:anywhere}.ship-customer-actions{display:flex;gap:6px;flex-wrap:wrap}.ship-export-loading{position:fixed;inset:0;z-index:999999;background:rgba(15,23,42,.30);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;font-family:Cairo,Arial,sans-serif;direction:rtl}.ship-export-loading.show{display:flex}.ship-export-loading-card{background:#fff;border:1px solid #e2e8f0;border-radius:22px;box-shadow:0 18px 50px rgba(15,23,42,.20);padding:16px 20px;min-width:210px;text-align:center;font-weight:900;color:#0f172a}.ship-export-spinner{width:42px;height:42px;border-radius:999px;border:4px solid #e2e8f0;border-top-color:#2563eb;margin:0 auto 10px;animation:shipSpin 1s linear infinite}@keyframes shipSpin{to{transform:rotate(360deg)}}
+        @media(max-width:720px){.ship-report-page .ship-report-head{grid-template-columns:minmax(0,1fr) 122px!important;gap:8px!important;padding:12px!important}.ship-report-brand-wrap{gap:8px!important}.ship-report-meta{font-size:10px!important}.ship-report-brand h2{font-size:13.5px!important;line-height:1.45!important}.ship-report-logo{width:46px!important;height:46px!important}.ship-customer-info-grid{grid-template-columns:1fr}.ship-date-range-box{grid-template-columns:1fr}}
+        @media print{#printArea .ship-report-page{width:100%!important;max-width:none!important;padding:12mm!important}.ship-card{break-inside:avoid;page-break-inside:avoid}}
+      </style>
+    `);
+  }
+
+  function ensureNav(){
+    const sidebar = $("sidebar");
+    if (sidebar && !sidebar.querySelector('[data-ship-page="shippingCalc"]')){
+      const reports = sidebar.querySelector('[data-page="reports"]') || sidebar.querySelector('[data-page="settings"]');
+      const html = `
+        <button class="nav-btn" type="button" data-ship-page="shippingCalc"><span class="nav-icon"><i class="fa-solid fa-calculator"></i></span> حاسبة طرود الشحن</button>
+        <button class="nav-btn" type="button" data-ship-page="shippingCustomers"><span class="nav-icon"><i class="fa-solid fa-users"></i></span> عملاء الشحن</button>
+        <button class="nav-btn" type="button" data-ship-page="shippingShipments"><span class="nav-icon"><i class="fa-solid fa-boxes-packing"></i></span> الشحنات</button>
+      `;
+      if (reports) reports.insertAdjacentHTML("beforebegin", html);
+      else sidebar.insertAdjacentHTML("beforeend", html);
+    }
+    applyShippingPermissionsUI();
+  }
+
+  function ensurePages(){
+    const main = document.querySelector("main.main");
+    if (!main) return;
+    if (!$('page-shippingCalc')){
+      const sec = document.createElement("section");
+      sec.id = "page-shippingCalc";
+      sec.className = "section";
+      sec.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <h1 class="ship-cbm-page-title"><i class="fa-solid fa-calculator"></i> حاسبة طرود الشحن</h1>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="shipNewBtn" class="ghost-btn" type="button"><i class="fa-solid fa-rotate-right"></i> شحنة جديدة</button>
+            <button class="primary-btn" type="button" data-ship-page="shippingShipments"><i class="fa-solid fa-list"></i> سجل الشحنات</button>
+          </div>
         </div>
-      </div>
-      <div class="oskar-account-filter-row">
-        <select id="oskarMovementFilterAccount" class="select"><option value="">كل الحسابات</option></select>
-        <button class="ghost-btn" id="oskarRefreshAccountLogBtn"><i class="fa-solid fa-rotate"></i> تحديث السجل</button>
-      </div>
-      <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الحساب</th><th>النوع</th><th>المبلغ</th><th>ملاحظات</th><th>الإجراءات</th></tr></thead><tbody id="oskarAccountMovementsRows"></tbody></table></div>`;
-    table.closest(".card")?.insertAdjacentElement("afterend", card);
-  }
-  function renderMovementFilter(){
-    const sel = $("oskarMovementFilterAccount");
-    if(!sel) return;
-    const val = sel.value || "";
-    sel.innerHTML = `<option value="">كل الحسابات</option>` + accountOptions(val || "cash", true);
-    sel.value = Array.from(sel.options).some(o => o.value === val) ? val : "";
-  }
-  function renderAccountMovementLog(filter=""){
-    ensureAccountLogCard();
-    renderMovementFilter();
-    const body = $("oskarAccountMovementsRows");
-    if(!body) return;
-    const data = periodData(false);
-    let list = [...(data.movements || [])].sort((a,b)=>num(b.createdAt)-num(a.createdAt));
-    const selected = filter || $("oskarMovementFilterAccount")?.value || "";
-    if(selected) list = list.filter(x => String(x.accountId || "cash") === String(selected));
-    body.innerHTML = list.map(m => {
-      const out = (m.kind || m.type) === "withdraw";
-      return `<tr>
-        <td>${new Date(num(m.createdAt, Date.now())).toLocaleString("ar")}</td>
-        <td><b>${esc(accountName(m.accountId || "cash"))}</b></td>
-        <td><span class="badge ${out ? "red" : "green"}">${out ? "سحب / خصم" : "إضافة رصيد"}</span></td>
-        <td class="${out ? "oskar-balance-negative" : "oskar-balance-positive"}">${money(m.amount)}</td>
-        <td>${esc(m.notes || "-")}</td>
-        <td><div class="oskar-account-actions"><button class="ghost-btn" data-oskar-move-edit="${esc(m.id)}"><i class="fa-solid fa-pen"></i> تعديل</button><button class="danger-btn" data-oskar-move-delete="${esc(m.id)}"><i class="fa-solid fa-trash"></i> حذف</button></div></td>
-      </tr>`;
-    }).join("") || `<tr><td colspan="6" class="muted" style="text-align:center">لا توجد حركات ضمن الفترة المحددة</td></tr>`;
+        <div class="card">
+          <form id="shippingCalcForm">
+            <div class="form-grid">
+              <div><label class="field-label">كود الشحن <span style="color:#dc2626">*</span></label><input id="shipCode" class="input" required placeholder="مثال: 30001" autocomplete="off"></div>
+              <div><label class="field-label">اسم العميل اختياري</label><input id="shipCustomer" class="input" placeholder="اسم العميل"></div>
+              <div><label class="field-label">رقم الجوال</label><input id="shipCustomerPhone" class="input" inputmode="tel" placeholder="يظهر تلقائياً من عملاء الشحن"></div>
+              <div><label class="field-label">عدد الكراتين</label><input id="shipCartonsCount" class="input" type="number" inputmode="numeric" min="1" step="1" value="1"></div>
+              <div><label class="field-label">سعر CBM بالشيكل</label><input id="shipCbmPrice" class="input" type="number" inputmode="decimal" min="0" step="0.001" placeholder="مثال: 8500"></div>
+              <div id="shipCustomerInfoBox" class="ship-customer-info full-row">
+                <div style="font-weight:900;color:#1d4ed8;margin-bottom:8px"><i class="fa-solid fa-user-check"></i> بيانات العميل المرجعية</div>
+                <div class="ship-customer-info-grid">
+                  <div class="ship-customer-info-item"><span>الكود</span><b id="shipInfoCode">-</b></div>
+                  <div class="ship-customer-info-item"><span>الاسم</span><b id="shipInfoName">-</b></div>
+                  <div class="ship-customer-info-item"><span>الجوال</span><b id="shipInfoPhone">-</b></div>
+                  <div class="ship-customer-info-item"><span>الهوية</span><b id="shipInfoId">-</b></div>
+                  <div class="ship-customer-info-item"><span>اسم المحل</span><b id="shipInfoShop">-</b></div>
+                  <div class="ship-customer-info-item"><span>العنوان</span><b id="shipInfoAddress">-</b></div>
+                </div>
+              </div>
+              <div class="full-row"><label class="field-label">ملاحظات</label><textarea id="shipNotes" class="textarea" placeholder="أي ملاحظات على الشحنة..."></textarea></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+              <button id="shipApplyCountBtn" class="ghost-btn" type="button"><i class="fa-solid fa-layer-group"></i> فتح حسب العدد</button>
+              <button id="shipAddCartonBtn" class="gold-btn" type="button"><i class="fa-solid fa-plus"></i> إضافة كرتونة جديدة</button>
+            </div>
+            <div id="shipCartonsList" class="ship-cbm-carton-list"></div>
+            <div class="ship-cbm-summary">
+              <div class="ship-cbm-sum-box"><span>مجموع الكراتين</span><b id="shipSumCartons">0</b></div>
+              <div class="ship-cbm-sum-box"><span>مجموع CBM (م³)</span><b id="shipSumCbm">0.000</b></div>
+              <div class="ship-cbm-sum-box"><span>سعر CBM</span><b id="shipSumPrice">₪ 0.00</b></div>
+              <div class="ship-cbm-sum-box"><span>السعر الإجمالي</span><b id="shipSumTotal" style="color:#d97706">₪ 0.00</b></div>
+            </div>
+            <button id="shipContinuePaymentBtn" class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-credit-card"></i> إنهاء وإظهار شاشة الدفع</button>
+          </form>
+        </div>
+      `;
+      main.appendChild(sec);
+    }
+    if (!$('page-shippingCustomers')){
+      const sec = document.createElement("section");
+      sec.id = "page-shippingCustomers";
+      sec.className = "section";
+      sec.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <h1 class="ship-cbm-page-title"><i class="fa-solid fa-users"></i> عملاء الشحن</h1>
+          <button class="primary-btn" type="button" data-ship-page="shippingCalc"><i class="fa-solid fa-calculator"></i> حاسبة الشحن</button>
+        </div>
+        <form id="shipCustomerForm" class="card" style="margin-bottom:14px">
+          <input id="shipCustomerEditingCode" type="hidden">
+          <div class="form-grid">
+            <div><label class="field-label">رقم الكود <span style="color:#dc2626">*</span></label><input id="shipCustomerCode" class="input" required placeholder="مثال: 30001" autocomplete="off"></div>
+            <div><label class="field-label">اسم العميل <span style="color:#dc2626">*</span></label><input id="shipCustomerName" class="input" required placeholder="اسم العميل"></div>
+            <div><label class="field-label">رقم الهوية - 9 خانات</label><input id="shipCustomerIdNumber" class="input" inputmode="numeric" maxlength="9" pattern="\\d{9}" placeholder="123456789"></div>
+            <div><label class="field-label">رقم الجوال</label><input id="shipCustomerMobile" class="input" inputmode="tel" placeholder="05xxxxxxxx"></div>
+            <div><label class="field-label">اسم المحل</label><input id="shipCustomerShopName" class="input" placeholder="اسم المحل"></div>
+            <div><label class="field-label">العنوان</label><input id="shipCustomerAddress" class="input" placeholder="العنوان"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+            <button class="primary-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> حفظ العميل</button>
+            <button id="shipCustomerNewBtn" class="ghost-btn" type="button"><i class="fa-solid fa-rotate-right"></i> جديد</button>
+            <button id="shipCustomersExcelBtn" class="success-btn" type="button"><i class="fa-solid fa-file-excel"></i> Excel</button>
+          </div>
+        </form>
+        <div class="card">
+          <input id="shipCustomerSearch" class="input" placeholder="بحث بالكود أو الاسم أو الجوال أو المحل..." style="margin-bottom:12px">
+          <div class="table-wrap"><table><thead><tr><th>الكود</th><th>اسم العميل</th><th>الجوال</th><th>رقم الهوية</th><th>اسم المحل</th><th>العنوان</th><th>الإجراءات</th></tr></thead><tbody id="shipCustomersTable"></tbody></table></div>
+        </div>
+      `;
+      main.appendChild(sec);
+    }
+
+    if (!$('page-shippingShipments')){
+      const sec = document.createElement("section");
+      sec.id = "page-shippingShipments";
+      sec.className = "section";
+      sec.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <h1 class="ship-cbm-page-title"><i class="fa-solid fa-boxes-packing"></i> الشحنات والتقارير</h1>
+          <button class="primary-btn" type="button" data-ship-page="shippingCalc"><i class="fa-solid fa-plus"></i> إضافة شحنة</button>
+        </div>
+        <div class="clean-stats-card"><div class="clean-stats-grid" id="shipStatsGrid"></div></div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="folder-tabs" id="shipPaymentFolders"></div>
+          <div class="form-grid">
+            <input id="shipSearch" class="input" placeholder="بحث بكود الشحن أو اسم العميل...">
+            <select id="shipSort" class="select"><option value="date_desc">الأحدث تاريخاً</option><option value="date_asc">الأقدم تاريخاً</option><option value="code_asc">حسب الكود تصاعدي</option><option value="code_desc">حسب الكود تنازلي</option></select>
+            <select id="shipPeriod" class="select"><option value="all">كل السجل</option><option value="today">اليوم</option><option value="week">أسبوع</option><option value="month">شهر</option><option value="custom">من تاريخ إلى تاريخ</option></select>
+            <div id="shipDateRangeBox" class="ship-date-range-box">
+              <div><label class="field-label">من تاريخ ووقت</label><input id="shipDateFrom" type="datetime-local" class="input" title="من تاريخ ووقت"></div>
+              <div><label class="field-label">إلى تاريخ ووقت</label><input id="shipDateTo" type="datetime-local" class="input" title="إلى تاريخ ووقت"></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+            <button id="shipSummaryReportBtn" class="ghost-btn" type="button"><i class="fa-solid fa-chart-pie"></i> تقرير شامل</button>
+            <button id="shipDetailedReportBtn" class="gold-btn" type="button"><i class="fa-solid fa-file-lines"></i> تقرير تفصيلي</button>
+            <button id="shipExcelBtn" class="success-btn" type="button"><i class="fa-solid fa-file-excel"></i> Excel</button>
+            <button id="shipPdfBtn" class="danger-btn" type="button"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+            <button id="shipImageBtn" class="success-btn" type="button"><i class="fa-solid fa-image"></i> صورة</button>
+            <button id="shipWhatsappBtn" class="ghost-btn" type="button"><i class="fa-brands fa-whatsapp"></i> واتس اب</button>
+          </div>
+        </div>
+        <div class="card"><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>كود الشحن</th><th>العميل</th><th>الجوال</th><th>الكراتين</th><th>CBM</th><th>سعر CBM</th><th>إجمالي السعر</th><th>مدفوع</th><th>متبقي</th><th>الدفع</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody id="shipmentsTable"></tbody></table></div></div>
+      `;
+      main.appendChild(sec);
+    }
   }
 
-  function renderAccountsReport(){
-    const table = $("accountsReportTable");
-    if(!table) return;
-    const data = periodData(false);
-    const balances = Object.values(accountBalances(data));
-    ensureReportsExtraCards(data);
-    const head = table.closest("table")?.querySelector("thead tr");
-    if(head) head.innerHTML = `<th>الحساب</th><th>الداخل</th><th>الخارج</th><th>تفصيل الخارج</th><th>الرصيد النهائي</th><th>العمليات</th>`;
-    table.innerHTML = balances.map(r => {
-      const cls = r.balance < 0 ? "oskar-balance-negative" : "oskar-balance-positive";
-      return `<tr>
-        <td><b>${esc(r.name || accountName(r.id))}</b><div class="oskar-small-note">${esc(r.id)}</div></td>
-        <td class="money">${money(r.in)}</td>
-        <td class="oskar-balance-negative">${money(r.out)}</td>
-        <td class="oskar-account-details"><b>مصاريف:</b> ${money(r.expenses)} · <b>أجور:</b> ${money(r.wages)} · <b>مشتريات:</b> ${money(r.purchases)}<br><b>دفعات تجار:</b> ${money(r.supplierPayments)} · <b>حركات يدوية:</b> +${money(r.manualIn)} / -${money(r.manualOut)}</td>
-        <td class="${cls}">${money(r.balance)}</td>
-        <td><div class="oskar-account-actions"><button class="success-btn" data-oskar-move-add="deposit" data-account="${esc(r.id)}"><i class="fa-solid fa-plus"></i> إضافة</button><button class="danger-btn" data-oskar-move-add="withdraw" data-account="${esc(r.id)}"><i class="fa-solid fa-minus"></i> سحب</button><button class="ghost-btn" data-oskar-account-log="${esc(r.id)}"><i class="fa-solid fa-list"></i> السجل</button></div></td>
-      </tr>`;
-    }).join("") || `<tr><td colspan="6" class="muted" style="text-align:center">لا توجد أرصدة</td></tr>`;
-    renderAccountMovementLog();
+  function shipSwitchPage(page){
+    if (!window.state?.auth?.user){ toast("سجل الدخول أولاً"); return; }
+    if (!shippingHasPermission(page)){ toast("لا تملك صلاحية فتح هذا القسم"); return; }
+    $$(".section").forEach(s => s.classList.remove("active"));
+    const sec = $(`page-${page}`);
+    if (sec) sec.classList.add("active");
+    $$(".nav-btn,.bottom-btn").forEach(b => b.classList.remove("active"));
+    $$(`[data-ship-page="${page}"]`).forEach(b => b.classList.add("active"));
+    $("sidebar")?.classList.remove("open");
+    if (page === "shippingCalc") renderCalcPage();
+    if (page === "shippingCustomers") renderShipCustomersPage();
+    if (page === "shippingShipments") renderShipmentsPage();
   }
 
-  function renderSettingsAccountsEnhanced(){
-    const box = $("paymentAccountsList");
-    if(!box || box.dataset.oskarLinkedRendering === "1") return;
-    const balances = accountBalances(periodData(true));
-    box.dataset.oskarLinkedRendering = "1";
-    box.innerHTML = getAccounts().map(a => {
-      const b = balances[a.id] || {balance:0,in:0,out:0};
-      const cls = b.balance < 0 ? "oskar-balance-negative" : "oskar-balance-positive";
-      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;border:1px solid #e5e7eb;border-radius:18px;margin-bottom:8px;background:#fff;flex-wrap:wrap">
-        <div><b>${esc(a.name)}</b><div class="muted">${esc(a.number || "بدون رقم")}</div><div class="oskar-small-note">الرصيد الحالي: <span class="${cls}">${money(b.balance)}</span> · الداخل ${money(b.in)} · الخارج ${money(b.out)}</div></div>
-        <div class="oskar-account-actions">
-          <button class="success-btn" data-oskar-move-add="deposit" data-account="${esc(a.id)}"><i class="fa-solid fa-plus"></i> إضافة دفعة</button>
-          <button class="danger-btn" data-oskar-move-add="withdraw" data-account="${esc(a.id)}"><i class="fa-solid fa-minus"></i> سحب دفعة</button>
-          <button class="ghost-btn" data-oskar-account-log="${esc(a.id)}"><i class="fa-solid fa-list"></i> السجل</button>
-          <button class="ghost-btn" data-edit-account="${esc(a.id)}"><i class="fa-solid fa-pen"></i> تعديل</button>
-          <button class="danger-btn" data-delete-account="${esc(a.id)}"><i class="fa-solid fa-trash"></i> حذف</button>
+  window.oskarShipSwitchPage = shipSwitchPage;
+
+  function resetDraft(){
+    draft.editingId = "";
+    draft.cartons = [{ id: uid("carton"), length:"", width:"", height:"", qty:1 }];
+    if ($("shippingCalcForm")) $("shippingCalcForm").reset();
+    if ($("shipCartonsCount")) $("shipCartonsCount").value = 1;
+    if ($("shipCbmPrice")) $("shipCbmPrice").value = getLastCbmPrice();
+    updateShipCustomerInfoBox(null);
+    renderCalcPage();
+  }
+
+  function setDraftFromShipment(ship){
+    const s = normalizeShipment(ship);
+    if (!s) return;
+    draft.editingId = s.id;
+    draft.cartons = s.cartons.map(c => ({...c}));
+    shipSwitchPage("shippingCalc");
+    setTimeout(() => {
+      if ($("shipCode")) $("shipCode").value = s.code;
+      if ($("shipCustomer")) $("shipCustomer").value = s.customerName;
+      if ($("shipCustomerPhone")) $("shipCustomerPhone").value = s.customerPhone || "";
+      if ($("shipCbmPrice")) $("shipCbmPrice").value = s.cbmPrice || "";
+      if ($("shipCartonsCount")) $("shipCartonsCount").value = s.cartons.length || 1;
+      if ($("shipNotes")) $("shipNotes").value = s.notes || "";
+      renderCalcPage();
+    }, 60);
+  }
+
+  function applyCount(){
+    const count = Math.max(1, Math.round(num($("shipCartonsCount")?.value, draft.cartons.length || 1)));
+    const old = draft.cartons.slice();
+    while (draft.cartons.length < count) {
+      const last = old[old.length - 1] || draft.cartons[draft.cartons.length - 1] || {length:"",width:"",height:"",qty:1};
+      draft.cartons.push({ id: uid("carton"), length:last.length || "", width:last.width || "", height:last.height || "", qty:1 });
+    }
+    if (draft.cartons.length > count) draft.cartons = draft.cartons.slice(0, count);
+    renderCalcPage();
+  }
+
+  function readCartonsFromDom(){
+    const list = $("shipCartonsList");
+    if (!list) return;
+    draft.cartons = $$(".ship-cbm-carton", list).map(card => {
+      const q = card.querySelector('[data-field="qty"]')?.value;
+      return {
+        id: card.dataset.cartonId || uid("carton"),
+        length: card.querySelector('[data-field="length"]')?.value ?? "",
+        width: card.querySelector('[data-field="width"]')?.value ?? "",
+        height: card.querySelector('[data-field="height"]')?.value ?? "",
+        qty: q === "" || q == null ? 1 : Math.max(1, Math.round(num(q, 1)))
+      };
+    });
+  }
+
+  function renderCalcPage(){
+    ensureStyles();
+    const list = $("shipCartonsList");
+    if (!list) return;
+    if (!draft.cartons.length) draft.cartons.push({ id: uid("carton"), length:"", width:"", height:"", qty:1 });
+    ensureLastCbmPriceInInput();
+    updateShipCustomerInfoBox(findShipCustomerByCode($("shipCode")?.value));
+    list.innerHTML = draft.cartons.map((c, i) => {
+      const calc = calcLine(c);
+      return `
+        <div class="ship-cbm-carton" data-carton-id="${esc(c.id)}" data-carton-index="${i}">
+          <div class="ship-cbm-carton-head">
+            <div class="ship-cbm-carton-title"><i class="fa-solid fa-box"></i> كرتونة رقم ${i+1} <span class="badge blue ship-cbm-volume-badge">${fmt(calc.totalCbm)} م³</span></div>
+            <div style="display:flex;gap:7px;flex-wrap:wrap">
+              <button class="ghost-btn" type="button" data-carton-repeat="${i}" style="padding:8px 10px;border-radius:13px"><i class="fa-solid fa-copy"></i> تكرار</button>
+              <button class="danger-btn" type="button" data-carton-remove="${i}" style="padding:8px 10px;border-radius:13px"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+          <div class="form-grid-compact">
+            <div><label class="field-label">الطول (سم)</label><input class="input" type="number" inputmode="decimal" min="0" step="0.001" data-field="length" value="${esc(c.length)}" placeholder="100"></div>
+            <div><label class="field-label">العرض (سم)</label><input class="input" type="number" inputmode="decimal" min="0" step="0.001" data-field="width" value="${esc(c.width)}" placeholder="70"></div>
+            <div><label class="field-label">الارتفاع (سم)</label><input class="input" type="number" inputmode="decimal" min="0" step="0.001" data-field="height" value="${esc(c.height)}" placeholder="60"></div>
+            <div><label class="field-label">العدد</label><input class="input" type="number" inputmode="numeric" min="1" step="1" data-field="qty" value="${esc(c.qty || 1)}"></div>
+            <div class="full-row"><button class="gold-btn" type="button" data-carton-add-after="${i}" style="width:100%;margin-top:2px"><i class="fa-solid fa-plus"></i> إضافة كرتونة تحت هذه</button></div>
+          </div>
+        </div>`;
+    }).join("");
+    updateCalcSummary();
+  }
+
+  function updateCalcSummary(){
+    readCartonsFromDom();
+    const calc = calcShipment(draft.cartons, $("shipCbmPrice")?.value || 0);
+    $$(".ship-cbm-carton").forEach((card, i) => {
+      const line = calc.lines[i] || calcLine({});
+      const badge = card.querySelector(".ship-cbm-volume-badge");
+      if (badge) badge.textContent = `${fmt(line.totalCbm)} م³`;
+    });
+    if ($("shipSumCartons")) $("shipSumCartons").textContent = String(calc.totalCartons);
+    if ($("shipSumCbm")) $("shipSumCbm").textContent = fmt(calc.totalCbm);
+    if ($("shipSumPrice")) $("shipSumPrice").textContent = money(calc.cbmPrice);
+    if ($("shipSumTotal")) $("shipSumTotal").textContent = money(calc.total);
+    if ($("shipCartonsCount")) $("shipCartonsCount").value = String(draft.cartons.length || 1);
+  }
+
+  function collectDraft(){
+    autoFillShipCustomer(false);
+    readCartonsFromDom();
+    const code = String($("shipCode")?.value || "").trim();
+    const refCustomer = findShipCustomerByCode(code);
+    const customerName = String($("shipCustomer")?.value || refCustomer?.name || "").trim();
+    const customerPhone = String($("shipCustomerPhone")?.value || refCustomer?.phone || "").trim();
+    const customerIdNumber = String(refCustomer?.idNumber || "").replace(/\D/g, "").slice(0, 9);
+    const customerShopName = String(refCustomer?.shopName || "").trim();
+    const customerAddress = String(refCustomer?.address || "").trim();
+    const cbmPrice = num($("shipCbmPrice")?.value, 0);
+    const notes = String($("shipNotes")?.value || "").trim();
+    const cartons = draft.cartons.map(c => ({...c, length:num(c.length), width:num(c.width), height:num(c.height), qty:Math.max(1, Math.round(num(c.qty, 1)))}));
+    const calc = calcShipment(cartons, cbmPrice);
+    return { code, customerName, customerPhone, customerIdNumber, customerShopName, customerAddress, cartons, cbmPrice, notes, ...calc };
+  }
+
+  function validateDraft(d){
+    if (!d.code) { toast("كود الشحن إجباري"); return false; }
+    if (!d.cartons.length) { toast("أضف كرتونة واحدة على الأقل"); return false; }
+    if (!d.cartons.every(c => num(c.length)>0 && num(c.width)>0 && num(c.height)>0)) { toast("أدخل الطول والعرض والارتفاع لكل كرتونة"); return false; }
+    if (d.cbmPrice <= 0) { toast("أدخل سعر CBM"); return false; }
+    if (d.totalCbm <= 0) { toast("مجموع CBM غير صحيح"); return false; }
+    return true;
+  }
+
+  function openPaymentModal(d){
+    const old = draft.editingId ? st().shipments.find(x => x.id === draft.editingId) : null;
+    const paidDefault = old ? num(old.paidAmount, 0) : 0;
+    const methodDefault = old?.paymentMethod || "cash";
+    const partialMethodDefault = old?.partialPaymentMethod || "cash";
+    const defaultPaidValue = old ? paidDefault : (methodDefault === "later" ? 0 : d.total.toFixed(2));
+    const html = `
+      <div class="ship-cbm-soft">
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:18px;padding:10px 12px;margin-bottom:12px;font-weight:900;line-height:1.8">
+          <i class="fa-solid fa-circle-info"></i> راجع الدفع أولاً، ولن يتم حفظ الشحنة إلا بعد الضغط على زر حفظ الشحنة.
+        </div>
+        <div class="ship-cbm-summary" style="margin-top:0">
+          <div class="ship-cbm-sum-box"><span>كود الشحن</span><b>${esc(d.code)}</b></div>
+          <div class="ship-cbm-sum-box"><span>الكراتين</span><b>${d.totalCartons}</b></div>
+          <div class="ship-cbm-sum-box"><span>CBM</span><b>${fmt(d.totalCbm)}</b></div>
+          <div class="ship-cbm-sum-box"><span>المطلوب</span><b style="color:#d97706">${money(d.total)}</b></div>
+        </div>
+        <form id="shipPaymentForm" style="margin-top:14px">
+          <label class="field-label">طريقة الدفع</label>
+          <div class="ship-payment-grid">
+            <label class="ship-payment-method-card"><input type="radio" name="shipPayMethod" value="cash" ${methodDefault === "cash" ? "checked" : ""}> <i class="fa-solid fa-money-bill-wave"></i> دفع كاش</label>
+            <label class="ship-payment-method-card"><input type="radio" name="shipPayMethod" value="bank" ${methodDefault === "bank" ? "checked" : ""}> <i class="fa-solid fa-building-columns"></i> تحويل بنكي / تطبيق</label>
+            <label class="ship-payment-method-card"><input type="radio" name="shipPayMethod" value="later" ${methodDefault === "later" ? "checked" : ""}> <i class="fa-solid fa-clock"></i> دفع لاحق</label>
+          </div>
+          <div class="form-grid" style="margin-top:12px">
+            <div id="shipPayAccountBox"><label class="field-label">حساب التحويل</label><select id="shipPayAccount" class="select">${accountOptions(old?.paymentAccountId || "")}</select></div>
+            <div id="shipPartialMethodBox"><label class="field-label">طريقة الدفعة الآن عند الدفع لاحقاً</label><select id="shipPartialPayMethod" class="select"><option value="cash" ${partialMethodDefault !== "bank" ? "selected" : ""}>دفعة كاش</option><option value="bank" ${partialMethodDefault === "bank" ? "selected" : ""}>دفعة تحويل بنكي / تطبيق</option></select></div>
+            <div id="shipPartialAccountBox"><label class="field-label">حساب دفعة التحويل</label><select id="shipPartialPayAccount" class="select">${accountOptions(old?.partialPaymentAccountId || old?.paymentAccountId || "")}</select></div>
+            <div><label class="field-label">الدفعة المدفوعة الآن</label><input id="shipPaidAmount" class="input" type="number" inputmode="decimal" min="0" step="0.001" value="${defaultPaidValue}"></div>
+            <div class="full-row"><div class="ship-cbm-sum-box"><span>المتبقي على العميل</span><b id="shipRemainingPreview" style="color:#dc2626">${money(Math.max(0, d.total - num(defaultPaidValue)))}</b></div></div>
+          </div>
+          <button class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-floppy-disk"></i> حفظ الشحنة</button>
+        </form>
+      </div>`;
+    modal("دفع الشحنة قبل الحفظ", html, true);
+    let lastMethod = document.querySelector('input[name="shipPayMethod"]:checked')?.value || methodDefault;
+    const updatePay = (fromMethodChange=false) => {
+      const method = document.querySelector('input[name="shipPayMethod"]:checked')?.value || "cash";
+      const paidInput = $("shipPaidAmount");
+      if (fromMethodChange && paidInput){
+        paidInput.value = method === "later" ? "0" : d.total.toFixed(2);
+      }
+      if ($("shipPayAccountBox")) $("shipPayAccountBox").style.display = method === "bank" ? "block" : "none";
+      if ($("shipPartialMethodBox")) $("shipPartialMethodBox").style.display = method === "later" ? "block" : "none";
+      const partialMethod = $("shipPartialPayMethod")?.value || "cash";
+      const paid = Math.max(0, num(paidInput?.value, 0));
+      if ($("shipPartialAccountBox")) $("shipPartialAccountBox").style.display = (method === "later" && partialMethod === "bank" && paid > 0) ? "block" : "none";
+      if ($("shipRemainingPreview")) $("shipRemainingPreview").textContent = money(Math.max(0, d.total - paid));
+      lastMethod = method;
+    };
+    $$('input[name="shipPayMethod"]').forEach(x => x.onchange = () => updatePay(true));
+    if ($("shipPartialPayMethod")) $("shipPartialPayMethod").onchange = () => updatePay(false);
+    if ($("shipPaidAmount")) $("shipPaidAmount").oninput = () => updatePay(false);
+    updatePay(false);
+    $("shipPaymentForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const method = document.querySelector('input[name="shipPayMethod"]:checked')?.value || "cash";
+      const paid = Math.min(d.total, Math.max(0, num($("shipPaidAmount")?.value, 0)));
+      let accountId = "";
+      let accountName = "";
+      let partialPaymentMethod = "";
+      let partialPaymentAccountId = "";
+      let partialPaymentAccountName = "";
+      if (method === "cash"){
+        accountName = "دفع كاش";
+      } else if (method === "bank"){
+        accountId = String($("shipPayAccount")?.value || "");
+        const account = (window.state?.paymentAccounts || []).find(a => String(a.id) === accountId);
+        accountName = account?.name || "تحويل بنكي";
+      } else {
+        accountName = "دفع لاحق";
+        if (paid > 0){
+          partialPaymentMethod = $("shipPartialPayMethod")?.value || "cash";
+          if (partialPaymentMethod === "bank"){
+            partialPaymentAccountId = String($("shipPartialPayAccount")?.value || "");
+            const pAccount = (window.state?.paymentAccounts || []).find(a => String(a.id) === partialPaymentAccountId);
+            partialPaymentAccountName = pAccount?.name || "تحويل بنكي";
+          } else {
+            partialPaymentAccountName = "دفع كاش";
+          }
+        }
+      }
+      const now = Date.now();
+      const ship = normalizeShipment({
+        id: old?.id || uid("shipment"),
+        code: d.code,
+        customerName: d.customerName,
+        customerPhone: d.customerPhone,
+        customerIdNumber: d.customerIdNumber,
+        customerShopName: d.customerShopName,
+        customerAddress: d.customerAddress,
+        cartons: d.cartons,
+        cbmPrice: d.cbmPrice,
+        totalCartons: d.totalCartons,
+        totalCbm: d.totalCbm,
+        totalPrice: d.total,
+        paymentMethod: method,
+        paymentAccountId: accountId,
+        paymentAccountName: accountName,
+        partialPaymentMethod,
+        partialPaymentAccountId,
+        partialPaymentAccountName,
+        paidAmount: paid,
+        notes: d.notes,
+        createdAt: old?.createdAt || now,
+        updatedAt: now,
+        syncPending: true
+      });
+      const arr = st().shipments || [];
+      const idx = arr.findIndex(x => x.id === ship.id);
+      if (idx >= 0) arr[idx] = ship; else arr.unshift(ship);
+      st().shipments = arr.sort((a,b) => Number(b.createdAt)-Number(a.createdAt));
+      saveLocalShipments();
+      saveLastCbmPrice(ship.cbmPrice);
+      const rememberedCustomer = rememberShipCustomer(ship.code, ship.customerName, ship.customerPhone, ship.customerIdNumber, ship.customerShopName, ship.customerAddress);
+      if (rememberedCustomer) saveRemoteShipCustomer(rememberedCustomer).catch(() => {});
+      closeModal();
+      await saveRemoteShipment(ship);
+      toast("تم حفظ شحنة الطرود بنجاح");
+      resetDraft();
+      renderShipmentsPage();
+      shipSwitchPage("shippingShipments");
+    };
+  }
+
+  function statusBadge(s){
+    if (s.paymentStatus === "paid") return `<span class="badge ship-status-paid">مدفوع</span>`;
+    if (s.paymentStatus === "partial") return `<span class="badge ship-status-partial">مدفوع جزئي</span>`;
+    return `<span class="badge ship-status-later">دفع لاحق</span>`;
+  }
+
+  function filteredShipments(ignoreFolder=false){
+    const query = String($("shipSearch")?.value || "").trim().toLowerCase();
+    const period = $("shipPeriod")?.value || "all";
+    const sort = $("shipSort")?.value || "date_desc";
+    const now = Date.now();
+    const today = startOfDay(new Date());
+    const week = now - 7*86400000;
+    const month = now - 30*86400000;
+    let from = 0, to = Infinity;
+    if (period === "today") from = today;
+    if (period === "week") from = week;
+    if (period === "month") from = month;
+    if (period === "custom"){
+      from = readShipDateTime("shipDateFrom", false);
+      to = readShipDateTime("shipDateTo", true);
+    }
+    const rows = (st().shipments || []).filter(s => {
+      const time = Number(s.createdAt || 0);
+      const matches = !query || String(s.code || "").toLowerCase().includes(query) || String(s.customerName || "").toLowerCase().includes(query) || String(s.customerPhone || "").toLowerCase().includes(query);
+      return matches && time >= from && time <= to && (ignoreFolder || shipFolderMatches(s, activeShipFolder));
+    });
+    rows.sort((a,b) => {
+      if (sort === "date_asc") return Number(a.createdAt)-Number(b.createdAt);
+      if (sort === "code_asc") return String(a.code).localeCompare(String(b.code), "ar", {numeric:true});
+      if (sort === "code_desc") return String(b.code).localeCompare(String(a.code), "ar", {numeric:true});
+      return Number(b.createdAt)-Number(a.createdAt);
+    });
+    return rows;
+  }
+
+  function totals(rows){
+    return rows.reduce((a,s) => {
+      const paid = num(s.paidAmount);
+      a.count += 1;
+      a.cartons += num(s.totalCartons);
+      a.cbm += num(s.totalCbm);
+      a.sales += num(s.totalPrice);
+      a.paid += paid;
+      a.remaining += num(s.remaining);
+      if (s.paymentMethod === "cash") a.cash += paid;
+      if (s.paymentMethod === "bank") a.bank += paid;
+      if (s.paymentMethod === "later") {
+        a.later += num(s.remaining);
+        if (s.partialPaymentMethod === "bank") a.bank += paid;
+        else if (paid > 0) a.cash += paid;
+      }
+      return a;
+    }, {count:0, cartons:0, cbm:0, sales:0, paid:0, remaining:0, cash:0, bank:0, later:0});
+  }
+
+  function renderShipmentsPage(){
+    const table = $("shipmentsTable");
+    if (!table) return;
+    const period = $("shipPeriod")?.value || "all";
+    if ($("shipDateRangeBox")) $("shipDateRangeBox").classList.toggle("show", period === "custom");
+    const baseRows = filteredShipments(true);
+    renderShipPaymentFolders(baseRows);
+    const rows = filteredShipments(false);
+    const t = totals(rows);
+    if ($("shipStatsGrid")) $("shipStatsGrid").innerHTML = `
+      <div class="clean-stat"><div class="clean-stat-title"><span>عدد الشحنات</span><i class="fa-solid fa-boxes-packing"></i></div><div class="clean-stat-value blue">${t.count}</div></div>
+      <div class="clean-stat"><div class="clean-stat-title"><span>مجموع الكراتين</span><i class="fa-solid fa-box"></i></div><div class="clean-stat-value dark">${t.cartons}</div></div>
+      <div class="clean-stat"><div class="clean-stat-title"><span>مجموع CBM</span><i class="fa-solid fa-cube"></i></div><div class="clean-stat-value green">${fmt(t.cbm)}</div></div>
+      <div class="clean-stat"><div class="clean-stat-title"><span>إجمالي السعر</span><i class="fa-solid fa-shekel-sign"></i></div><div class="clean-stat-value gold">${money(t.sales)}</div></div>
+      <div class="clean-stat"><div class="clean-stat-title"><span>المدفوع</span><i class="fa-solid fa-money-check-dollar"></i></div><div class="clean-stat-value green">${money(t.paid)}</div></div>
+      <div class="clean-stat"><div class="clean-stat-title"><span>المتبقي</span><i class="fa-solid fa-clock"></i></div><div class="clean-stat-value red">${money(t.remaining)}</div></div>
+      <div class="clean-stat"><div class="clean-stat-title"><span>دفع كاش</span><i class="fa-solid fa-money-bill-wave"></i></div><div class="clean-stat-value green">${money(t.cash)}</div></div>
+      <div class="clean-stat"><div class="clean-stat-title"><span>تحويلات بنكية</span><i class="fa-solid fa-building-columns"></i></div><div class="clean-stat-value blue">${money(t.bank)}</div></div>
+      <div class="clean-stat"><div class="clean-stat-title"><span>دفع لاحق</span><i class="fa-solid fa-calendar-check"></i></div><div class="clean-stat-value red">${money(t.later)}</div></div>`;
+    table.innerHTML = rows.length ? rows.map(s => `
+      <tr>
+        <td>${formatDate(s.createdAt)}</td><td><b>${esc(s.code)}</b>${s.syncPending ? ' <span class="badge yellow">محلي</span>' : ''}</td><td>${esc(s.customerName || "-")}</td><td>${esc(s.customerPhone || "-")}</td><td>${s.totalCartons}</td><td>${fmt(s.totalCbm)}</td><td>${money(s.cbmPrice)}</td><td class="money">${money(s.totalPrice)}</td><td style="color:#16a34a;font-weight:900">${money(s.paidAmount)}</td><td style="color:#dc2626;font-weight:900">${money(s.remaining)}</td><td>${esc(shipPaymentLabel(s))}</td><td>${statusBadge(s)}</td>
+        <td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="ghost-btn" type="button" data-ship-view="${s.id}" style="padding:7px 9px;border-radius:12px"><i class="fa-solid fa-eye"></i></button><button class="primary-btn" type="button" data-ship-edit="${s.id}" style="padding:7px 9px;border-radius:12px"><i class="fa-solid fa-pen"></i></button><button class="ghost-btn" type="button" data-ship-wa="${s.id}" style="padding:7px 9px;border-radius:12px"><i class="fa-brands fa-whatsapp"></i></button><button class="danger-btn" type="button" data-ship-del="${s.id}" style="padding:7px 9px;border-radius:12px"><i class="fa-solid fa-trash"></i></button></div></td>
+      </tr>`).join("") : `<tr><td colspan="13" class="muted" style="text-align:center;padding:32px">لا توجد شحنات حسب الفلتر الحالي</td></tr>`;
+  }
+
+  function applyDefaultShippingLogoToApp(){
+    try{
+      const settings = window.state && window.state.settings ? window.state.settings : null;
+      if (settings) {
+        settings.logo = SHIPPING_DEFAULT_LOGO;
+        settings.logoUrl = SHIPPING_DEFAULT_LOGO;
+        settings.shopLogo = SHIPPING_DEFAULT_LOGO;
+      }
+      ["topShopLogo","sideShopLogo"].forEach(id => {
+        const img = $(id);
+        if (img) {
+          img.crossOrigin = "anonymous";
+          img.referrerPolicy = "no-referrer";
+          img.src = SHIPPING_DEFAULT_LOGO;
+        }
+      });
+    }catch(e){}
+  }
+
+  function shopLogo(){
+    const s = window.state?.settings || {};
+    const bad = (x) => {
+      const v = String(x || "").trim();
+      return !v || v === "undefined" || v === "null" || v.startsWith("blob:null");
+    };
+    const candidates = [s.localLogo, s.logoData, s.logoBase64, s.companyLogo, s.storeLogo, s.shopLogo, s.logoUrl, s.logo, $("topShopLogo")?.src, $("sideShopLogo")?.src, SHIPPING_DEFAULT_LOGO].filter(x => !bad(x));
+    return String(candidates[0] || SHIPPING_DEFAULT_LOGO).trim();
+  }
+
+  function reportLogoHtml(){
+    const logo = shopLogo();
+    if (!logo) return "";
+    return `<img class="ship-report-logo" src="${esc(logo)}" crossorigin="anonymous" referrerpolicy="no-referrer" decoding="sync" loading="eager" onerror="this.remove()">`;
+  }
+
+  function shopName(){
+    const s = window.state?.settings || {};
+    return s.shopName || s.storeName || s.companyName || $("topShopName")?.textContent?.trim() || "مجموعة إيلاف للشحن والتجارة الدولية";
+  }
+
+  function detailedTotalsHtml(t){
+    return `
+      <div class="ship-card ship-report-grand">
+        <h3 class="ship-report-grand-title"><i class="fa-solid fa-calculator"></i> الإجمالي النهائي للتقرير</h3>
+        <div class="ship-report-total-grid">
+          <div class="ship-report-total-box"><span>عدد الشحنات</span><b>${t.count}</b></div>
+          <div class="ship-report-total-box"><span>إجمالي الكراتين</span><b>${t.cartons}</b></div>
+          <div class="ship-report-total-box"><span>إجمالي CBM</span><b>${fmt(t.cbm)}</b></div>
+          <div class="ship-report-total-box"><span>إجمالي الحساب</span><b class="orange">${money(t.sales)}</b></div>
+          <div class="ship-report-total-box"><span>المدفوع</span><b style="color:#16a34a">${money(t.paid)}</b></div>
+          <div class="ship-report-total-box"><span>المتبقي</span><b style="color:#dc2626">${money(t.remaining)}</b></div>
+          <div class="ship-report-total-box"><span>دفع كاش</span><b>${money(t.cash)}</b></div>
+          <div class="ship-report-total-box"><span>تحويلات / تطبيقات</span><b>${money(t.bank)}</b></div>
+          <div class="ship-report-total-box"><span>دفع لاحق</span><b>${money(t.later)}</b></div>
         </div>
       </div>`;
-    }).join("") || `<div class="muted">لا توجد حسابات دفع</div>`;
-    setTimeout(() => { delete box.dataset.oskarLinkedRendering; }, 0);
   }
 
-  function openMovementModal(kind="deposit", accountId="cash", moveId=""){
-    loadMovements();
-    const old = moveId ? (st().accountMovements || []).find(x => x.id === moveId) : null;
-    const selectedKind = old ? (old.kind || old.type || "deposit") : kind;
-    const selectedAccount = old?.accountId || accountId || "cash";
-    const title = old ? "تعديل حركة رصيد حساب" : (selectedKind === "withdraw" ? "سحب دفعة من حساب" : "إضافة دفعة إلى حساب");
-    const html = `<form id="oskarAccountMovementForm">
-      <div class="form-grid-compact">
-        <div><label class="field-label">الحساب</label><select id="oskarMoveAccount" class="select">${accountOptions(selectedAccount, true)}</select></div>
-        <div><label class="field-label">نوع الحركة</label><select id="oskarMoveKind" class="select"><option value="deposit" ${selectedKind!=="withdraw" ? "selected" : ""}>إضافة رصيد / دفعة داخلة</option><option value="withdraw" ${selectedKind==="withdraw" ? "selected" : ""}>سحب / خصم من الحساب</option></select></div>
-        <div><label class="field-label">المبلغ</label><input id="oskarMoveAmount" type="number" inputmode="decimal" min="0" step="0.01" class="input" required value="${esc(old?.amount || "")}"></div>
-        <div><label class="field-label">ملاحظات</label><input id="oskarMoveNotes" class="input" value="${esc(old?.notes || "")}" placeholder="اختياري"></div>
-      </div>
-      <button class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-floppy-disk"></i> حفظ الحركة</button>
-    </form>`;
-    const titleEl = $("modalTitle"), body = $("modalBody"), back = $("modalBackdrop"), box = $("modalBox");
-    if(!titleEl || !body || !back){ return toast("تعذر فتح نافذة الحركة"); }
-    titleEl.textContent = title;
-    if(box) box.classList.remove("large");
+  function buildDetailedReport(rows){
+    const t = totals(rows);
+    const cards = rows.map((s, idx) => {
+      const calc = calcShipment(s.cartons, s.cbmPrice);
+      return `
+        <div class="ship-card">
+          <div class="ship-card-top">
+            <div><div class="ship-card-small">${formatDate(s.createdAt)}</div></div>
+            <div style="text-align:left"><div class="ship-card-code">${esc(s.code)}</div><div class="ship-card-small">العميل: ${esc(s.customerName || "-")}</div><div class="ship-card-small">الجوال: ${esc(s.customerPhone || "-")}</div></div>
+            <div class="ship-card-small">${idx + 1}</div>
+          </div>
+          <table class="ship-report-table"><thead><tr><th>#</th><th>الطول (سم)</th><th>العرض (سم)</th><th>الارتفاع (سم)</th><th>العدد</th><th>حجم الكرتونة (م³)</th><th>إجمالي (م³)</th></tr></thead><tbody>
+            ${calc.lines.map((l,i) => `<tr><td>${i+1}</td><td>${fmt(l.length)}</td><td>${fmt(l.width)}</td><td>${fmt(l.height)}</td><td><span style="color:#c56a36">${l.qty}×</span></td><td>${fmt(l.unitCbm)}</td><td>${fmt(l.totalCbm)}</td></tr>`).join("")}
+          </tbody></table>
+          <div class="ship-report-total-grid compact">
+            <div class="ship-report-total-box"><span>كراتين</span><b>${s.totalCartons}</b></div>
+            <div class="ship-report-total-box"><span>CBM (م³)</span><b>${fmt(s.totalCbm)}</b></div>
+            <div class="ship-report-total-box"><span>سعر CBM</span><b>${money(s.cbmPrice)}</b></div>
+            <div class="ship-report-total-box"><span>إجمالي السعر</span><b class="orange">${money(s.totalPrice)}</b></div>
+            <div class="ship-report-total-box"><span>المدفوع</span><b style="color:#16a34a">${money(s.paidAmount)}</b></div>
+            <div class="ship-report-total-box"><span>المتبقي</span><b style="color:#dc2626">${money(s.remaining)}</b></div>
+          </div>
+          <div class="ship-card-small" style="margin-top:8px">الدفع: ${shipPaymentLabel(s)}</div>
+        </div>`;
+    }).join("");
+    return `
+      <div class="ship-report-page">
+        <div class="ship-report-topline"><span class="ship-report-top-date">${formatDate(Date.now())}</span><span class="ship-report-top-title">CBM</span><span class="ship-report-top-blank"></span></div>
+        <div class="ship-report-head">
+          <div class="ship-report-brand-wrap"><div class="ship-report-logo-holder">${reportLogoHtml()}</div><div class="ship-report-brand"><h2>${esc(shopName())}</h2><p>International Trading · شحن وتجارة</p><div class="ship-report-count-line">عدد الشحنات في التقرير: <b>${rows.length}</b></div></div></div>
+          <div class="ship-report-meta"><div class="ship-report-label">DETAILED REPORT</div><div style="font-weight:900;margin-top:8px">تقرير تفصيلي كامل</div><div class="ship-card-small">${formatDate(Date.now())}</div></div>
+        </div>
+        ${cards || `<div class="ship-card" style="text-align:center;font-weight:900">لا توجد بيانات</div>`}
+        ${detailedTotalsHtml(t)}
+        <div class="ship-report-footer"><span></span><span>1/1</span></div>
+      </div>`;
+  }
+
+  function buildSummaryReport(rows){
+    const t = totals(rows);
+    return `<div class="ship-report-page"><div class="ship-report-topline"><span class="ship-report-top-date">${formatDate(Date.now())}</span><span class="ship-report-top-title">تقرير شامل للشحنات</span><span class="ship-report-top-blank"></span></div><div class="ship-report-head"><div class="ship-report-brand-wrap"><div class="ship-report-logo-holder">${reportLogoHtml()}</div><div class="ship-report-brand"><h2>${esc(shopName())}</h2><p>تقرير شامل</p></div></div><div class="ship-report-meta"><div class="ship-report-label">SUMMARY REPORT</div><div style="font-weight:900;margin-top:8px">حسابات المبيعات والشحنات</div><div class="ship-card-small">${formatDate(Date.now())}</div></div></div>${detailedTotalsHtml(t)}<div class="ship-card"><table class="ship-report-table"><thead><tr><th>التاريخ</th><th>الكود</th><th>العميل</th><th>الجوال</th><th>كراتين</th><th>CBM</th><th>إجمالي</th><th>مدفوع</th><th>متبقي</th></tr></thead><tbody>${rows.map(s => `<tr><td>${formatDate(s.createdAt)}</td><td>${esc(s.code)}</td><td>${esc(s.customerName || "-")}</td><td>${esc(s.customerPhone || "-")}</td><td>${s.totalCartons}</td><td>${fmt(s.totalCbm)}</td><td>${money(s.totalPrice)}</td><td>${money(s.paidAmount)}</td><td>${money(s.remaining)}</td></tr>`).join("") || `<tr><td colspan="9">لا توجد بيانات</td></tr>`}</tbody></table></div></div>`;
+  }
+
+  function clearShipCustomerForm(){
+    ["shipCustomerEditingCode","shipCustomerCode","shipCustomerName","shipCustomerIdNumber","shipCustomerMobile","shipCustomerShopName","shipCustomerAddress"].forEach(id => { if ($(id)) $(id).value = ""; });
+    if ($("shipCustomerCode")) $("shipCustomerCode").disabled = false;
+  }
+
+  function fillShipCustomerForm(code){
+    const c = findShipCustomerByCode(code);
+    if (!c) return;
+    if ($("shipCustomerEditingCode")) $("shipCustomerEditingCode").value = c.code;
+    if ($("shipCustomerCode")) { $("shipCustomerCode").value = c.code; $("shipCustomerCode").disabled = true; }
+    if ($("shipCustomerName")) $("shipCustomerName").value = c.name || "";
+    if ($("shipCustomerIdNumber")) $("shipCustomerIdNumber").value = c.idNumber || "";
+    if ($("shipCustomerMobile")) $("shipCustomerMobile").value = c.phone || "";
+    if ($("shipCustomerShopName")) $("shipCustomerShopName").value = c.shopName || "";
+    if ($("shipCustomerAddress")) $("shipCustomerAddress").value = c.address || "";
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  async function saveShipCustomerFromForm(){
+    const editing = String($("shipCustomerEditingCode")?.value || "").trim();
+    const code = String($("shipCustomerCode")?.value || editing || "").trim();
+    const name = String($("shipCustomerName")?.value || "").trim();
+    const idNumber = String($("shipCustomerIdNumber")?.value || "").replace(/\D/g, "").slice(0, 9);
+    const phone = String($("shipCustomerMobile")?.value || "").trim();
+    const shopName = String($("shipCustomerShopName")?.value || "").trim();
+    const address = String($("shipCustomerAddress")?.value || "").trim();
+    if (!code) return toast("رقم الكود إجباري");
+    if (!name) return toast("اسم العميل إجباري");
+    if (String($("shipCustomerIdNumber")?.value || "").trim() && idNumber.length !== 9) return toast("رقم الهوية يجب أن يكون 9 خانات");
+    const saved = upsertShipCustomer({code, name, idNumber, phone, shopName, address}, true);
+    await saveRemoteShipCustomer(saved);
+    clearShipCustomerForm();
+    toast("تم حفظ عميل الشحن");
+  }
+
+  async function deleteShipCustomer(code){
+    const c = findShipCustomerByCode(code);
+    if (!c) return;
+    if (!confirm(`حذف عميل الشحن ${c.name || c.code}؟`)) return;
+    st().shipCustomers = (st().shipCustomers || []).filter(x => String(x.code) !== String(code));
+    saveLocalShipCustomers();
+    saveLegacyCustomerMapFromRows(st().shipCustomers);
+    await deleteRemoteShipCustomer(code);
+    renderShipCustomersPage();
+    toast("تم حذف عميل الشحن");
+  }
+
+  function renderShipCustomersPage(){
+    const table = $("shipCustomersTable");
+    if (!table) return;
+    const q = String($("shipCustomerSearch")?.value || "").trim().toLowerCase();
+    const rows = sortShipCustomers(st().shipCustomers || []).filter(c => {
+      return !q || [c.code, c.name, c.phone, c.idNumber, c.shopName, c.address].some(v => String(v || "").toLowerCase().includes(q));
+    });
+    table.innerHTML = rows.length ? rows.map(c => `
+      <tr>
+        <td><b>${esc(c.code)}</b>${c.syncPending ? ' <span class="badge yellow">محلي</span>' : ''}</td>
+        <td>${esc(c.name || "-")}</td>
+        <td>${esc(c.phone || "-")}</td>
+        <td>${esc(c.idNumber || "-")}</td>
+        <td>${esc(c.shopName || "-")}</td>
+        <td>${esc(c.address || "-")}</td>
+        <td><div class="ship-customer-actions"><button class="primary-btn" type="button" data-ship-customer-edit="${esc(c.code)}" style="padding:7px 9px;border-radius:12px"><i class="fa-solid fa-pen"></i></button><button class="danger-btn" type="button" data-ship-customer-del="${esc(c.code)}" style="padding:7px 9px;border-radius:12px"><i class="fa-solid fa-trash"></i></button></div></td>
+      </tr>`).join("") : `<tr><td colspan="7" class="muted" style="text-align:center;padding:32px">لا يوجد عملاء شحن</td></tr>`;
+  }
+
+  function exportShipCustomersExcel(){
+    if (!window.XLSX) return toast("مكتبة Excel لم تحمل بعد");
+    const rows = sortShipCustomers(st().shipCustomers || []).map(c => ({"الكود":c.code,"اسم العميل":c.name,"رقم الهوية":c.idNumber,"رقم الجوال":c.phone,"اسم المحل":c.shopName,"العنوان":c.address}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "عملاء الشحن");
+    XLSX.writeFile(wb, `shipping-customers-${dateKey(Date.now())}.xlsx`);
+    toast("تم تنزيل عملاء الشحن Excel");
+  }
+
+  function modal(title, html, large=true){
+    const back = $("modalBackdrop"), box = $("modalBox"), body = $("modalBody"), titleEl = $("modalTitle");
+    if (!back || !box || !body) return;
+    if (titleEl) titleEl.textContent = title;
+    box.classList.toggle("large", !!large);
     body.innerHTML = html;
     back.classList.add("show");
-    patchSelect("oskarMoveAccount", selectedAccount, true);
-    $("oskarAccountMovementForm").onsubmit = async (e) => {
-      e.preventDefault();
-      const amount = num($("oskarMoveAmount")?.value, 0);
-      if(amount <= 0) return toast("أدخل مبلغ صحيح");
-      const item = {
-        ...(old || {}),
-        id: old?.id || uid("move"),
-        accountId: $("oskarMoveAccount")?.value || "cash",
-        kind: $("oskarMoveKind")?.value || "deposit",
-        amount,
-        notes: $("oskarMoveNotes")?.value.trim() || "",
-        createdAt: old?.createdAt || Date.now(),
-        updatedAt: Date.now()
-      };
-      const list = st().accountMovements || [];
-      const idx = list.findIndex(x => x.id === item.id);
-      if(idx >= 0) list[idx] = item; else list.push(item);
-      st().accountMovements = list;
-      saveMovements();
-      await pushMovement(item);
-      back.classList.remove("show");
-      renderEverything();
-      toast(old ? "تم تعديل حركة الحساب" : "تم حفظ حركة الحساب");
-    };
-  }
-  async function deleteMovement(id){
-    if(!confirm("حذف حركة رصيد الحساب؟")) return;
-    st().accountMovements = (loadMovements() || []).filter(x => x.id !== id);
-    saveMovements();
-    await removeMovementRemote(id);
-    renderEverything();
-    toast("تم حذف الحركة");
+    const close = $("modalCloseBtn");
+    if (close) close.onclick = closeModal;
   }
 
-  function bindMovementEvents(){
-    document.addEventListener("click", e => {
-      const add = e.target.closest("[data-oskar-move-add]");
-      if(add){ e.preventDefault(); e.stopPropagation(); openMovementModal(add.dataset.oskarMoveAdd || "deposit", add.dataset.account || $("oskarMovementFilterAccount")?.value || "cash"); return; }
-      const log = e.target.closest("[data-oskar-account-log]");
-      if(log){ e.preventDefault(); e.stopPropagation(); ensureAccountLogCard(); if($("oskarMovementFilterAccount")) $("oskarMovementFilterAccount").value = log.dataset.oskarAccountLog || ""; renderAccountMovementLog(log.dataset.oskarAccountLog || ""); toast("تم عرض سجل الحساب"); return; }
-      const edit = e.target.closest("[data-oskar-move-edit]");
-      if(edit){ e.preventDefault(); e.stopPropagation(); const m=(loadMovements()||[]).find(x=>x.id===edit.dataset.oskarMoveEdit); openMovementModal(m?.kind || "deposit", m?.accountId || "cash", edit.dataset.oskarMoveEdit); return; }
-      const del = e.target.closest("[data-oskar-move-delete]");
-      if(del){ e.preventDefault(); e.stopPropagation(); deleteMovement(del.dataset.oskarMoveDelete); return; }
-      if(e.target.closest("#oskarRefreshAccountLogBtn")){ e.preventDefault(); renderAccountMovementLog(); return; }
-    }, true);
-    document.addEventListener("change", e => { if(e.target?.id === "oskarMovementFilterAccount") renderAccountMovementLog(e.target.value || ""); }, true);
+  function closeModal(){
+    $("modalBackdrop")?.classList.remove("show");
+    $("modalBox")?.classList.remove("large");
   }
 
-  async function fullBackupData(){
-    await refreshAccounts(); loadExtra(); loadMovements();
-    const stores = ["products","invoices","customers","expenses","purchases","supplierPayments","paymentAccounts","employees","settings","syncQueue"];
-    const data = {version:"oskar-full-site-backup-2026-05-03-final", exportedAt:Date.now(), firebaseRoot:root(), accountMovements:st().accountMovements || [], suppliers:st().suppliers || [], workers:st().workers || [], workerWages:st().workerWages || []};
-    for(const store of stores){
-      try{
-        if(typeof window.idbGetAll === "function") data[store] = await window.idbGetAll(store);
-        else data[store] = Array.isArray(st()[store]) ? st()[store] : (store === "settings" && st().settings ? [st().settings] : []);
-      }catch{ data[store] = Array.isArray(st()[store]) ? st()[store] : []; }
+  function ensureExportLoading(){
+    let el = $("shipExportLoading");
+    if (!el) {
+      document.body.insertAdjacentHTML("beforeend", `<div id="shipExportLoading" class="ship-export-loading"><div class="ship-export-loading-card"><div class="ship-export-spinner"></div><div id="shipExportLoadingText">جاري تجهيز الملف...</div></div></div>`);
+      el = $("shipExportLoading");
     }
-    if(st().settings) data.settingsMain = st().settings;
-    data.paymentAccounts = getAccounts();
-    return data;
-  }
-  function downloadBackup(data){
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "oskar-full-site-backup-" + new Date().toISOString().slice(0,10) + ".json";
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }
-  async function importBackupFile(file){
-    if(!file) return;
-    try{
-      const data = JSON.parse(await file.text());
-      const stores = ["products","invoices","customers","expenses","purchases","supplierPayments","paymentAccounts","employees","settings","syncQueue"];
-      for(const store of stores){
-        if(Array.isArray(data[store])){
-          st()[store] = store === "paymentAccounts" ? data[store].map(normalizeAcc) : data[store];
-          if(typeof window.idbClear === "function") { try{ await window.idbClear(store); }catch{} }
-          if(typeof window.idbPut === "function"){
-            for(const item of data[store]){
-              const row = store === "settings" ? {...item, id:item.id || "main"} : item;
-              if(row && row.id) await window.idbPut(store, row);
-            }
-          }
-        }
-      }
-      st().suppliers = Array.isArray(data.suppliers) ? data.suppliers : (st().suppliers || []);
-      st().workers = Array.isArray(data.workers) ? data.workers : (st().workers || []);
-      st().workerWages = Array.isArray(data.workerWages) ? data.workerWages : (st().workerWages || []);
-      st().accountMovements = Array.isArray(data.accountMovements) ? data.accountMovements : (st().accountMovements || []);
-      saveExtra(); saveMovements(); writeAccountsCache(getAccounts());
-      try{ await window.loadLocalData?.(true); }catch{}
-      await refreshAccounts();
-      try{ window.renderAll?.(); }catch{}
-      renderEverything();
-      toast("تم استيراد النسخة الاحتياطية الشاملة");
-    }catch(err){ console.error(err); toast("فشل استيراد النسخة الاحتياطية"); }
-    if($("importBackupInput")) $("importBackupInput").value = "";
-  }
-  function bindBackup(){
-    document.addEventListener("click", async e => {
-      const btn = e.target.closest("#exportBackupBtn");
-      if(!btn) return;
-      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-      downloadBackup(await fullBackupData());
-      toast("تم تحميل نسخة احتياطية تشمل كل الموقع");
-    }, true);
-    document.addEventListener("change", e => {
-      if(e.target?.id !== "importBackupInput") return;
-      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-      importBackupFile(e.target.files && e.target.files[0]);
-    }, true);
+    return el;
   }
 
-  function renderEverything(){
-    ensureStyle();
-    getAccounts();
-    ensureFormDropdowns();
-    renderAccountsReport();
-    renderSettingsAccountsEnhanced();
-    if($("workerWagesFinalRows")){
-      $$("#workerWagesFinalRows tr").forEach(tr => {
-        const cells = Array.from(tr.children);
-        if(cells[4] && cells[4].textContent && !cells[4].dataset.oskarNamed){
-          const id = cells[4].textContent.trim();
-          cells[4].textContent = accountName(id);
-          cells[4].dataset.oskarNamed = "1";
-        }
+  function showExportLoading(text="جاري تجهيز الملف..."){
+    const el = ensureExportLoading();
+    const t = $("shipExportLoadingText");
+    if (t) t.textContent = text;
+    el.classList.add("show");
+  }
+
+  function hideExportLoading(){
+    $("shipExportLoading")?.classList.remove("show");
+  }
+
+  function openReport(type="detailed", rows=filteredShipments()){
+    const html = type === "summary" ? buildSummaryReport(rows) : buildDetailedReport(rows);
+    modal(type === "summary" ? "تقرير شامل للشحنات" : "تقرير تفصيلي للشحنات", `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" class="no-print"><button id="shipModalPdf" class="danger-btn" type="button"><i class="fa-solid fa-file-pdf"></i> PDF</button><button id="shipModalImage" class="success-btn" type="button"><i class="fa-solid fa-image"></i> صورة</button><button id="shipModalPrint" class="ghost-btn" type="button"><i class="fa-solid fa-print"></i> طباعة</button><button id="shipModalWa" class="ghost-btn" type="button"><i class="fa-brands fa-whatsapp"></i> واتس اب</button></div><div id="shipReportPreview">${html}</div>`, true);
+    $("shipModalPdf").onclick = () => exportPdf(type, rows);
+    $("shipModalImage").onclick = () => exportImage(type, rows);
+    $("shipModalPrint").onclick = () => printReport(type, rows);
+    $("shipModalWa").onclick = () => shareWhatsapp(rows);
+  }
+
+  function waitForReportAssets(root, timeout=550){
+    const imgs = Array.from(root.querySelectorAll("img"));
+    if (!imgs.length) return Promise.resolve();
+    return Promise.all(imgs.map(img => {
+      img.crossOrigin = "anonymous";
+      img.referrerPolicy = "no-referrer";
+      if (img.complete && img.naturalWidth) return Promise.resolve();
+      return new Promise(resolve => {
+        const done = () => resolve();
+        img.onload = done; img.onerror = done;
+        setTimeout(done, timeout);
       });
+    }));
+  }
+
+  async function renderReportOffscreen(type, rows){
+    const holder = document.createElement("div");
+    holder.style.position = "fixed";
+    holder.style.right = "-99999px";
+    holder.style.top = "0";
+    holder.style.background = "#fff";
+    holder.style.pointerEvents = "none";
+    holder.innerHTML = type === "summary" ? buildSummaryReport(rows) : buildDetailedReport(rows);
+    document.body.appendChild(holder);
+    await waitForReportAssets(holder, 500);
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    return holder;
+  }
+
+  async function exportImage(type="detailed", rows=filteredShipments()){
+    if (!window.html2canvas) return toast("مكتبة الصور لم تحمل بعد");
+    showExportLoading("جاري تنزيل الصورة...");
+    let holder = null;
+    try{
+      holder = await renderReportOffscreen(type, rows);
+      const el = holder.querySelector(".ship-report-page");
+      const canvas = await html2canvas(el, {scale:type === "summary" ? 1.55 : 1.35, backgroundColor:"#ffffff", useCORS:true, allowTaint:false, logging:false, imageTimeout:650, scrollX:0, scrollY:0});
+      const a = document.createElement("a");
+      a.download = `${type === "summary" ? "summary" : "detailed"}-shipments-${dateKey(Date.now())}.png`;
+      document.body.appendChild(a);
+      if (canvas.toBlob) {
+        await new Promise(resolve => canvas.toBlob(blob => {
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            a.href = url;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
+          } else {
+            a.href = canvas.toDataURL("image/png");
+            a.click();
+          }
+          resolve();
+        }, "image/png"));
+      } else {
+        a.href = canvas.toDataURL("image/png");
+        a.click();
+      }
+      a.remove();
+      toast("تم تنزيل صورة التقرير");
+    }catch(e){ console.error(e); toast("تعذر تنزيل الصورة"); }
+    finally{ if (holder) holder.remove(); hideExportLoading(); }
+  }
+
+  async function exportPdf(type="detailed", rows=filteredShipments()){
+    if (!window.html2canvas || !window.jspdf?.jsPDF) return toast("مكتبة PDF لم تحمل بعد");
+    showExportLoading("جاري تنزيل PDF...");
+    let holder = null;
+    try{
+      holder = await renderReportOffscreen(type, rows);
+      const el = holder.querySelector(".ship-report-page");
+      const canvas = await html2canvas(el, {scale:type === "summary" ? 1.45 : 1.25, backgroundColor:"#ffffff", useCORS:true, allowTaint:false, logging:false, imageTimeout:650, scrollX:0, scrollY:0});
+      const pdf = new window.jspdf.jsPDF("p", "mm", "a4");
+      const pageW = 210, pageH = 297;
+      const imgH = canvas.height * pageW / canvas.width;
+      const data = canvas.toDataURL("image/png");
+      let heightLeft = imgH;
+      let pos = 0;
+      pdf.addImage(data, "PNG", 0, pos, pageW, imgH);
+      heightLeft -= pageH;
+      while (heightLeft > 0){
+        pos = heightLeft - imgH;
+        pdf.addPage();
+        pdf.addImage(data, "PNG", 0, pos, pageW, imgH);
+        heightLeft -= pageH;
+      }
+      pdf.save(`${type === "summary" ? "summary" : "detailed"}-shipments-${dateKey(Date.now())}.pdf`);
+      toast("تم تنزيل PDF");
+    }catch(e){ console.error(e); toast("تعذر تنزيل PDF"); }
+    finally{ if (holder) holder.remove(); hideExportLoading(); }
+  }
+
+  function printReport(type="detailed", rows=filteredShipments()){
+    const area = $("printArea");
+    if (!area) return toast("منطقة الطباعة غير موجودة");
+    area.innerHTML = type === "summary" ? buildSummaryReport(rows) : buildDetailedReport(rows);
+    area.style.display = "block";
+    setTimeout(() => { window.print(); setTimeout(() => { area.style.display = "none"; area.innerHTML = ""; }, 500); }, 40);
+  }
+
+  async function exportExcel(rows=filteredShipments()){
+    if (!window.XLSX) return toast("مكتبة Excel لم تحمل بعد");
+    showExportLoading("جاري تجهيز Excel...");
+    try{
+      const summary = rows.map(s => ({
+        "التاريخ": formatDate(s.createdAt), "كود الشحن": s.code, "العميل": s.customerName || "", "الجوال": s.customerPhone || "", "الكراتين": s.totalCartons, "CBM": s.totalCbm, "سعر CBM": s.cbmPrice, "إجمالي السعر": s.totalPrice, "المدفوع": s.paidAmount, "المتبقي": s.remaining, "طريقة الدفع": shipPaymentLabel(s), "حساب التحويل": s.paymentAccountName || "", "الحالة": s.paymentStatus, "ملاحظات": s.notes || ""
+      }));
+      const details = [];
+      rows.forEach(s => s.cartons.forEach((c,i) => { const l = calcLine(c); details.push({"كود الشحن":s.code,"العميل":s.customerName || "","الجوال":s.customerPhone || "","#":i+1,"الطول سم":l.length,"العرض سم":l.width,"الارتفاع سم":l.height,"العدد":l.qty,"حجم الكرتونة م3":l.unitCbm,"إجمالي م3":l.totalCbm}); }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "الشحنات");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(details), "تفصيلي الكراتين");
+      XLSX.writeFile(wb, `shipments-${dateKey(Date.now())}.xlsx`);
+      toast("تم تنزيل ملف Excel");
+    }catch(e){ console.error(e); toast("تعذر تنزيل Excel"); }
+    finally{ hideExportLoading(); }
+  }
+
+  function whatsappText(rows=filteredShipments()){
+    const t = totals(rows);
+    const lines = [`تقرير الشحنات - ${shopName()}`, `عدد الشحنات: ${t.count}`, `مجموع الكراتين: ${t.cartons}`, `مجموع CBM: ${fmt(t.cbm)}`, `إجمالي السعر: ${money(t.sales)}`, `المدفوع: ${money(t.paid)}`, `دفع كاش: ${money(t.cash)}`, `تحويلات: ${money(t.bank)}`, `المتبقي: ${money(t.remaining)}`, "", "تفاصيل:"];
+    rows.slice(0, 35).forEach((s,i) => lines.push(`${i+1}) ${s.code} - ${s.customerName || "بدون اسم"} - ${s.totalCartons} كرتون - ${fmt(s.totalCbm)} CBM - ${money(s.totalPrice)} - ${shipPaymentShortLabel(s)} - متبقي ${money(s.remaining)}`));
+    if (rows.length > 35) lines.push(`... و ${rows.length - 35} شحنة أخرى`);
+    return lines.join("\n");
+  }
+
+  function shareWhatsapp(rows=filteredShipments()){
+    const text = whatsappText(rows);
+    if (navigator.share) {
+      navigator.share({text}).catch(() => {});
+      return;
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  }
+
+  async function deleteShipment(id){
+    const s = st().shipments.find(x => x.id === id);
+    if (!s) return;
+    if (!confirm(`حذف الشحنة ${s.code}؟`)) return;
+    st().shipments = st().shipments.filter(x => x.id !== id);
+    saveLocalShipments();
+    await deleteRemoteShipment(id);
+    renderShipmentsPage();
+    toast("تم حذف الشحنة");
+  }
+
+  function bindEvents(){
+    if (window.__oskarShippingBound) return;
+    window.__oskarShippingBound = true;
+
+    document.addEventListener("click", async (ev) => {
+      const shipNav = ev.target.closest("[data-ship-page]");
+      if (shipNav) { ev.preventDefault(); ev.stopPropagation(); shipSwitchPage(shipNav.dataset.shipPage); return; }
+
+      const shipFolder = ev.target.closest("[data-ship-folder]");
+      if (shipFolder) { ev.preventDefault(); activeShipFolder = shipFolder.dataset.shipFolder || "all"; renderShipmentsPage(); return; }
+
+      if (ev.target.closest("#shipNewBtn")) { ev.preventDefault(); resetDraft(); return; }
+      if (ev.target.closest("#shipApplyCountBtn")) { ev.preventDefault(); applyCount(); return; }
+      if (ev.target.closest("#shipAddCartonBtn")) { ev.preventDefault(); readCartonsFromDom(); draft.cartons.push({ id: uid("carton"), length:"", width:"", height:"", qty:1 }); renderCalcPage(); return; }
+
+      const addAfter = ev.target.closest("[data-carton-add-after]");
+      if (addAfter) {
+        ev.preventDefault();
+        readCartonsFromDom();
+        const i = Number(addAfter.dataset.cartonAddAfter);
+        draft.cartons.splice(i + 1, 0, { id: uid("carton"), length:"", width:"", height:"", qty:1 });
+        renderCalcPage();
+        return;
+      }
+
+      const repeat = ev.target.closest("[data-carton-repeat]");
+      if (repeat) { ev.preventDefault(); readCartonsFromDom(); const i = Number(repeat.dataset.cartonRepeat); const base = draft.cartons[i] || {}; draft.cartons.splice(i+1, 0, {...base, id:uid("carton")}); renderCalcPage(); return; }
+
+      const remove = ev.target.closest("[data-carton-remove]");
+      if (remove) { ev.preventDefault(); readCartonsFromDom(); if (draft.cartons.length <= 1) return toast("يجب ترك كرتونة واحدة على الأقل"); draft.cartons.splice(Number(remove.dataset.cartonRemove), 1); renderCalcPage(); return; }
+
+      const view = ev.target.closest("[data-ship-view]");
+      if (view) { ev.preventDefault(); const s = st().shipments.find(x => x.id === view.dataset.shipView); if (s) openReport("detailed", [s]); return; }
+      const edit = ev.target.closest("[data-ship-edit]");
+      if (edit) { ev.preventDefault(); const s = st().shipments.find(x => x.id === edit.dataset.shipEdit); if (s) setDraftFromShipment(s); return; }
+      const del = ev.target.closest("[data-ship-del]");
+      if (del) { ev.preventDefault(); await deleteShipment(del.dataset.shipDel); return; }
+      const wa = ev.target.closest("[data-ship-wa]");
+      if (wa) { ev.preventDefault(); const s = st().shipments.find(x => x.id === wa.dataset.shipWa); if (s) shareWhatsapp([s]); return; }
+
+      if (ev.target.closest("#shipSummaryReportBtn")) { ev.preventDefault(); openReport("summary"); return; }
+      if (ev.target.closest("#shipDetailedReportBtn")) { ev.preventDefault(); openReport("detailed"); return; }
+      if (ev.target.closest("#shipExcelBtn")) { ev.preventDefault(); exportExcel(); return; }
+      if (ev.target.closest("#shipCustomerNewBtn")) { ev.preventDefault(); clearShipCustomerForm(); return; }
+      if (ev.target.closest("#shipCustomersExcelBtn")) { ev.preventDefault(); exportShipCustomersExcel(); return; }
+      const custEdit = ev.target.closest("[data-ship-customer-edit]");
+      if (custEdit) { ev.preventDefault(); fillShipCustomerForm(custEdit.dataset.shipCustomerEdit); return; }
+      const custDel = ev.target.closest("[data-ship-customer-del]");
+      if (custDel) { ev.preventDefault(); await deleteShipCustomer(custDel.dataset.shipCustomerDel); return; }
+      if (ev.target.closest("#shipPdfBtn")) { ev.preventDefault(); exportPdf("detailed"); return; }
+      if (ev.target.closest("#shipImageBtn")) { ev.preventDefault(); exportImage("detailed"); return; }
+      if (ev.target.closest("#shipWhatsappBtn")) { ev.preventDefault(); shareWhatsapp(); return; }
+    }, true);
+
+    document.addEventListener("input", (ev) => {
+      if (ev.target.closest("#shipCartonsList") || ev.target.id === "shipCbmPrice") updateCalcSummary();
+      if (ev.target.id === "shipCbmPrice") saveLastCbmPrice(ev.target.value);
+      if (ev.target.id === "shipCode") autoFillShipCustomer(false);
+      if (ev.target.id === "shipCustomerSearch") renderShipCustomersPage();
+      if (ev.target.id === "shipCustomerIdNumber") ev.target.value = String(ev.target.value || "").replace(/\D/g, "").slice(0, 9);
+      if (["shipSearch","shipDateFrom","shipDateTo"].includes(ev.target.id)) renderShipmentsPage();
+    });
+
+    document.addEventListener("change", (ev) => {
+      if (ev.target.id === "shipCartonsCount") applyCount();
+      if (ev.target.id === "shipCode") autoFillShipCustomer(true);
+      if (["shipSort","shipPeriod","shipDateFrom","shipDateTo"].includes(ev.target.id)) renderShipmentsPage();
+    });
+
+    document.addEventListener("submit", (ev) => {
+      if (ev.target.id === "shippingCalcForm"){
+        ev.preventDefault();
+        const d = collectDraft();
+        if (!validateDraft(d)) return;
+        openPaymentModal(d);
+      }
+      if (ev.target.id === "shipCustomerForm"){
+        ev.preventDefault();
+        saveShipCustomerFromForm();
+      }
+    });
+
+    window.addEventListener("online", () => { loadRemoteShipCustomers().then(syncPendingShipCustomers); loadRemoteShipments().then(syncPendingShipments); });
+  }
+
+  function patchRenderAll(){
+    const old = window.renderAll;
+    if (typeof old === "function" && !old.__shippingWrapped){
+      const wrapped = function(){
+        const out = old.apply(this, arguments);
+        setTimeout(() => { ensureNav(); ensurePages(); renderCalcPage(); renderShipmentsPage(); }, 80);
+        return out;
+      };
+      wrapped.__shippingWrapped = true;
+      window.renderAll = wrapped;
     }
   }
 
   async function init(){
-    for(let i=0;i<140;i++){ if(window.state && document.body) break; await wait(80); }
-    ensureStyle(); loadExtra(); loadMovements();
-    await refreshAccounts();
-    await pullMovements();
-    bindFormCapture();
-    bindMovementEvents();
-    bindBackup();
-    renderEverything();
-    document.addEventListener("click", () => setTimeout(() => refreshAccounts().then(renderEverything), 140), true);
-    document.addEventListener("input", e => { if(["purchaseCost","expenseAmount","finalWageAmount"].includes(e.target?.id)) setTimeout(renderEverything, 120); }, true);
-    document.addEventListener("change", e => { if(["reportsPeriod","reportsCustomDate","purchaseAccountId","expenseAccountId","supplierPaymentAccountId","finalWageAccount"].includes(e.target?.id)) setTimeout(renderEverything, 100); }, true);
-    window.addEventListener("online", async () => { await refreshAccounts(); await pullMovements(); await syncAllMovements(); renderEverything(); });
-    setInterval(() => refreshAccounts().then(renderEverything), 1000);
-    console.log("[oskar-payment-accounts-linked-final] ready");
+    for (let i=0;i<120;i++){
+      if (window.state && $("sidebar") && document.querySelector("main.main")) break;
+      await wait(100);
+    }
+    ensureStyles();
+    applyDefaultShippingLogoToApp();
+    ensureNav();
+    ensurePages();
+    applyShippingPermissionsUI();
+    loadLocalShipments();
+    loadLocalShipCustomers();
+    bindEvents();
+    patchRenderAll();
+    renderCalcPage();
+    renderShipCustomersPage();
+    renderShipmentsPage();
+    await loadRemoteShipCustomers();
+    await loadRemoteShipments();
+    await syncPendingShipCustomers();
+    await syncPendingShipments();
+    setInterval(() => { applyDefaultShippingLogoToApp(); ensureNav(); ensurePages(); applyShippingPermissionsUI(); renderShipCustomersPage(); renderShipmentsPage(); }, 3000);
+    console.log("[oskar-shipping-cbm] ready", PATCH_VERSION);
   }
-  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, {once:true}); else init();
+
+  init();
+})();
+</script>
+
+
+<script id="oskar-shipping-permissions-final-fix-2026-05-03">
+(function(){
+  "use strict";
+
+  var SHIPPING_PERMISSION_PAGES = [
+    { id: "shippingCalc", label: "حاسبة طرود الشحن", icon: "fa-calculator" },
+    { id: "shippingCustomers", label: "عملاء الشحن", icon: "fa-users" },
+    { id: "shippingShipments", label: "الشحنات", icon: "fa-boxes-packing" }
+  ];
+
+  function esc(v){
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function addPermissionCards(){
+    var grids = document.querySelectorAll("#employeePermissionsGrid, .employee-grid, .oskar-perm-grid");
+    grids.forEach(function(grid){
+      if (!grid) return;
+      var isOskar = grid.classList.contains("oskar-perm-grid");
+      var cardClass = isOskar ? "oskar-perm" : "perm-card";
+      var checkClass = isOskar ? "oskarPerm" : "employee-permission-check";
+
+      SHIPPING_PERMISSION_PAGES.forEach(function(page){
+        if (grid.querySelector('input[value="' + page.id + '"]')) return;
+        var label = document.createElement("label");
+        label.className = cardClass;
+        label.innerHTML =
+          '<input type="checkbox" value="' + esc(page.id) + '" class="' + checkClass + '">' +
+          '<span><i class="fa-solid ' + esc(page.icon) + '"></i> ' + esc(page.label) + '</span>';
+        grid.appendChild(label);
+      });
+    });
+  }
+
+  function currentUser(){
+    return window.state && window.state.auth ? window.state.auth.user : null;
+  }
+
+  function canOpen(pageId){
+    var user = currentUser();
+    if (!user) return true;
+    var perms = Array.isArray(user.permissions) ? user.permissions : [];
+    if (user.role === "admin" || perms.indexOf("__admin__") >= 0) return true;
+    return perms.indexOf(pageId) >= 0;
+  }
+
+  function applyShippingVisibility(){
+    document.querySelectorAll("[data-ship-page]").forEach(function(el){
+      var page = el.dataset.shipPage;
+      el.classList.toggle("auth-hidden", !canOpen(page));
+    });
+  }
+
+  function refresh(){
+    addPermissionCards();
+    applyShippingVisibility();
+  }
+
+  var observer = new MutationObserver(function(){ refresh(); });
+  observer.observe(document.documentElement, { childList:true, subtree:true });
+  document.addEventListener("click", function(){ setTimeout(refresh, 60); }, true);
+  window.addEventListener("load", function(){ refresh(); setInterval(refresh, 1500); });
+  refresh();
 })();
 </script>
 
