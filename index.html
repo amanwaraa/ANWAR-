@@ -1738,7 +1738,6 @@
   <style id="oskar-no-login-flash-style-2026-04-30">
     html.oskar-saved-session-boot #authLock{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important}
   </style>
-  <link data-oskar-default-logo-preload="1" rel="preload" as="image" href="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg" fetchpriority="high" referrerpolicy="no-referrer">
 </head>
 <body>
   <div id="authLock" class="auth-lock">
@@ -2471,18 +2470,18 @@
             </div>
 
             <div>
-              <label class="field-label">رابط شعار المحل</label>
-              <input id="settingLogoUrl" type="url" class="input" placeholder="https://example.com/logo.png">
+              <label class="field-label">رابط صورة الموقع</label>
+              <input id="settingSiteImageUrl" type="url" class="input" placeholder="https://example.com/logo.png">
             </div>
 
             <div>
-              <label class="field-label">شعار محلي من الجهاز</label>
+              <label class="field-label">صورة محلية من الجهاز (اختياري)</label>
               <input id="settingLogoFile" type="file" accept="image/*" class="input">
             </div>
           </div>
 
           <div class="muted" style="font-size:12px;margin-top:10px;line-height:1.8">
-            رابط الشعار يتزامن مع Firebase ويظهر على كل الأجهزة. أما شعار الجهاز فيبقى محليًا فقط ولا يتم رفعه.
+            ضع رابط صورة الموقع هنا وسيتم حفظه على Firebase ويظهر على كل الأجهزة. لا يوجد أي رابط شعار ثابت داخل الكود.
           </div>
 
           <button id="saveSettingsBtn" class="primary-btn" style="margin-top:14px">
@@ -3164,9 +3163,12 @@
       shopPhone: "",
       currency: "₪",
       lowStock: 5,
-      logo: "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg",
+      siteImageUrl: "",
+      logo: "",
+      logoUrl: "",
+      shopLogo: "",
       localLogo: "",
-      logoMode: "url",
+      logoMode: "default",
       adminPasswordHash: "",
       updatedAt: Date.now()
     };
@@ -3398,8 +3400,12 @@
             ...defaultSettings,
             ...remote,
             id: "main",
-            localLogo: current.localLogo || "",
-            logoMode: current.localLogo ? "local" : (remote.logo ? "url" : "default")
+            siteImageUrl: remote.siteImageUrl || remote.logo || remote.logoUrl || remote.shopLogo || "",
+            logo: remote.siteImageUrl || remote.logo || remote.logoUrl || remote.shopLogo || "",
+            logoUrl: remote.siteImageUrl || remote.logo || remote.logoUrl || remote.shopLogo || "",
+            shopLogo: remote.siteImageUrl || remote.logo || remote.logoUrl || remote.shopLogo || "",
+            localLogo: (remote.siteImageUrl || remote.logo || remote.logoUrl || remote.shopLogo) ? "" : (current.localLogo || ""),
+            logoMode: (remote.siteImageUrl || remote.logo || remote.logoUrl || remote.shopLogo) ? "url" : (current.localLogo ? "local" : "default")
           };
           await idbPut("settings", remoteSettings);
           state.settings = remoteSettings;
@@ -4282,8 +4288,12 @@
           remote = {
             ...defaultSettings,
             ...remote,
-            localLogo: current?.localLogo || "",
-            logoMode: current?.localLogo ? "local" : (remote.logo ? "url" : "default")
+            siteImageUrl: remote.siteImageUrl || remote.logo || remote.logoUrl || remote.shopLogo || "",
+            logo: remote.siteImageUrl || remote.logo || remote.logoUrl || remote.shopLogo || "",
+            logoUrl: remote.siteImageUrl || remote.logo || remote.logoUrl || remote.shopLogo || "",
+            shopLogo: remote.siteImageUrl || remote.logo || remote.logoUrl || remote.shopLogo || "",
+            localLogo: (remote.siteImageUrl || remote.logo || remote.logoUrl || remote.shopLogo) ? "" : (current?.localLogo || ""),
+            logoMode: (remote.siteImageUrl || remote.logo || remote.logoUrl || remote.shopLogo) ? "url" : (current?.localLogo ? "local" : "default")
           };
         }
 
@@ -4633,8 +4643,12 @@
           const remoteSettings = {
             ...defaultSettings,
             ...snap.val(),
-            localLogo: current.localLogo || "",
-            logoMode: current.localLogo ? "local" : (snap.val()?.logo ? "url" : "default")
+            siteImageUrl: (snap.val()?.siteImageUrl || snap.val()?.logo || snap.val()?.logoUrl || snap.val()?.shopLogo || ""),
+            logo: (snap.val()?.siteImageUrl || snap.val()?.logo || snap.val()?.logoUrl || snap.val()?.shopLogo || ""),
+            logoUrl: (snap.val()?.siteImageUrl || snap.val()?.logo || snap.val()?.logoUrl || snap.val()?.shopLogo || ""),
+            shopLogo: (snap.val()?.siteImageUrl || snap.val()?.logo || snap.val()?.logoUrl || snap.val()?.shopLogo || ""),
+            localLogo: (snap.val()?.siteImageUrl || snap.val()?.logo || snap.val()?.logoUrl || snap.val()?.shopLogo) ? "" : (current.localLogo || ""),
+            logoMode: (snap.val()?.siteImageUrl || snap.val()?.logo || snap.val()?.logoUrl || snap.val()?.shopLogo) ? "url" : (current.localLogo ? "local" : "default")
           };
 
           await idbPut("settings", remoteSettings);
@@ -5145,7 +5159,7 @@
 
     function applySettingsToUI() {
       const s = state.settings || defaultSettings;
-      const logo = s.localLogo || s.logo || makeLogoDataUrl(s.shopName || "المحل");
+      const logo = s.siteImageUrl || s.logo || s.logoUrl || s.shopLogo || s.localLogo || makeLogoDataUrl(s.shopName || "المحل");
 
       $("topShopName").textContent = s.shopName || "oskar";
       $("sideShopName").textContent = s.shopName || "oskar";
@@ -5156,7 +5170,7 @@
       if ($("settingShopPhone")) $("settingShopPhone").value = s.shopPhone || "";
       if ($("settingCurrency")) $("settingCurrency").value = s.currency || "₪";
       if ($("settingLowStock")) $("settingLowStock").value = s.lowStock || 5;
-      if ($("settingLogoUrl")) $("settingLogoUrl").value = s.logo || "";
+      if ($("settingSiteImageUrl")) $("settingSiteImageUrl").value = s.siteImageUrl || s.logo || s.logoUrl || s.shopLogo || "";
     }
 
     async function loadLocalData(skipRender = false) {
@@ -9516,10 +9530,10 @@
       downloadElementPdf(wrap, `reports-full-${todayKey()}.pdf`).finally(() => wrap.remove());
     }
     async function saveSettings() {
-      const logoUrl = $("settingLogoUrl")?.value.trim() || "";
+      const logoUrl = $("settingSiteImageUrl")?.value.trim() || "";
       const file = $("settingLogoFile")?.files?.[0] || null;
 
-      let localLogo = state.settings?.localLogo || "";
+      let localLogo = logoUrl ? "" : (state.settings?.localLogo || "");
 
       if (file) {
         localLogo = await readFileAsDataUrl(file);
@@ -9533,7 +9547,10 @@
         shopPhone: $("settingShopPhone").value.trim(),
         currency: $("settingCurrency").value.trim() || "₪",
         lowStock: cleanNumber($("settingLowStock").value, 5),
+        siteImageUrl: logoUrl,
         logo: logoUrl,
+        logoUrl,
+        shopLogo: logoUrl,
         localLogo,
         logoMode: localLogo ? "local" : (logoUrl ? "url" : "default"),
         adminPasswordHash: state.settings?.adminPasswordHash || simpleHash(DEFAULT_ADMIN_PIN),
@@ -9551,7 +9568,7 @@
 
       applySettingsToUI();
       renderAll();
-      toast("تم حفظ الإعدادات، الشعار المحلي لا يرفع ورابط الشعار يتزامن");
+      toast("تم حفظ الإعدادات ورابط صورة الموقع على Firebase");
     }
 
     function exportBackup() {
@@ -12800,7 +12817,7 @@
   const TRIAL_MODE_KEY="oskar_storage_mode_v1";
   const TRIAL_STARTED_KEY="oskar_trial_started_at_v1";
   const TRIAL_DURATION_MS=12*60*60*1000;
-  const LOGO_URL="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg";
+  const LOGO_URL="";
   const money = v => (typeof window.money==="function" ? window.money(v) : "₪ " + (Number(v||0).toFixed(2)));
   const clean = (v,f=0)=>{ const n=Number(String(v??"").replace(",",".")); return Number.isFinite(n)?n:f; };
   function toast(msg,ms=2800){ if(typeof window.toast==="function") return window.toast(msg,ms); const el=$("toast"); if(el){el.textContent=msg; el.classList.add("show"); clearTimeout(el.__t); el.__t=setTimeout(()=>el.classList.remove("show"),ms);} else alert(msg); }
@@ -12830,7 +12847,7 @@
       .auth-user-pill .oskar-side-minutes i{display:none!important}
       .oskar-trial-locked{opacity:.52!important;filter:grayscale(.25)!important;pointer-events:none!important}
       .oskar-trial-locked-note{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:16px;padding:10px 12px;margin:10px 0;font-weight:900;font-size:12px;line-height:1.8}
-      #settingLogoUrl.oskar-trial-disabled-input,#settingShopPhone.oskar-trial-disabled-input,#settingLowStock.oskar-trial-disabled-input{background:#f1f5f9!important;color:#94a3b8!important;pointer-events:none!important}
+      #settingSiteImageUrl.oskar-trial-disabled-input,#settingShopPhone.oskar-trial-disabled-input,#settingLowStock.oskar-trial-disabled-input{background:#f1f5f9!important;color:#94a3b8!important;pointer-events:none!important}
       .patch-inventory-summary .patch-inventory-stat:first-child span::after{content:""}
     `;
     document.head.appendChild(st);
@@ -13477,7 +13494,7 @@
         window.state = window.state || {};
         window.state.settings = {...(window.state.settings || {}), localLogo:dataUrl, logoMode:"local", updatedAt:Date.now()};
         applyLogoSrc(dataUrl);
-        if($("settingLogoUrl")) $("settingLogoUrl").value = "";
+        if($("settingSiteImageUrl")) $("settingSiteImageUrl").value = "";
         if(typeof window.idbPut === "function") await window.idbPut("settings", {...window.state.settings, id:"main"});
         toast("تم تحميل الشعار وظهوره محليًا");
       }catch(e){ console.warn(e); toast("تعذر تحميل الشعار"); }
@@ -14135,7 +14152,7 @@
   window.__OSKAR_FINAL_USER_REQUEST_PATCH_20260430__=true;
   const $=id=>document.getElementById(id),$$=sel=>Array.from(document.querySelectorAll(sel));
   const MODE_KEY="oskar_storage_mode_v1",START_KEY="oskar_trial_started_at_v1",TRIAL_MS=12*60*60*1000;
-  const DEFAULT_LOGO="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg";
+  const DEFAULT_LOGO="";
   function clean(v,d=0){const n=parseFloat(String(v??"").replace(",",".").replace(/[^0-9+\-.]/g,""));return Number.isFinite(n)?n:d}
   function isTrial(){const st=Number(localStorage.getItem(START_KEY)||0);return localStorage.getItem(MODE_KEY)==="trial"&&st&&Date.now()-st<TRIAL_MS}
   function money(v){return typeof window.money==="function"?window.money(v):"₪ "+clean(v,0).toFixed(2)}
@@ -14214,7 +14231,7 @@
 <script id="oskar-final-request-2026-05-01-script">
 (function(){
   "use strict";
-  const DEFAULT_LOGO = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg";
+  const DEFAULT_LOGO = "";
   const MODE_KEY = "oskar_storage_mode_v1";
   const START_KEY = "oskar_trial_started_at_v1";
   const DUR = 12 * 60 * 60 * 1000;
@@ -14251,7 +14268,7 @@
       s.updatedAt = s.updatedAt || Date.now();
       try{ if(typeof window.idbPut === "function") window.idbPut("settings", s); }catch{}
     }
-    const url = $("settingLogoUrl");
+    const url = $("settingSiteImageUrl");
     if(url && badLogo(url.value) && !s.localLogo) url.value = s.logo || DEFAULT_LOGO;
   }
   function bestLogo(){
@@ -15608,7 +15625,7 @@
   "use strict";
 
   const PATCH_VERSION = "2026-05-03-shipping-cbm-v5-customers-fast-reports-logo";
-  const SHIPPING_DEFAULT_LOGO = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg";
+  const SHIPPING_DEFAULT_LOGO = "";
   const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   const $ = (id) => document.getElementById(id);
   const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
@@ -17283,7 +17300,7 @@
   if(window.__OSKAR_FINAL_LOCAL_EXPORT_STABLE_LOGO_LOGIN_CLEAN_20260503__) return;
   window.__OSKAR_FINAL_LOCAL_EXPORT_STABLE_LOGO_LOGIN_CLEAN_20260503__ = true;
 
-  var DEFAULT_LOGO = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjdPPkUu7icK6Xvj7WNXy7gzT23kN4qXGgKncrc21CwjupZWN014sOZvrLyhpVj_0BwSjuLgaadrXZBLjED8aV3XJaOn02FpqJa3PnXTQm6cUcgDp99_e0E-k7tt39FC0k3qStrGsmTEsiuKR_YRxl1faWKCNMnftwInFKZoO0yTw5RUnipfYhGW2s1GY02/s1200/1000023372.jpg";
+  var DEFAULT_LOGO = "";
   var CACHE_LOCAL = "oskar_cached_local_logo_final_20260503";
   var CACHE_URL = "oskar_cached_logo_url_final_20260503";
   var LAST_SETTINGS_CACHE = null;
@@ -17445,7 +17462,7 @@
         reader.readAsDataURL(f);
       }, true);
     }
-    var url = $("settingLogoUrl");
+    var url = $("settingSiteImageUrl");
     if(url && url.dataset.oskarFinalUrlCache !== "1"){
       url.dataset.oskarFinalUrlCache = "1";
       ["input","change"].forEach(function(ev){
@@ -17631,6 +17648,313 @@
   try{ new MutationObserver(function(){ clearTimeout(window.__oskarFinalLogoCleanT); window.__oskarFinalLogoCleanT = setTimeout(tick, 60); }).observe(document.documentElement, {childList:true, subtree:true}); }catch(e){}
   setInterval(tick, 850);
   setInterval(removeStuckLoaders, 4000);
+})();
+</script>
+
+
+<style id="oskar-site-image-url-final-2026-05-03-style">
+  #authLock .auth-logo.has-site-image{
+    background:#fff!important;
+    color:inherit!important;
+    padding:0!important;
+    overflow:hidden!important;
+    border:1px solid #e2e8f0!important;
+  }
+  #authLock .auth-logo.has-site-image img{
+    width:100%!important;
+    height:100%!important;
+    object-fit:cover!important;
+    display:block!important;
+    background:#fff!important;
+  }
+</style>
+<script id="oskar-site-image-url-final-2026-05-03-script">
+(function(){
+  "use strict";
+  if(window.__OSKAR_SITE_IMAGE_URL_FINAL_20260503__) return;
+  window.__OSKAR_SITE_IMAGE_URL_FINAL_20260503__ = true;
+
+  var SITE_FIELD_ID = "settingSiteImageUrl";
+  var URL_CACHE_KEY = "oskar_site_image_url_cache_v1";
+  var OLD_CACHE_KEYS = [
+    "oskar_fast_logo_cache_src_v1",
+    "oskar_cached_logo_url_final_20260503"
+  ];
+
+  function $(id){ return document.getElementById(id); }
+  function $$(sel, root){ return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function str(v){ return String(v == null ? "" : v).trim(); }
+  function isBad(v){
+    v = str(v);
+    return !v || /^(undefined|null)$/i.test(v) || /blogger\.googleusercontent|1000023372/i.test(v);
+  }
+  function esc(v){ return String(v == null ? "" : v).replace(/[&<>\"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]; }); }
+  function toast(msg, ms){
+    if(typeof window.toast === "function") return window.toast(msg, ms || 1800);
+    var el = $("toast");
+    if(el){ el.textContent = msg; el.classList.add("show"); clearTimeout(el.__siteImageToast); el.__siteImageToast = setTimeout(function(){ el.classList.remove("show"); }, ms || 1800); }
+  }
+  function purgeOldLogoLinks(){
+    try{
+      document.querySelectorAll('link[rel="preload"][as="image"],link[data-oskar-logo-preload],link[data-oskar-default-logo-preload]').forEach(function(link){
+        var href = str(link.getAttribute("href"));
+        if(!href || /blogger\.googleusercontent|1000023372/i.test(href)) link.remove();
+      });
+      OLD_CACHE_KEYS.forEach(function(k){ localStorage.removeItem(k); });
+      Object.keys(localStorage).forEach(function(k){
+        if(/logo/i.test(k) && /blogger\.googleusercontent|1000023372/i.test(str(localStorage.getItem(k)))) localStorage.removeItem(k);
+      });
+    }catch(e){}
+  }
+  function fallbackLogo(){
+    var name = str((window.state && window.state.settings && window.state.settings.shopName) || ($("topShopName") && $("topShopName").textContent) || "oskar");
+    var ch = (name.charAt(0) || "O").replace(/[<>&\"']/g, "");
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2563eb"/><stop offset=".55" stop-color="#7c3aed"/><stop offset="1" stop-color="#0891b2"/></linearGradient></defs><rect width="220" height="220" rx="54" fill="url(#g)"/><text x="50%" y="58%" text-anchor="middle" font-family="Arial,Tahoma,sans-serif" font-size="86" font-weight="900" fill="#fff">' + esc(ch) + '</text></svg>';
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  }
+  function normalizeSettings(){
+    if(!window.state) window.state = {};
+    var s = window.state.settings || {};
+    var url = str(s.siteImageUrl || s.logo || s.logoUrl || s.shopLogo || "");
+    if(isBad(url)) url = str(localStorage.getItem(URL_CACHE_KEY) || "");
+    if(isBad(url)) url = "";
+    s = Object.assign({}, s, {
+      id: "main",
+      siteImageUrl: url,
+      logo: url,
+      logoUrl: url,
+      shopLogo: url,
+      localLogo: url ? "" : str(s.localLogo || ""),
+      logoMode: url ? "url" : (s.localLogo ? "local" : "default")
+    });
+    window.state.settings = s;
+    if(url){ try{ localStorage.setItem(URL_CACHE_KEY, url); }catch(e){} }
+    return s;
+  }
+  function chosenLogo(){
+    var s = normalizeSettings();
+    var url = str(s.siteImageUrl);
+    if(!isBad(url)) return {src:url, real:true};
+    var local = str(s.localLogo);
+    if(/^data:image\//i.test(local)) return {src:local, real:true};
+    return {src:fallbackLogo(), real:false};
+  }
+  function preloadUrl(src){
+    if(isBad(src) || !/^https?:\/\//i.test(src)) return;
+    try{
+      var selector = 'link[data-oskar-site-image-preload="1"][href="' + (window.CSS && CSS.escape ? CSS.escape(src) : src.replace(/"/g,'\\"')) + '"]';
+      if(document.querySelector(selector)) return;
+      var link = document.createElement("link");
+      link.rel = "preload";
+      link.as = "image";
+      link.href = src;
+      link.fetchPriority = "high";
+      link.referrerPolicy = "no-referrer";
+      link.dataset.oskarSiteImagePreload = "1";
+      document.head.appendChild(link);
+    }catch(e){}
+  }
+  function applyToImage(img, src){
+    if(!img || !src) return;
+    img.loading = "eager";
+    img.decoding = "sync";
+    img.referrerPolicy = "no-referrer";
+    try{ img.fetchPriority = "high"; }catch(e){}
+    try{ if(!/^data:/i.test(src)) img.crossOrigin = "anonymous"; }catch(e){}
+    if(img.getAttribute("src") !== src) img.setAttribute("src", src);
+    if(img.dataset.siteImageErrorPatch !== "1"){
+      img.dataset.siteImageErrorPatch = "1";
+      img.addEventListener("error", function(){
+        var fb = fallbackLogo();
+        if(this.getAttribute("src") !== fb) this.setAttribute("src", fb);
+      });
+    }
+  }
+  function applySiteImage(){
+    purgeOldLogoLinks();
+    var picked = chosenLogo();
+    preloadUrl(picked.real ? picked.src : "");
+    [$("topShopLogo"), $("sideShopLogo")].forEach(function(img){ applyToImage(img, picked.src); });
+    $$("img.shop-logo,img.invoice-logo").forEach(function(img){ applyToImage(img, picked.src); });
+    var input = $(SITE_FIELD_ID);
+    if(input && input.value !== (window.state.settings.siteImageUrl || "")) input.value = window.state.settings.siteImageUrl || "";
+    var auth = document.querySelector("#authLock .auth-logo");
+    if(auth){
+      if(picked.real){
+        auth.classList.add("has-site-image", "has-shop-logo");
+        if(!auth.querySelector("img")) auth.innerHTML = '<img alt="صورة الموقع">';
+        applyToImage(auth.querySelector("img"), picked.src);
+      }else{
+        auth.classList.remove("has-site-image", "has-shop-logo");
+        if(!auth.querySelector("i")) auth.innerHTML = '<i class="fa-solid fa-user-shield"></i>';
+      }
+    }
+  }
+  async function saveSiteImageToLocalAndCloud(showMessage){
+    var input = $(SITE_FIELD_ID);
+    var url = str(input && input.value);
+    if(isBad(url)) url = "";
+    if(!window.state) window.state = {};
+    window.state.settings = Object.assign({}, window.state.settings || {}, {
+      id: "main",
+      siteImageUrl: url,
+      logo: url,
+      logoUrl: url,
+      shopLogo: url,
+      localLogo: url ? "" : str(window.state.settings && window.state.settings.localLogo),
+      logoMode: url ? "url" : "default",
+      updatedAt: Date.now()
+    });
+    if(url){ try{ localStorage.setItem(URL_CACHE_KEY, url); }catch(e){} }
+    applySiteImage();
+    try{ if(typeof window.idbPut === "function") await window.idbPut("settings", window.state.settings); }catch(e){}
+    var safe = Object.assign({}, window.state.settings, {localLogo:"", logoMode:url ? "url" : "default"});
+    if(url){ safe.siteImageUrl = url; safe.logo = url; safe.logoUrl = url; safe.shopLogo = url; }
+    try{
+      var root = window.FIREBASE_ROOT || (window.CASHIER_FIREBASE_CONFIG && window.CASHIER_FIREBASE_CONFIG.firebaseRoot) || "cashier_units_pro_default";
+      if(navigator.onLine && window.db && window.ref && window.set){
+        await window.set(window.ref(window.db, root + "/settings/main"), safe);
+      }else if(typeof window.enqueueSync === "function"){
+        await window.enqueueSync({type:"set", store:"settings", itemId:"main", data:safe});
+      }
+      if(showMessage) toast("تم حفظ رابط صورة الموقع على Firebase");
+    }catch(e){
+      console.warn("site image firebase save failed", e);
+      if(showMessage) toast("تم الحفظ محليًا وسيتم رفع رابط الصورة عند توفر الإنترنت");
+    }
+  }
+  function bindSiteImageInput(){
+    var input = $(SITE_FIELD_ID);
+    if(input && input.dataset.siteImageFinalBound !== "1"){
+      input.dataset.siteImageFinalBound = "1";
+      input.setAttribute("name", "siteImageUrl");
+      input.setAttribute("autocomplete", "off");
+      input.placeholder = "ضع رابط صورة الموقع هنا";
+      ["input", "change"].forEach(function(ev){
+        input.addEventListener(ev, function(){
+          var url = str(input.value);
+          if(!window.state) window.state = {};
+          window.state.settings = Object.assign({}, window.state.settings || {}, {siteImageUrl:url, logo:url, logoUrl:url, shopLogo:url, localLogo:url?"":str(window.state.settings && window.state.settings.localLogo), logoMode:url?"url":"default", updatedAt:Date.now()});
+          if(url){ try{ localStorage.setItem(URL_CACHE_KEY, url); }catch(e){} }
+          applySiteImage();
+        }, true);
+      });
+    }
+    var saveBtn = $("saveSettingsBtn");
+    if(saveBtn && saveBtn.dataset.siteImageSaveBound !== "1"){
+      saveBtn.dataset.siteImageSaveBound = "1";
+      saveBtn.addEventListener("click", function(){ saveSiteImageToLocalAndCloud(false); }, true);
+      saveBtn.addEventListener("click", function(){ setTimeout(function(){ saveSiteImageToLocalAndCloud(true); }, 450); }, false);
+    }
+  }
+  function readImagesFast(root){
+    var imgs = $$("img", root).filter(function(img){ return img && img.offsetParent !== null; });
+    return Promise.all(imgs.map(function(img){
+      img.loading = "eager"; img.decoding = "sync";
+      if(img.complete) return Promise.resolve();
+      return new Promise(function(resolve){
+        var done = function(){ resolve(); };
+        img.onload = done;
+        img.onerror = done;
+        setTimeout(done, 350);
+      });
+    }));
+  }
+  function makeCaptureClone(element, width){
+    var wrap = document.createElement("div");
+    wrap.style.cssText = "position:fixed;left:-10000px;top:0;background:#fff;z-index:-1;pointer-events:none;direction:rtl;width:" + width + "px;overflow:visible";
+    var clone = element.cloneNode(true);
+    clone.style.cssText += ";width:" + width + "px;max-width:" + width + "px;background:#fff;transform:none!important;filter:none!important;animation:none!important;transition:none!important";
+    $$(".no-print,script,style", clone).forEach(function(el){ try{ el.remove(); }catch(e){} });
+    $$("table", clone).forEach(function(t){ t.style.minWidth = "0"; t.style.width = "100%"; });
+    $$("*", clone).forEach(function(el){ el.style.animation = "none"; el.style.transition = "none"; el.style.transform = "none"; el.style.filter = "none"; });
+    var src = chosenLogo().src;
+    $$("img.shop-logo,img.invoice-logo", clone).forEach(function(img){ applyToImage(img, src); });
+    wrap.appendChild(clone);
+    document.body.appendChild(wrap);
+    return {wrap:wrap, clone:clone};
+  }
+  function downloadHref(href, name){
+    var a = document.createElement("a");
+    a.href = href;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  async function nodeToCanvasFast(element, opts){
+    if(!window.html2canvas) throw new Error("html2canvas_not_ready");
+    applySiteImage();
+    var rect = element.getBoundingClientRect ? element.getBoundingClientRect() : {width:850};
+    var width = Math.ceil(opts && opts.width || Math.min(980, Math.max(320, rect.width || element.scrollWidth || 850)));
+    var pair = makeCaptureClone(element, width);
+    try{
+      await readImagesFast(pair.clone);
+      await new Promise(function(r){ requestAnimationFrame(r); });
+      var h = Math.ceil(Math.max(pair.clone.scrollHeight || 0, pair.clone.getBoundingClientRect().height || 0, 120));
+      return await html2canvas(pair.clone, {
+        scale: (opts && opts.scale) || (window.innerWidth <= 620 ? 1.15 : 1.35),
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        imageTimeout: 450,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: width,
+        windowHeight: h,
+        width: width,
+        height: h,
+        removeContainer: true
+      });
+    }finally{ pair.wrap.remove(); }
+  }
+  async function savePng(canvas, filename){
+    if(canvas.toBlob){
+      await new Promise(function(resolve){
+        canvas.toBlob(function(blob){
+          if(blob){ var url = URL.createObjectURL(blob); downloadHref(url, filename); setTimeout(function(){ URL.revokeObjectURL(url); }, 1000); }
+          else downloadHref(canvas.toDataURL("image/png"), filename);
+          resolve();
+        }, "image/png");
+      });
+    }else downloadHref(canvas.toDataURL("image/png"), filename);
+  }
+  window.downloadElementImage = async function(element, filename){
+    if(!element) return;
+    var canvas = await nodeToCanvasFast(element, {scale: window.innerWidth <= 620 ? 1.15 : 1.35});
+    await savePng(canvas, filename || ("image-" + Date.now() + ".png"));
+  };
+  window.downloadElementPdf = async function(element, filename){
+    if(!element) return;
+    if(!window.jspdf || !window.jspdf.jsPDF) throw new Error("jspdf_not_ready");
+    var canvas = await nodeToCanvasFast(element, {scale: window.innerWidth <= 620 ? 1.05 : 1.25});
+    var img = canvas.toDataURL("image/jpeg", .86);
+    var jsPDF = window.jspdf.jsPDF;
+    var pdf = new jsPDF("p", "mm", "a4", true);
+    var pageWidth = pdf.internal.pageSize.getWidth();
+    var pageHeight = pdf.internal.pageSize.getHeight();
+    var margin = 6;
+    var imgWidth = pageWidth - margin * 2;
+    var imgHeight = canvas.height * imgWidth / canvas.width;
+    if(imgHeight <= pageHeight - margin * 2){ pdf.addImage(img, "JPEG", margin, margin, imgWidth, imgHeight, undefined, "FAST"); }
+    else{
+      var remaining = imgHeight;
+      var position = 0;
+      while(remaining > 0){
+        pdf.addImage(img, "JPEG", margin, margin - position, imgWidth, imgHeight, undefined, "FAST");
+        remaining -= pageHeight - margin * 2;
+        position += pageHeight - margin * 2;
+        if(remaining > 0) pdf.addPage();
+      }
+    }
+    pdf.save(filename || ("file-" + Date.now() + ".pdf"));
+  };
+  function tick(){ bindSiteImageInput(); normalizeSettings(); applySiteImage(); }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", tick, {once:true}); else tick();
+  window.addEventListener("load", function(){ tick(); setTimeout(tick, 250); }, {once:true});
+  try{ new MutationObserver(function(){ clearTimeout(window.__siteImageFinalTick); window.__siteImageFinalTick = setTimeout(tick, 70); }).observe(document.documentElement, {childList:true, subtree:true}); }catch(e){}
+  setInterval(tick, 700);
 })();
 </script>
 
