@@ -13,11 +13,11 @@
   <meta name="apple-mobile-web-app-title" content="نظام كاشير">
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" async></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" async data-oskar-legacy-capture="1"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" async></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" async></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3835,18 +3835,101 @@
       return { text: "مسدّد", cls: "credit" };
     }
 
+
+    /* OSKAR_TURBO_CORE_2026_05_03: fast in-memory indexes for all product/barcode searches */
+    let __oskarProductIndexSignature = "";
+    let __oskarProductRows = [];
+    let __oskarProductById = new Map();
+    let __oskarProductByBarcode = new Map();
+
+    function normalizeSearchText(value = "") {
+      return String(value ?? "")
+        .toLowerCase()
+        .replace(/[أإآ]/g, "ا")
+        .replace(/ة/g, "ه")
+        .replace(/ى/g, "ي")
+        .replace(/[\u064B-\u065F\u0670]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function productIndexSignature() {
+      const arr = state.products || [];
+      return arr.length + ":" + arr.map(p => `${p.id || ""}:${p.updatedAt || ""}:${p.barcode || ""}:${p.code || ""}`).join("|");
+    }
+
+    function rebuildProductFastIndex(force = false) {
+      const sig = productIndexSignature();
+      if (!force && sig === __oskarProductIndexSignature) return;
+
+      __oskarProductIndexSignature = sig;
+      __oskarProductRows = [];
+      __oskarProductById = new Map();
+      __oskarProductByBarcode = new Map();
+
+      for (const raw of (state.products || [])) {
+        if (!raw) continue;
+        const p = normalizeProduct(raw);
+        __oskarProductById.set(String(p.id || ""), p);
+        [p.barcode, p.code, p.id].forEach(v => {
+          const key = String(v || "").trim();
+          if (key) __oskarProductByBarcode.set(key, p);
+        });
+        __oskarProductRows.push({
+          p,
+          text: normalizeSearchText(`${p.name || ""} ${p.barcode || ""} ${p.code || ""} ${p.category || ""}`),
+          name: normalizeSearchText(p.name || ""),
+          barcode: String(p.barcode || "").trim(),
+          code: String(p.code || "").trim()
+        });
+      }
+    }
+
+    function fastProductSearch(query = "", limit = 80) {
+      rebuildProductFastIndex();
+      const raw = String(query || "").trim();
+      if (!raw) return __oskarProductRows.slice(0, limit).map(x => x.p);
+
+      const exact = __oskarProductByBarcode.get(raw);
+      if (exact) return [exact];
+
+      const q = normalizeSearchText(raw);
+      if (!q) return __oskarProductRows.slice(0, limit).map(x => x.p);
+
+      const starts = [];
+      const contains = [];
+      const barcodeLike = /^\d{3,}$/.test(raw);
+
+      for (const row of __oskarProductRows) {
+        if (barcodeLike && (row.barcode.includes(raw) || row.code.includes(raw))) {
+          starts.push(row.p);
+        } else if (row.name.startsWith(q) || row.barcode.startsWith(raw) || row.code.startsWith(raw)) {
+          starts.push(row.p);
+        } else if (row.text.includes(q)) {
+          contains.push(row.p);
+        }
+        if (starts.length >= limit) break;
+      }
+
+      if (starts.length < limit) {
+        for (const p of contains) {
+          starts.push(p);
+          if (starts.length >= limit) break;
+        }
+      }
+      return starts;
+    }
+
     function getProductById(id) {
-      return state.products.find((p) => p.id === id);
+      rebuildProductFastIndex();
+      return __oskarProductById.get(String(id || "")) || state.products.find((p) => p.id === id) || null;
     }
 
     function getProductByBarcode(code) {
       const c = String(code || "").trim();
       if (!c) return null;
-
-      return state.products.find(p =>
-        String(p.barcode || "").trim() === c ||
-        String(p.code || "").trim() === c
-      ) || null;
+      rebuildProductFastIndex();
+      return __oskarProductByBarcode.get(c) || null;
     }
 
     function getSaleUnitOptions(product) {
@@ -5448,24 +5531,43 @@
       return state.customers.reduce((s, c) => s + Math.max(0, -cleanNumber(c.balance)), 0);
     }
 
+        function renderActivePage(page = getActivePage()) {
+      const active = page || "home";
+      if (active === "home") {
+        renderHome();
+        renderProductsHome();
+      } else if (active === "cashier") {
+        renderCart();
+      } else if (active === "freeInvoice") {
+        renderFreeInvoice();
+      } else if (active === "inventory") {
+        renderInventory();
+      } else if (active === "invoices") {
+        renderInvoiceFolders();
+        renderInvoices();
+      } else if (active === "debts") {
+        renderDebts();
+      } else if (active === "purchases") {
+        renderPurchases();
+      } else if (active === "supplierPayments") {
+        renderSupplierPayments();
+      } else if (active === "expenses") {
+        renderExpenses();
+      } else if (active === "reports") {
+        renderReports();
+      } else if (active === "settings") {
+        renderSettingsAccounts();
+        renderEmployees();
+      }
+    }
+
     function renderAll() {
+      rebuildProductFastIndex(true);
       renderHome();
-      renderProductsHome();
-      renderCart();
-      renderFreeInvoice();
-      renderInventory();
-      renderInvoiceFolders();
-      renderInvoices();
-      renderDebts();
-      renderPurchases();
-      renderSupplierPayments();
-      renderExpenses();
-      renderReports();
-      renderSettingsAccounts();
-      renderEmployees();
       renderNotifications();
       applySettingsToUI();
       applyPermissionsUI();
+      renderActivePage(getActivePage());
     }
 
     function renderHome() {
@@ -5500,19 +5602,12 @@
       `;
     }
 
-    function renderProductsHome() {
-      const q = ($("homeProductSearch")?.value || "").trim().toLowerCase();
-
-      const products = state.products
-        .filter((p) =>
-          !q ||
-          String(p.name || "").toLowerCase().includes(q) ||
-          String(p.barcode || "").includes(q) ||
-          String(p.category || "").toLowerCase().includes(q)
-        )
-        .slice(0, 80);
-
-      $("homeProductsGrid").innerHTML =
+        function renderProductsHome() {
+      const q = ($("homeProductSearch")?.value || "").trim();
+      const products = fastProductSearch(q, 80);
+      const box = $("homeProductsGrid");
+      if (!box) return;
+      box.innerHTML =
         products.map(productCardHtml).join("") ||
         `<div class="muted">لا توجد منتجات بعد</div>`;
     }
@@ -5862,9 +5957,11 @@
       return { subtotal, discount, total, cost, profit };
     }
 
-    function renderSuggestions() {
-      const q = $("cashierSearch").value.trim().toLowerCase();
+        function renderSuggestions() {
+      const input = $("cashierSearch");
       const box = $("suggestionsBox");
+      if (!input || !box) return;
+      const q = input.value.trim();
 
       if (!q) {
         box.style.display = "none";
@@ -5872,22 +5969,24 @@
         return;
       }
 
-      const matches = state.products
-        .filter((p) =>
-          String(p.name || "").toLowerCase().includes(q) ||
-          String(p.barcode || "").includes(q) ||
-          String(p.code || "").includes(q)
-        )
-        .slice(0, 8);
+      const exact = /^\d{3,}$/.test(q) ? getProductByBarcode(q) : null;
+      if (exact) {
+        addToCart(exact);
+        input.value = "";
+        box.style.display = "none";
+        box.innerHTML = "";
+        return;
+      }
 
+      const matches = fastProductSearch(q, 8);
       if (!matches.length) {
         box.style.display = "none";
+        box.innerHTML = "";
         return;
       }
 
       box.innerHTML = matches.map((p) => {
         p = normalizeProduct(p);
-
         return `
           <div data-suggest-product="${p.id}" style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px;border-bottom:1px solid #f1f5f9;cursor:pointer">
             <div>
@@ -6008,29 +6107,18 @@
       };
     }
 
-    function renderInventory() {
-      const q = ($("inventorySearch")?.value || "").trim().toLowerCase();
+        function renderInventory() {
+      const q = ($("inventorySearch")?.value || "").trim();
+      const limit = q ? 420 : 260;
+      const allMatches = q ? fastProductSearch(q, 5000) : fastProductSearch("", limit);
+      const list = allMatches
+        .slice(0, limit)
+        .sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""), "ar"));
 
-      const rows = state.products
-        .filter((p) =>
-          !q ||
-          String(p.name || "").toLowerCase().includes(q) ||
-          String(p.barcode || "").includes(q) ||
-          String(p.category || "").toLowerCase().includes(q)
-        )
-        .sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""), "ar"))
+      const rows = list
         .map((p) => {
           p = normalizeProduct(p);
           const low = cleanNumber(p.stock) <= cleanNumber(p.lowStock || state.settings?.lowStock || 5);
-
-          const conversionText =
-            p.unitType === "kg"
-              ? "1 كيلو = 1000 جرام، ويمكن البيع بالكسور مثل 0.25"
-              : p.unitType === "liter"
-                ? "1 لتر = 1000 مل، ويمكن البيع بالكسور مثل 0.25"
-                : p.unitType === "carton"
-                  ? `1 كرتونة = ${cleanNumber(p.cartonUnits,1)} قطعة، ويمكن البيع بالكرتونة أو القطعة`
-                  : "بيع بالقطعة فقط";
 
           return `
             <tr>
@@ -6050,24 +6138,25 @@
               <td>${money(p.displayCostPrice)}</td>
               <td class="money">${money(p.displaySalePrice)}</td>
               <td>
-                <button class="ghost-btn" data-show-barcode="${p.id}">
-                  <i class="fa-solid fa-barcode"></i> باركود
+                <button class="ghost-btn" data-show-barcode="${p.id}" title="باركود">
+                  <i class="fa-solid fa-barcode"></i>
                 </button>
               </td>
               <td>
-                <button class="ghost-btn" data-edit-product="${p.id}">
-                  <i class="fa-solid fa-pen"></i> تعديل
+                <button class="ghost-btn" data-edit-product="${p.id}" title="تعديل">
+                  <i class="fa-solid fa-pen"></i>
                 </button>
-                <button class="danger-btn" data-delete-product="${p.id}">
-                  <i class="fa-solid fa-trash"></i> حذف
+                <button class="danger-btn" data-delete-product="${p.id}" title="حذف">
+                  <i class="fa-solid fa-trash"></i>
                 </button>
               </td>
             </tr>
           `;
         }).join("");
 
+      const more = allMatches.length > list.length ? `<tr><td colspan="9" class="muted" style="text-align:center;background:#f8fafc">تم عرض أول ${list.length} نتيجة فقط — اكتب اسم أو باركود لتضييق البحث بسرعة</td></tr>` : "";
       $("inventoryTable").innerHTML =
-        rows ||
+        rows + more ||
         `<tr><td colspan="9" class="muted" style="text-align:center">لا توجد منتجات</td></tr>`;
     }
 
@@ -6220,8 +6309,11 @@
         .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
     }
 
-    function renderInvoices() {
-      const rows = getFilteredInvoices()
+        function renderInvoices() {
+      const all = getFilteredInvoices();
+      const limit = 360;
+      const visible = all.slice(0, limit);
+      const rows = visible
         .map(inv => {
           return `
             <tr>
@@ -6236,22 +6328,23 @@
               <td>${money(inv.discount)}</td>
               <td class="money">${money(inv.total)}</td>
               <td>
-                <button class="ghost-btn" data-view-invoice="${inv.id}">
-                  <i class="fa-solid fa-eye"></i> عرض
+                <button class="ghost-btn" data-view-invoice="${inv.id}" title="عرض">
+                  <i class="fa-solid fa-eye"></i>
                 </button>
-                <button class="ghost-btn" data-edit-invoice="${inv.id}">
-                  <i class="fa-solid fa-pen"></i> تعديل
+                <button class="ghost-btn" data-edit-invoice="${inv.id}" title="تعديل">
+                  <i class="fa-solid fa-pen"></i>
                 </button>
-                <button class="danger-btn" data-delete-invoice="${inv.id}">
-                  <i class="fa-solid fa-trash"></i> حذف
+                <button class="danger-btn" data-delete-invoice="${inv.id}" title="حذف">
+                  <i class="fa-solid fa-trash"></i>
                 </button>
               </td>
             </tr>
           `;
         }).join("");
 
+      const more = all.length > visible.length ? `<tr><td colspan="11" class="muted" style="text-align:center;background:#f8fafc">تم عرض أول ${visible.length} فاتورة — استخدم البحث أو التاريخ للوصول فوراً</td></tr>` : "";
       $("invoicesTable").innerHTML =
-        rows ||
+        rows + more ||
         `<tr><td colspan="11" class="muted" style="text-align:center">لا توجد فواتير</td></tr>`;
     }
 
@@ -6358,15 +6451,41 @@
         }
       }
     }
-    function renderDebts() {
+        function renderDebts() {
       rebuildCustomerBalances(false);
 
-      const q = ($("debtsSearch")?.value || "").trim().toLowerCase();
+      const q = normalizeSearchText($("debtsSearch")?.value || "");
       const sort = $("debtsSort")?.value || "balance_desc";
+
+      const meta = new Map();
+      for (const c of state.customers || []) {
+        meta.set(c.id, { count: 0, last: Number(c.updatedAt || c.createdAt || 0), firstDebtAt: 0 });
+      }
+      for (const inv of state.invoices || []) {
+        const id = inv.customerId;
+        if (!id || !meta.has(id)) continue;
+        const m = meta.get(id);
+        m.count += 1;
+        m.last = Math.max(m.last, Number(inv.createdAt || 0));
+        if (["debt", "later_app"].includes(inv.paymentMethod) && inv.status !== "paid") {
+          const t = Number(inv.createdAt || 0);
+          if (!m.firstDebtAt || t < m.firstDebtAt) m.firstDebtAt = t;
+        }
+      }
+      for (const c of state.customers || []) {
+        const m = meta.get(c.id) || { count:0, last:0, firstDebtAt:0 };
+        (c.payments || []).forEach(p => m.last = Math.max(m.last, Number(p.createdAt || 0)));
+        (c.manualDebts || []).forEach(d => {
+          const t = Number(d.createdAt || 0);
+          m.last = Math.max(m.last, t);
+          if (d.status !== "paid" && (!m.firstDebtAt || t < m.firstDebtAt)) m.firstDebtAt = t;
+        });
+        meta.set(c.id, m);
+      }
 
       let list = state.customers.filter(c =>
         !q ||
-        String(c.name || "").toLowerCase().includes(q) ||
+        normalizeSearchText(c.name || "").includes(q) ||
         String(c.phone || "").includes(q)
       );
 
@@ -6377,12 +6496,11 @@
       } else if (sort === "name") {
         list = list.sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""), "ar"));
       } else {
-        list = list.sort((a,b) => getCustomerLastActivity(b.id) - getCustomerLastActivity(a.id));
+        list = list.sort((a,b) => (meta.get(b.id)?.last || 0) - (meta.get(a.id)?.last || 0));
       }
 
       const totalOwed = getTotalOwed();
       const totalCredit = getTotalCredit();
-
       const laterUnpaid = state.invoices.filter(i => i.paymentMethod === "later_app" && i.status !== "paid").length;
       const manualUnpaid = state.customers.flatMap(c => (c.manualDebts || []).filter(d => d.status !== "paid")).length;
 
@@ -6394,22 +6512,19 @@
       $("debtsFooterCredit").textContent = money(totalCredit);
       $("debtsFooterNet").textContent = money(totalOwed - totalCredit);
 
-      $("debtsList").innerHTML = list.map(c => {
+      const limit = 280;
+      const visible = list.slice(0, limit);
+      $("debtsList").innerHTML = visible.map(c => {
         const bal = customerBalanceText(c.balance);
-        const last = getCustomerLastActivity(c.id);
-        const customerInvoices = getCustomerInvoices(c);
-        const firstDebt = customerInvoices.find(inv =>
-          ["debt", "later_app"].includes(inv.paymentMethod) && inv.status !== "paid"
-        );
-        const ageText = firstDebt ? ` · الدين ${formatAge(firstDebt.createdAt)}` : "";
-
+        const m = meta.get(c.id) || {count:0,last:0,firstDebtAt:0};
+        const ageText = m.firstDebtAt ? ` · الدين ${formatAge(m.firstDebtAt)}` : "";
         return `
           <div class="debt-card" data-open-customer="${c.id}">
             <div>
               <div class="debt-name">${escapeHtml(c.name)}</div>
               <div class="debt-sub">
-                ${escapeHtml(c.phone || "بدون رقم")} · فواتير: ${customerInvoices.length}
-                ${last ? ` · آخر حركة: ${formatDate(last)}` : ""}
+                ${escapeHtml(c.phone || "بدون رقم")} · فواتير: ${m.count}
+                ${m.last ? ` · آخر حركة: ${formatDate(m.last)}` : ""}
                 ${ageText}
               </div>
             </div>
@@ -6417,6 +6532,10 @@
           </div>
         `;
       }).join("") || `<div class="muted" style="text-align:center;padding:28px">لا توجد حسابات ديون</div>`;
+
+      if (list.length > visible.length) {
+        $("debtsList").insertAdjacentHTML("beforeend", `<div class="muted" style="text-align:center;padding:12px;background:#f8fafc;border-radius:16px">تم عرض أول ${visible.length} حساب — اكتب الاسم أو الرقم للبحث الفوري</div>`);
+      }
     }
 
     function renderPurchases() {
@@ -6430,6 +6549,7 @@
           String(p.notes || "").toLowerCase().includes(q)
         )
         .sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+        .slice(0, 360)
         .map(p => `
           <tr>
             <td>${formatDate(p.createdAt)}</td>
@@ -6472,6 +6592,7 @@
             String(p.notes || "").toLowerCase().includes(q);
         })
         .sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+        .slice(0, 360)
         .map(p => {
           const acc = state.paymentAccounts.find(a => a.id === p.accountId);
 
@@ -6509,6 +6630,7 @@
           String(e.notes || "").toLowerCase().includes(q)
         )
         .sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+        .slice(0, 360)
         .map(e => `
           <tr>
             <td>${formatDate(e.createdAt)}</td>
@@ -6680,21 +6802,22 @@
       $("notifBadge").style.display = count ? "flex" : "none";
     }
 
-    function switchPage(page) {
+        function switchPage(page) {
       if (!hasPermission(page)) {
         toast("ليس لديك صلاحية للدخول إلى هذه الصفحة");
         return;
       }
 
-      document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+      document.querySelectorAll(".section.active").forEach(s => s.classList.remove("active"));
       $(`page-${page}`)?.classList.add("active");
 
       document.querySelectorAll(".nav-btn,.bottom-btn").forEach(b => {
         b.classList.toggle("active", b.dataset.page === page);
       });
 
-      $("sidebar").classList.remove("open");
-      renderAll();
+      $("sidebar")?.classList.remove("open");
+      window.scrollTo({ top: 0, behavior: "auto" });
+      requestAnimationFrame(() => renderActivePage(page));
     }
     function refreshProductUnitUI() {
       const unitType = $("productUnitType").value;
@@ -9094,7 +9217,7 @@
       const rect = element.getBoundingClientRect();
       const width = Math.max(320, Math.ceil(element.scrollWidth || rect.width || 900));
       const height = Math.max(120, Math.ceil(element.scrollHeight || rect.height || 700));
-      const scale = window.innerWidth <= 640 ? 1.18 : 1.35;
+      const scale = window.innerWidth <= 640 ? 1.0 : 1.1;
 
       try {
         return await html2canvas(element, {
@@ -9103,7 +9226,7 @@
           allowTaint: true,
           backgroundColor: "#ffffff",
           logging: false,
-          imageTimeout: 650,
+          imageTimeout: 220,
           removeContainer: true,
           foreignObjectRendering: false,
           scrollX: 0,
@@ -11133,6 +11256,15 @@
       money,
       toast,
       renderAll,
+      renderActivePage,
+      renderProductsHome,
+      renderInventory,
+      renderSuggestions,
+      renderInvoices,
+      renderDebts,
+      renderPurchases,
+      renderSupplierPayments,
+      renderExpenses,
       renderCart,
       addToCart,
       updateCartLine,
@@ -15013,7 +15145,7 @@
     try{
       const canvas = await buildExactInvoiceCanvas();
       const a = document.createElement("a");
-      a.href = canvas.toDataURL("image/png");
+      a.href = canvas.toDataURL("image/jpeg", .9);
       a.download = "invoice-" + invoiceNumberFromDom() + ".png";
       document.body.appendChild(a);
       a.click();
@@ -15032,7 +15164,7 @@
     try{
       if(!window.jspdf || !window.jspdf.jsPDF) throw new Error("jspdf_not_ready");
       const canvas = await buildExactInvoiceCanvas();
-      const img = canvas.toDataURL("image/jpeg", .92);
+      const img = canvas.toDataURL("image/jpeg", .78);
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF("p", "mm", "a4", true);
       const pageW = pdf.internal.pageSize.getWidth();
@@ -15487,7 +15619,7 @@
     if(!receipt) throw new Error("receipt_not_found");
     renderBarcodes(receipt);
     if(!window.html2canvas) throw new Error("html2canvas_not_ready");
-    try{ if(document.fonts && document.fonts.ready) await document.fonts.ready; }catch{}
+    try{ if(document.fonts && document.fonts.ready) await Promise.race([document.fonts.ready, new Promise(r=>setTimeout(r,120))]); }catch{}
     await waitFrame();
     const wrap = document.createElement("div");
     wrap.style.cssText = "position:fixed;left:-100000px;top:0;background:#fff;width:80mm;z-index:2147483647;opacity:1;visibility:visible;pointer-events:none;direction:rtl;padding:0;margin:0;overflow:visible";
@@ -15505,14 +15637,14 @@
     wrap.appendChild(clone);
     document.body.appendChild(wrap);
     renderBarcodes(clone);
-    try{ if(document.fonts && document.fonts.ready) await document.fonts.ready; }catch{}
+    try{ if(document.fonts && document.fonts.ready) await Promise.race([document.fonts.ready, new Promise(r=>setTimeout(r,120))]); }catch{}
     await waitFrame();
     await waitFrame();
     try{
       const rect = clone.getBoundingClientRect();
       const w = Math.ceil(Math.max(clone.scrollWidth, rect.width, 302));
       const h = Math.ceil(Math.max(clone.scrollHeight, rect.height, 80)) + 10;
-      return await html2canvas(clone, {backgroundColor:"#ffffff", scale:3, useCORS:false, allowTaint:true, logging:false, scrollX:0, scrollY:0, windowWidth:w, windowHeight:h, width:w, height:h, imageTimeout:1200, removeContainer:true});
+      return await html2canvas(clone, {backgroundColor:"#ffffff", scale:1.25, useCORS:false, allowTaint:true, logging:false, scrollX:0, scrollY:0, windowWidth:w, windowHeight:h, width:w, height:h, imageTimeout:180, removeContainer:true});
     }finally{
       wrap.remove();
     }
@@ -15523,8 +15655,8 @@
     try{
       const canvas = await receiptCanvas();
       const a = document.createElement("a");
-      a.download = invoiceName() + ".png";
-      a.href = canvas.toDataURL("image/png");
+      a.download = invoiceName() + ".jpg";
+      a.href = canvas.toDataURL("image/jpeg", .9);
       document.body.appendChild(a); a.click(); a.remove();
       toast("تم تنزيل صورة الفاتورة");
     }catch(err){ console.error(err); toast("تعذر تنزيل الصورة الآن"); }
@@ -15535,7 +15667,7 @@
     try{
       if(!window.jspdf || !window.jspdf.jsPDF) throw new Error("jspdf_not_ready");
       const canvas = await receiptCanvas();
-      const img = canvas.toDataURL("image/jpeg", .92);
+      const img = canvas.toDataURL("image/jpeg", .78);
       const widthMm = 80;
       const heightMm = Math.max(90, canvas.height * widthMm / canvas.width);
       const { jsPDF } = window.jspdf;
@@ -17216,784 +17348,96 @@
   .oskar-turbo-added{position:fixed;right:12px;left:12px;bottom:18px;z-index:5;display:flex;gap:8px;overflow-x:auto;padding:4px;}
   .oskar-turbo-chip{background:rgba(255,255,255,.96);color:#064e3b;border:1px solid #d1fae5;border-radius:999px;padding:9px 12px;font-weight:900;font-size:12px;white-space:nowrap;box-shadow:0 12px 28px rgba(0,0,0,.22);}
 </style>
-<script id="oskar-turbo-green-final-script-2026-05-03">
+
+<style id="oskar-ultra-response-style-2026-05-03">
+  *{scroll-behavior:auto!important;}
+  .section{animation:none!important;}
+  .card,.product-card,.modal,.topbar,.sidebar,.nav-btn,.primary-btn,.gold-btn,.ghost-btn,.danger-btn,.success-btn,.icon-btn,.payment-choice{transition:background-color .08s linear,border-color .08s linear,color .08s linear!important;}
+  .table-wrap,#cartLines,.modal,.sidebar{contain:content;content-visibility:auto;}
+  .nav-btn:active,.bottom-btn:active,.icon-btn:active,.primary-btn:active,.gold-btn:active,.ghost-btn:active,.danger-btn:active,.success-btn:active,.payment-choice:active{transform:scale(.985)!important;}
+  [data-show-barcode],[data-view-invoice],[data-edit-product],[data-delete-product],[data-edit-invoice],[data-delete-invoice],[data-edit-purchase],[data-delete-purchase],[data-edit-supplier-payment],[data-delete-supplier-payment],[data-edit-expense],[data-delete-expense]{width:38px!important;height:38px!important;padding:0!important;border-radius:14px!important;font-size:0!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;margin-inline:2px!important;}
+  [data-show-barcode] i,[data-view-invoice] i,[data-edit-product] i,[data-delete-product] i,[data-edit-invoice] i,[data-delete-invoice] i,[data-edit-purchase] i,[data-delete-purchase] i,[data-edit-supplier-payment] i,[data-delete-supplier-payment] i,[data-edit-expense] i,[data-delete-expense] i{font-size:16px!important;margin:0!important;}
+</style>
+<script id="oskar-ultra-response-script-2026-05-03">
 (function(){
   "use strict";
-  if(window.__OSKAR_TURBO_GREEN_FINAL_20260503__) return;
-  window.__OSKAR_TURBO_GREEN_FINAL_20260503__ = true;
-
+  if(window.__OSKAR_ULTRA_RESPONSE_20260503__) return;
+  window.__OSKAR_ULTRA_RESPONSE_20260503__ = true;
   const $ = id => document.getElementById(id);
-  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-  const QR_SRC = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
-  const toast = (msg, ms=2200) => typeof window.toast === "function" ? window.toast(msg, ms) : console.log(msg);
-  const clean = v => { const n = Number(String(v ?? "").replace(",", ".").replace(/[^0-9.\-]/g,"")); return Number.isFinite(n) ? n : 0; };
+  const toast = (m,ms)=> typeof window.toast === "function" ? window.toast(m,ms||1800) : console.log(m);
 
-  function applyGreenMeta(){
-    let meta = document.querySelector('meta[name="theme-color"]');
-    if(!meta){ meta = document.createElement("meta"); meta.name = "theme-color"; document.head.appendChild(meta); }
-    meta.content = "#059669";
+  function debounceInput(id, delay){
+    const el = $(id);
+    if(!el || el.dataset.oskarUltraInput === "1") return;
+    el.dataset.oskarUltraInput = "1";
+    const original = el.oninput;
+    let timer = 0;
+    el.oninput = function(ev){
+      const value = String(el.value || "").trim();
+      const instant = /barcode|cashierSearch|invoiceSearch|inventorySearch/i.test(id) && /^\d{4,}$/.test(value);
+      clearTimeout(timer);
+      timer = setTimeout(() => { if(typeof original === "function") original.call(el, ev); }, instant ? 0 : delay);
+    };
   }
 
-  function fastNavigate(page){
-    const section = page && $("page-" + page);
-    if(!section) return false;
-    document.querySelectorAll(".section.active").forEach(s => s.classList.remove("active"));
-    section.classList.add("active");
-    document.querySelectorAll(".nav-btn,.bottom-btn").forEach(b => b.classList.toggle("active", b.dataset.page === page));
+  function installDebounce(){
+    debounceInput("cashierSearch", 20);
+    debounceInput("homeProductSearch", 35);
+    debounceInput("inventorySearch", 45);
+    debounceInput("invoiceSearch", 55);
+    debounceInput("debtsSearch", 55);
+    debounceInput("purchaseTableSearch", 55);
+    debounceInput("supplierPaymentsSearch", 55);
+    debounceInput("expensesSearch", 55);
+  }
+
+  function fastNav(page){
+    const sec = page && $("page-"+page);
+    if(!sec) return false;
+    document.querySelectorAll(".section.active").forEach(s=>s.classList.remove("active"));
+    sec.classList.add("active");
+    document.querySelectorAll(".nav-btn,.bottom-btn").forEach(b=>b.classList.toggle("active", b.dataset.page === page));
     $("sidebar")?.classList.remove("open");
-    window.scrollTo({top:0, behavior:"auto"});
+    window.scrollTo(0,0);
+    requestAnimationFrame(()=>{ try{ window.renderActivePage ? window.renderActivePage(page) : window.renderAll?.(); }catch(e){ console.warn(e); } });
     return true;
   }
 
   document.addEventListener("click", function(e){
     const nav = e.target.closest && e.target.closest(".nav-btn[data-page],.bottom-btn[data-page],[data-page-jump]");
     if(!nav) return;
+    if(nav.classList.contains("auth-hidden")){ e.preventDefault(); e.stopImmediatePropagation(); toast("ليس لديك صلاحية للدخول إلى هذه الصفحة"); return; }
     const page = nav.dataset.page || nav.dataset.pageJump;
-    if(!page) return;
-    if(nav.classList.contains("auth-hidden")){
-      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-      toast("ليس لديك صلاحية للدخول إلى هذه الصفحة");
-      return;
-    }
-    const ok = fastNavigate(page);
-    if(ok){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }
+    if(page && fastNav(page)){ e.preventDefault(); e.stopImmediatePropagation(); }
   }, true);
 
-  function debounceOnInput(id, delay){
-    const el = $(id);
-    if(!el || el.__oskarTurboDebounced) return;
-    const old = el.oninput;
-    if(typeof old !== "function") return;
-    let t = 0;
-    el.oninput = function(ev){
-      clearTimeout(t);
-      const value = String(el.value || "").trim();
-      const isLikelyBarcode = /^(cashierSearch|invoiceSearch|inventorySearch)$/.test(id) && /^\d{5,}$/.test(value);
-      const wait = isLikelyBarcode ? 0 : delay;
-      t = setTimeout(() => old.call(el, ev), wait);
-    };
-    el.__oskarTurboDebounced = true;
-  }
-  function installSearchTurbo(){
-    debounceOnInput("cashierSearch", 45);
-    debounceOnInput("homeProductSearch", 80);
-    debounceOnInput("inventorySearch", 95);
-    debounceOnInput("invoiceSearch", 95);
-    debounceOnInput("debtsSearch", 95);
-    debounceOnInput("purchaseTableSearch", 95);
-    debounceOnInput("supplierPaymentsSearch", 95);
-    debounceOnInput("expensesSearch", 95);
-  }
+  document.addEventListener("pointerdown", function(e){
+    const btn = e.target.closest && e.target.closest("button,.product-card,.debt-card,.payment-choice");
+    if(btn) btn.style.willChange = "transform";
+  }, {capture:true, passive:true});
 
-  function loadingDom(){
-    let el = $("oskarTurboLoading");
-    if(el) return el;
-    el = document.createElement("div");
-    el.id = "oskarTurboLoading";
-    el.className = "oskar-turbo-loading";
-    el.innerHTML = '<div class="oskar-turbo-loading-box"><div class="oskar-turbo-spinner"></div><div id="oskarTurboLoadingText">جاري التحميل بسرعة...</div></div>';
-    document.body.appendChild(el);
-    return el;
-  }
-  function showLoading(text){
-    const el = loadingDom();
-    const tx = $("oskarTurboLoadingText");
-    if(tx) tx.textContent = text || "جاري التحميل بسرعة...";
-    el.classList.add("show");
-  }
-  function hideLoading(){ $("oskarTurboLoading")?.classList.remove("show"); }
-  function waitFrame(){ return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); }
-
-  async function captureNode(node, scale){
-    if(!node) throw new Error("capture node missing");
-    if(!window.html2canvas) throw new Error("html2canvas not ready");
-    try{ if(document.fonts?.ready) await Promise.race([document.fonts.ready, new Promise(r=>setTimeout(r,180))]); }catch{}
-    await waitFrame();
-    const rect = node.getBoundingClientRect();
-    const width = Math.max(260, Math.ceil(node.scrollWidth || rect.width || 420));
-    const height = Math.max(80, Math.ceil(node.scrollHeight || rect.height || 320));
-    return html2canvas(node, {
-      scale: scale || (window.innerWidth < 640 ? 1.2 : 1.35),
-      backgroundColor:"#ffffff",
-      useCORS:true,
-      allowTaint:true,
-      logging:false,
-      imageTimeout:550,
-      removeContainer:true,
-      foreignObjectRendering:false,
-      scrollX:0,
-      scrollY:0,
-      width,
-      height,
-      windowWidth:width,
-      windowHeight:height
-    });
-  }
-  function saveCanvas(canvas, filename, type="image/png", quality=.88){
-    return new Promise(resolve => {
-      const fallback = () => { const a=document.createElement("a"); a.download=filename; a.href=canvas.toDataURL(type, quality); document.body.appendChild(a); a.click(); a.remove(); resolve(); };
-      if(!canvas.toBlob) return fallback();
-      try{
-        canvas.toBlob(blob => {
-          if(!blob) return fallback();
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a"); a.download = filename; a.href = url; document.body.appendChild(a); a.click(); a.remove();
-          setTimeout(() => URL.revokeObjectURL(url), 1300);
-          resolve();
-        }, type, quality);
-      }catch{ fallback(); }
-    });
-  }
-  async function exportImage(node, filename){
-    showLoading("تجهيز الصورة...");
-    try{ const canvas = await captureNode(node); await saveCanvas(canvas, filename || ("export-"+Date.now()+".png")); toast("تم تنزيل الصورة بسرعة"); }
-    catch(err){ console.error(err); toast("تعذر تنزيل الصورة الآن"); }
-    finally{ hideLoading(); }
-  }
-  async function exportPdf(node, filename, thermal=false){
-    showLoading("تجهيز PDF...");
+  function warmLogo(){
     try{
-      if(!window.jspdf?.jsPDF) throw new Error("jspdf not ready");
-      const canvas = await captureNode(node, thermal ? 1.35 : undefined);
-      const img = canvas.toDataURL("image/jpeg", .84);
-      const { jsPDF } = window.jspdf;
-      if(thermal){
-        const w = 80, h = Math.max(80, canvas.height * w / canvas.width);
-        const pdf = new jsPDF({orientation:"p", unit:"mm", format:[w,h], compress:true});
-        pdf.addImage(img,"JPEG",0,0,w,h,undefined,"FAST");
-        pdf.save(filename || ("receipt-"+Date.now()+".pdf"));
-      }else{
-        const pdf = new jsPDF("p","mm","a4",true);
-        const pageW=pdf.internal.pageSize.getWidth(), pageH=pdf.internal.pageSize.getHeight(), m=5;
-        const imgW=pageW-m*2, imgH=canvas.height*imgW/canvas.width;
-        if(imgH <= pageH-m*2) pdf.addImage(img,"JPEG",m,m,imgW,imgH,undefined,"FAST");
-        else { let y=0, step=pageH-m*2; while(y<imgH){ pdf.addImage(img,"JPEG",m,m-y,imgW,imgH,undefined,"FAST"); y+=step; if(y<imgH) pdf.addPage(); } }
-        pdf.save(filename || ("export-"+Date.now()+".pdf"));
-      }
-      toast("تم تجهيز PDF بسرعة");
-    }catch(err){ console.error(err); toast("تعذر تجهيز PDF الآن"); }
-    finally{ hideLoading(); }
+      const src = window.state?.settings?.localLogo || window.state?.settings?.logo || localStorage.getItem("oskar_fast_logo_cache_src_v1") || $("topShopLogo")?.src || "";
+      if(src){ const img = new Image(); img.decoding = "async"; img.loading = "eager"; img.src = src; }
+    }catch{}
   }
 
-  function currentThermalReceipt(){
-    return document.querySelector(".oskar-thermal-receipt[data-oskar-thermal-receipt]") || document.querySelector("#invoiceViewBox .invoice-paper") || $("invoiceViewBox");
+  function idle(fn){
+    if("requestIdleCallback" in window) requestIdleCallback(fn,{timeout:900});
+    else setTimeout(fn,120);
   }
-  function invoiceName(){
-    const n = document.querySelector(".oskar-thermal-receipt[data-invoice-number]")?.dataset.invoiceNumber || ($("modalTitle")?.textContent || "").replace(/\D+/g,"") || Date.now();
-    return "invoice-" + n;
-  }
-  document.addEventListener("click", function(e){
-    const img = e.target.closest && e.target.closest("#thermalImageInvoiceBtn");
-    const pdf = e.target.closest && e.target.closest("#thermalPdfInvoiceBtn");
-    if(!img && !pdf) return;
-    const node = currentThermalReceipt();
-    if(!node) return;
-    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-    if(img) exportImage(node, invoiceName()+".png");
-    if(pdf) exportPdf(node, invoiceName()+".pdf", true);
-  }, true);
-
-  let libPromise = null, scanner = null, running = false, scanMode = "sale", targetInput = "", lastCode = "", lastAt = 0;
-  const scanSound = new Audio("./qr.mp3"); scanSound.preload = "auto"; scanSound.volume = 1;
-  function playScanEffects(){ try{ scanSound.pause(); scanSound.currentTime = 0; scanSound.play().catch(()=>{}); }catch{} if(navigator.vibrate) navigator.vibrate([45,25,45]); const d=$("oskarTurboScanner"); if(d){ d.classList.add("detected"); clearTimeout(d.__det); d.__det=setTimeout(()=>d.classList.remove("detected"),420); } }
-  function loadQr(){
-    if(window.Html5Qrcode) return Promise.resolve(true);
-    if(libPromise) return libPromise;
-    libPromise = new Promise((resolve,reject) => {
-      const old = [...document.scripts].find(s => (s.src || "").includes("html5-qrcode"));
-      if(old){ old.addEventListener("load",()=>resolve(true),{once:true}); setTimeout(()=>resolve(!!window.Html5Qrcode),900); return; }
-      const sc=document.createElement("script"); sc.src=QR_SRC; sc.async=true; sc.onload=()=>resolve(true); sc.onerror=reject; document.head.appendChild(sc);
-    });
-    return libPromise;
-  }
-  function scannerDom(){
-    let d = $("oskarTurboScanner");
-    if(d) return d;
-    d = document.createElement("div");
-    d.id = "oskarTurboScanner";
-    d.className = "oskar-turbo-scanner";
-    d.innerHTML = '<div id="oskarTurboReader"></div><div class="oskar-turbo-frame"></div><div class="oskar-turbo-laser"></div><button id="oskarTurboClose" class="oskar-turbo-close" type="button">×</button><div id="oskarTurboTitle" class="oskar-turbo-title">قراءة باركود<small>وجّه الكاميرا نحو الكود وسيتم الالتقاط فوراً</small></div><div id="oskarTurboAdded" class="oskar-turbo-added"></div>';
-    document.body.appendChild(d);
-    $("oskarTurboClose").onclick = stopTurboScanner;
-    return d;
-  }
-  async function stopTurboScanner(){
-    try{ if(scanner && running) await scanner.stop(); }catch{}
-    try{ if(scanner) await scanner.clear(); }catch{}
-    running = false; scanner = null;
-    $("oskarTurboScanner")?.classList.remove("show","detected");
-  }
-  function getProduct(code){
-    const c = String(code || "").trim();
-    if(!c) return null;
-    if(typeof window.getProductByBarcode === "function") { try{ const p=window.getProductByBarcode(c); if(p) return p; }catch{} }
-    return (window.state?.products || []).find(p => [p.barcode,p.code,p.id].some(x => String(x || "").trim() === c)) || null;
-  }
-  function renderCartSafe(){ try{ window.renderCart?.(); }catch{} try{ window.renderAll?.(); }catch{} }
-  function addScannedProduct(product){
-    if(!product) return false;
-    try{ if(typeof window.addToCart === "function") window.addToCart(product); else {
-      window.state = window.state || {}; window.state.cart = window.state.cart || [];
-      const ex = window.state.cart.find(x => x.productId === product.id);
-      if(ex) ex.qty = clean(ex.qty) + 1;
-      else window.state.cart.push({id:"cart_"+Date.now(), productId:product.id, name:product.name, qty:1, price:clean(product.salePrice||product.displaySalePrice), total:clean(product.salePrice||product.displaySalePrice)});
-      renderCartSafe();
-    }}catch(err){ console.warn(err); return false; }
-    return true;
-  }
-  function keepOpen(){ return localStorage.getItem("oskar_keep_cashier_barcode_camera_open_v1") === "1"; }
-  function chip(txt){ const box=$("oskarTurboAdded"); if(!box) return; const s=document.createElement("span"); s.className="oskar-turbo-chip"; s.textContent=txt; box.prepend(s); setTimeout(()=>s.remove(),3500); }
-  async function handleCode(code){
-    code = String(code || "").trim(); if(!code) return;
-    playScanEffects();
-    if(scanMode === "product" || targetInput){
-      const input = $(targetInput || "productBarcode");
-      if(input){ input.value = code; input.dispatchEvent(new Event("input",{bubbles:true})); input.dispatchEvent(new Event("change",{bubbles:true})); }
-      toast("تمت قراءة الباركود ووضعه في الخانة");
-      await stopTurboScanner();
-      return;
-    }
-    const p = getProduct(code);
-    if(!p){ toast("لم يتم العثور على منتج بهذا الباركود"); if(!keepOpen()) await stopTurboScanner(); return; }
-    addScannedProduct(p);
-    const search = $("cashierSearch"); if(search) search.value = "";
-    chip("✓ " + (p.name || "تمت الإضافة"));
-    toast("تمت إضافة " + (p.name || "المنتج"));
-    if(!keepOpen()) await stopTurboScanner();
-  }
-  async function openTurboScanner(mode="sale", inputId=""){
-    try{ await loadQr(); }catch{ toast("تعذر تحميل قارئ الباركود"); return; }
-    if(!window.Html5Qrcode){ toast("تعذر تشغيل قارئ الباركود"); return; }
-    await stopTurboScanner();
-    scanMode = mode || "sale"; targetInput = inputId || ""; lastCode = ""; lastAt = 0;
-    const d = scannerDom();
-    $("oskarTurboAdded").innerHTML = "";
-    $("oskarTurboTitle").innerHTML = (scanMode === "product" ? "قراءة باركود المنتج" : "قراءة باركود للبيع") + '<small>وجّه الكاميرا نحو الكود وسيتم الالتقاط فوراً</small>';
-    d.classList.add("show");
-    try{
-      const f = window.Html5QrcodeSupportedFormats;
-      const formats = f ? [f.QR_CODE,f.EAN_13,f.EAN_8,f.UPC_A,f.UPC_E,f.CODE_128,f.CODE_39,f.CODE_93,f.ITF,f.CODABAR,f.DATA_MATRIX,f.AZTEC,f.PDF_417] : undefined;
-      scanner = new Html5Qrcode("oskarTurboReader", formats ? {formatsToSupport:formats, verbose:false} : undefined);
-      const config = {
-        fps: 45,
-        qrbox: (w,h) => ({width: Math.floor(w*.86), height: Math.floor(Math.min(h*.42, 320))}),
-        aspectRatio: 1.7777778,
-        disableFlip: false,
-        experimentalFeatures: {useBarCodeDetectorIfSupported:true},
-        videoConstraints: {facingMode:{ideal:"environment"}, width:{ideal:1280}, height:{ideal:720}, advanced:[{focusMode:"continuous"}]}
-      };
-      await scanner.start({facingMode:"environment"}, config, (txt) => {
-        const c = String(txt || "").trim(); const now = Date.now();
-        if(!c || (c === lastCode && now - lastAt < 1100)) return;
-        lastCode = c; lastAt = now;
-        handleCode(c);
-      }, () => {});
-      running = true;
-    }catch(err){ console.error(err); await stopTurboScanner(); toast("اسمح بالكاميرا وتأكد أن الرابط HTTPS"); }
-  }
-  window.openScanner = openTurboScanner;
-  window.openFloatingProductBarcodeScanner = (target="productBarcode") => openTurboScanner("product", target);
-  window.stopScanner = stopTurboScanner;
-  window.stopFloatingScanner = stopTurboScanner;
-  document.addEventListener("click", function(e){
-    const sale = e.target.closest && e.target.closest("#openScannerBtn");
-    const product = e.target.closest && e.target.closest("#scanProductBarcodeBtn");
-    if(!sale && !product) return;
-    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-    if(sale) openTurboScanner("sale");
-    if(product) openTurboScanner("product", "productBarcode");
-  }, true);
-  document.addEventListener("pointerdown", function(e){ if(e.target.closest && e.target.closest("#openScannerBtn,#scanProductBarcodeBtn")) loadQr().catch(()=>{}); }, {passive:true, capture:true});
-  window.addEventListener("beforeunload", () => { if(running) stopTurboScanner(); });
-  document.addEventListener("visibilitychange", () => { if(document.hidden && running && !keepOpen()) stopTurboScanner(); });
-
-  function addTitles(){
-    const map = [
-      ["[data-show-barcode]","باركود"],["[data-view-invoice]","عرض"],["[data-edit-product]","تعديل"],["[data-delete-product]","حذف"],["[data-edit-invoice]","تعديل"],["[data-delete-invoice]","حذف"],["[data-edit-purchase]","تعديل"],["[data-delete-purchase]","حذف"],["[data-edit-supplier-payment]","تعديل"],["[data-delete-supplier-payment]","حذف"],["[data-edit-expense]","تعديل"],["[data-delete-expense]","حذف"]
-    ];
-    map.forEach(([sel,title]) => $$(sel).forEach(b => { if(!b.title) b.title = title; b.setAttribute("aria-label", title); }));
-  }
-  const mo = new MutationObserver(() => addTitles());
 
   function init(){
-    applyGreenMeta();
-    installSearchTurbo();
-    addTitles();
-    mo.observe(document.body, {childList:true, subtree:true});
-    setTimeout(installSearchTurbo, 800);
-    setTimeout(installSearchTurbo, 2000);
-    setTimeout(() => loadQr().catch(()=>{}), 1200);
+    installDebounce();
+    warmLogo();
+    idle(()=>{ try{ window.renderActivePage?.(); }catch{} });
+    setTimeout(installDebounce, 500);
+    setTimeout(installDebounce, 1600);
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, {once:true}); else init();
 })();
 </script>
 
-<!-- oskar ultimate speed pack 2026-05-03: local-first save, instant search index, native/fast export without waiting for network images -->
-<style id="oskar-ultimate-speed-pack-2026-05-03-style">
-  :root{--oskar-fast-green:#059669;--oskar-fast-green2:#047857;}
-  *{scroll-behavior:auto!important;}
-  button,.nav-btn,.icon-btn,.primary-btn,.gold-btn,.ghost-btn,.danger-btn,.success-btn,.folder-tab,.tab-btn,.payment-choice,.product-card{
-    touch-action:manipulation!important;
-    -webkit-tap-highlight-color:transparent!important;
-  }
-  button:active,.product-card:active,.payment-choice:active{transform:translateY(1px) scale(.99)!important;}
-  .section{animation:none!important;content-visibility:auto;contain-intrinsic-size:700px;}
-  .section.active{content-visibility:visible;}
-  .table-wrap{contain:layout paint style;will-change:scroll-position;}
-  .table-wrap tbody tr{content-visibility:auto;contain-intrinsic-size:48px;}
-  .modal,.card,.topbar,.sidebar{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
-  body.oskar-fast-working{cursor:progress;}
-  .oskar-fast-export-overlay{
-    position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:999999;
-    background:rgba(15,23,42,.30);backdrop-filter:blur(2px);direction:rtl;font-family:Cairo,Arial,sans-serif;
-  }
-  .oskar-fast-export-overlay.show{display:flex;}
-  .oskar-fast-export-box{background:#fff;border:1px solid #e2e8f0;border-radius:24px;box-shadow:0 22px 70px rgba(15,23,42,.22);padding:18px 22px;display:flex;align-items:center;gap:12px;font-weight:900;color:#0f172a;}
-  .oskar-fast-export-spinner{width:28px;height:28px;border-radius:999px;border:4px solid #d1fae5;border-top-color:var(--oskar-fast-green);animation:oskarFastSpin .7s linear infinite;}
-  @keyframes oskarFastSpin{to{transform:rotate(360deg)}}
-  .oskar-fast-result-note{font-size:12px;color:#64748b;text-align:center;padding:9px 6px;}
-  #suggestionsBox{transform:translateZ(0);contain:layout paint style;}
-  @media (prefers-reduced-motion:no-preference){.oskar-export-busy i,.oskar-fast-busy i{animation:oskarFastSpin .75s linear infinite;}}
-  @media print{
-    body.oskar-native-printing *{visibility:hidden!important;}
-    body.oskar-native-printing #printArea,body.oskar-native-printing #printArea *{visibility:visible!important;}
-    body.oskar-native-printing #printArea{display:block!important;position:fixed!important;inset:0!important;width:100%!important;background:#fff!important;z-index:2147483647!important;padding:0!important;margin:0!important;overflow:visible!important;}
-    body.oskar-native-printing #printArea table{width:100%!important;min-width:0!important;}
-    body.oskar-native-printing #printArea .no-print,body.oskar-native-printing #printArea button{display:none!important;}
-  }
-</style>
-<script id="oskar-ultimate-speed-pack-2026-05-03-script">
-(function(){
-  "use strict";
-  if(window.__OSKAR_ULTIMATE_SPEED_PACK_20260503__) return;
-  window.__OSKAR_ULTIMATE_SPEED_PACK_20260503__ = true;
-
-  const $ = (id) => document.getElementById(id);
-  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-  const STORE_LOGO_DATA = "oskar_fast_logo_data_url_v5";
-  const STORE_LOGO_SRC = "oskar_fast_logo_original_src_v5";
-  const STORE_INDEX_STAMP = "oskar_fast_product_index_stamp_v2";
-  const QR_SRC = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
-  let productIndexStamp = "";
-  let productTextIndex = [];
-  let productBarcodeMap = new Map();
-  let productIdMap = new Map();
-  let pendingInputTimers = new Map();
-  let qrLibPromise = null;
-
-  function toast(msg, ms){
-    if(typeof window.toast === "function") return window.toast(msg, ms || 2200);
-    const el = $("toast");
-    if(el){ el.textContent = msg; el.classList.add("show"); clearTimeout(el.__fastToast); el.__fastToast = setTimeout(()=>el.classList.remove("show"), ms || 2200); }
-    else console.log(msg);
-  }
-  function esc(str){return String(str ?? "").replace(/[&<>\"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]));}
-  function num(v, fb=0){ const n = Number(String(v ?? "").replace(",",".")); return Number.isFinite(n) ? Math.round((n + Number.EPSILON) * 1000) / 1000 : fb; }
-  function money(v){ try{ return window.money ? window.money(v) : ((window.state?.settings?.currency || "₪") + " " + num(v).toFixed(3)); }catch{return "₪ " + num(v).toFixed(3);} }
-  function norm(s){
-    return String(s ?? "").toLowerCase().trim()
-      .replace(/[\u064B-\u065F\u0670]/g, "")
-      .replace(/[أإآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ؤ/g,"و").replace(/ئ/g,"ي").replace(/ة/g,"ه")
-      .replace(/\s+/g," ");
-  }
-  function unitLabel(type, custom){
-    const map = {piece:"قطعة",carton:"كرتونة",kg:"كيلو",gram:"جرام",liter:"لتر",ml:"مل",minute:"دقيقة",custom:custom||"وحدة"};
-    return map[type] || custom || type || "قطعة";
-  }
-  function productArray(){ return Array.isArray(window.state?.products) ? window.state.products : []; }
-  function normalizeProduct(p){ try{ return window.normalizeProduct ? window.normalizeProduct(p) : (p || {}); }catch{return p || {}; } }
-  function indexStamp(){
-    const arr = productArray();
-    return arr.length + ":" + arr.slice(-10).map(p => [p.id,p.updatedAt,p.name,p.barcode,p.code,p.stock,p.displaySalePrice,p.salePrice].join("|")).join("~");
-  }
-  function rebuildProductIndex(force){
-    const stamp = indexStamp();
-    if(!force && stamp === productIndexStamp) return;
-    productIndexStamp = stamp;
-    try{ sessionStorage.setItem(STORE_INDEX_STAMP, stamp); }catch{}
-    productBarcodeMap = new Map();
-    productIdMap = new Map();
-    productTextIndex = productArray().map(raw => {
-      const p = normalizeProduct(raw);
-      const codes = [p.barcode, p.code, p.id].map(x => String(x || "").trim()).filter(Boolean);
-      productIdMap.set(String(p.id), p);
-      codes.forEach(c => productBarcodeMap.set(c, p));
-      const text = norm([p.name,p.barcode,p.code,p.category,p.id].join(" "));
-      return {p, text, codes};
-    });
-    window.__oskarProductBarcodeMap = productBarcodeMap;
-    window.__oskarProductTextIndex = productTextIndex;
-  }
-  function findProductByCode(code){
-    rebuildProductIndex(false);
-    const c = String(code || "").trim();
-    if(!c) return null;
-    return productBarcodeMap.get(c) || productBarcodeMap.get(c.replace(/^0+/,"")) || null;
-  }
-  function findProducts(q, limit){
-    rebuildProductIndex(false);
-    const raw = String(q || "").trim();
-    if(!raw) return productArray().slice(0, limit || 80).map(normalizeProduct);
-    const exact = findProductByCode(raw);
-    const nq = norm(raw);
-    const out = [];
-    const seen = new Set();
-    if(exact){ out.push(exact); seen.add(exact.id); }
-    const tokens = nq.split(" ").filter(Boolean);
-    for(const row of productTextIndex){
-      if(out.length >= (limit || 80)) break;
-      if(seen.has(row.p.id)) continue;
-      if(row.text.includes(nq) || (tokens.length > 1 && tokens.every(t => row.text.includes(t)))){
-        out.push(row.p); seen.add(row.p.id);
-      }
-    }
-    return out;
-  }
-
-  function renderFastSuggestions(){
-    const input = $("cashierSearch"), box = $("suggestionsBox");
-    if(!input || !box) return;
-    const q = String(input.value || "").trim();
-    if(!q){ box.style.display = "none"; box.innerHTML = ""; return; }
-    const exact = /^\d{4,}$/.test(q) ? findProductByCode(q) : null;
-    if(exact){
-      if(typeof window.addToCart === "function"){
-        window.addToCart(exact);
-        input.value = "";
-        box.style.display = "none";
-        box.innerHTML = "";
-        return;
-      }
-    }
-    const matches = findProducts(q, 10);
-    if(!matches.length){ box.style.display = "none"; box.innerHTML = ""; return; }
-    box.innerHTML = matches.map(raw => {
-      const p = normalizeProduct(raw);
-      const unit = unitLabel(p.unitType, p.customUnit);
-      return `<div data-suggest-product="${esc(p.id)}" style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px;border-bottom:1px solid #f1f5f9;cursor:pointer">
-        <div><b>${esc(p.name)}</b><div class="muted">${esc(p.barcode || p.code || "")} · المتوفر: ${num(p.stock)} ${esc(unitLabel(p.baseUnit, p.customUnit))}</div></div>
-        <div style="text-align:left"><div class="money">${money(p.displaySalePrice || p.salePrice || 0)}</div><div class="muted" style="font-size:11px">${esc(unit)}</div></div>
-      </div>`;
-    }).join("");
-    box.style.display = "block";
-  }
-  function productCardHtml(raw){
-    const p = normalizeProduct(raw);
-    const lowLimit = num(p.lowStock || window.state?.settings?.lowStock || 5, 5);
-    const low = num(p.stock) <= lowLimit;
-    return `<div class="product-card" data-add-product="${esc(p.id)}">
-      <div class="product-icon"><i class="fa-solid fa-box"></i></div>
-      <div class="product-name">${esc(p.name)}</div>
-      <div class="money">${money(p.displaySalePrice || p.salePrice || 0)} / ${esc(unitLabel(p.unitType, p.customUnit))}</div>
-      <div class="product-meta"><span>${esc(unitLabel(p.unitType, p.customUnit))}</span><span class="stock-pill ${low ? "stock-low" : ""}">${num(p.stock)} ${esc(unitLabel(p.baseUnit, p.customUnit))}</span></div>
-      <div class="product-meta"><span>${esc(p.barcode || p.code || "-")}</span><span>${esc(p.category || "-")}</span></div>
-    </div>`;
-  }
-  function renderFastHomeProducts(){
-    const box = $("homeProductsGrid"); if(!box) return;
-    const q = $("homeProductSearch")?.value || "";
-    const rows = findProducts(q, 80);
-    box.innerHTML = rows.map(productCardHtml).join("") || `<div class="muted">لا توجد منتجات بعد</div>`;
-  }
-  function renderFastInventory(){
-    const body = $("inventoryTable"); if(!body) return;
-    const q = $("inventorySearch")?.value || "";
-    const rows = findProducts(q, q ? 350 : 260).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""), "ar"));
-    body.innerHTML = rows.map(raw => {
-      const p = normalizeProduct(raw);
-      const low = num(p.stock) <= num(p.lowStock || window.state?.settings?.lowStock || 5, 5);
-      return `<tr>
-        <td>${esc(p.barcode || p.code || "-")}</td>
-        <td><b>${esc(p.name)}</b><br><span class="muted">${esc(p.category || "-")}</span></td>
-        <td>${esc(p.category || "-")}</td>
-        <td>${esc(unitLabel(p.unitType, p.customUnit))}</td>
-        <td><span class="badge ${low ? "red" : "green"}">${num(p.stock)} ${esc(unitLabel(p.baseUnit, p.customUnit))}</span></td>
-        <td>${money(p.displayCostPrice || p.costPrice || 0)}</td>
-        <td class="money">${money(p.displaySalePrice || p.salePrice || 0)}</td>
-        <td><button class="ghost-btn" data-show-barcode="${esc(p.id)}"><i class="fa-solid fa-barcode"></i> باركود</button></td>
-        <td><button class="ghost-btn" data-edit-product="${esc(p.id)}"><i class="fa-solid fa-pen"></i> تعديل</button> <button class="danger-btn" data-delete-product="${esc(p.id)}"><i class="fa-solid fa-trash"></i> حذف</button></td>
-      </tr>`;
-    }).join("") || `<tr><td colspan="9" class="muted" style="text-align:center">لا توجد منتجات</td></tr>`;
-    if(!q && productArray().length > rows.length){
-      body.insertAdjacentHTML("beforeend", `<tr><td colspan="9" class="oskar-fast-result-note">للسرعة تم عرض أول ${rows.length} صنف. اكتب في البحث للوصول لأي صنف فوراً.</td></tr>`);
-    }
-  }
-  function debounce(id, fn, delay){
-    const el = $(id); if(!el || el.__oskarUltimateFastInput) return;
-    el.oninput = function(ev){
-      clearTimeout(pendingInputTimers.get(id));
-      const val = String(el.value || "").trim();
-      const wait = /^\d{4,}$/.test(val) ? 0 : delay;
-      pendingInputTimers.set(id, setTimeout(() => fn.call(el, ev), wait));
-    };
-    el.__oskarUltimateFastInput = true;
-  }
-  function installFastSearch(){
-    rebuildProductIndex(true);
-    window.getProductByBarcode = findProductByCode;
-    window.getProductById = function(id){ rebuildProductIndex(false); return productIdMap.get(String(id)) || productArray().find(p => String(p.id) === String(id)) || null; };
-    debounce("cashierSearch", renderFastSuggestions, 8);
-    debounce("homeProductSearch", renderFastHomeProducts, 35);
-    debounce("inventorySearch", renderFastInventory, 45);
-    // Keep all other searches light: wait until typing pauses instead of redrawing on every letter.
-    ["invoiceSearch","debtsSearch","purchaseTableSearch","supplierPaymentsSearch","expensesSearch"].forEach(id => {
-      const el = $(id); if(!el || el.__oskarUltimateSoftDebounced) return;
-      const old = el.oninput;
-      if(typeof old === "function"){
-        el.oninput = function(ev){ clearTimeout(pendingInputTimers.get(id)); pendingInputTimers.set(id, setTimeout(()=>old.call(el, ev), 95)); };
-        el.__oskarUltimateSoftDebounced = true;
-      }
-    });
-  }
-
-  function overlay(text){
-    let el = $("oskarFastExportOverlay");
-    if(!el){
-      el = document.createElement("div");
-      el.id = "oskarFastExportOverlay";
-      el.className = "oskar-fast-export-overlay";
-      el.innerHTML = '<div class="oskar-fast-export-box"><span class="oskar-fast-export-spinner"></span><span id="oskarFastExportText">جاري التجهيز...</span></div>';
-      document.body.appendChild(el);
-    }
-    const tx = $("oskarFastExportText"); if(tx) tx.textContent = text || "جاري التجهيز...";
-    document.body.classList.add("oskar-fast-working");
-    el.classList.add("show");
-  }
-  function hideOverlay(){ $("oskarFastExportOverlay")?.classList.remove("show"); document.body.classList.remove("oskar-fast-working"); }
-  function setBusy(btn, busy){
-    if(!btn) return;
-    btn.classList.toggle("oskar-export-busy", !!busy);
-    btn.classList.toggle("oskar-fast-busy", !!busy);
-    btn.disabled = !!busy;
-  }
-  function fallbackLogoSvg(){
-    const name = String(window.state?.settings?.shopName || $("topShopName")?.textContent || "Oskar").trim();
-    const ch = esc(name[0] || "O");
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#059669"/><stop offset="1" stop-color="#047857"/></linearGradient></defs><rect width="240" height="240" rx="58" fill="url(#g)"/><text x="50%" y="58%" text-anchor="middle" font-family="Arial,Tahoma,sans-serif" font-size="90" font-weight="900" fill="#fff">${ch}</text></svg>`;
-    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
-  }
-  function bestLogo(){
-    const st = window.state?.settings || {};
-    const cached = localStorage.getItem(STORE_LOGO_DATA) || "";
-    const list = [st.localLogo, cached, st.logo, st.logoUrl, st.shopLogo, $("topShopLogo")?.src, $("sideShopLogo")?.src].filter(Boolean);
-    return list.find(x => /^data:image\//i.test(String(x))) || list[0] || fallbackLogoSvg();
-  }
-  async function cacheLogoNow(){
-    const st = window.state?.settings || {};
-    const src = [st.localLogo, st.logo, st.logoUrl, st.shopLogo, $("topShopLogo")?.src, $("sideShopLogo")?.src].filter(Boolean)[0];
-    if(!src) return;
-    if(/^data:image\//i.test(src)){
-      try{ localStorage.setItem(STORE_LOGO_DATA, src); localStorage.setItem(STORE_LOGO_SRC, "local"); }catch{}
-      applyLogoFast(); return;
-    }
-    if(localStorage.getItem(STORE_LOGO_SRC) === src && localStorage.getItem(STORE_LOGO_DATA)){ applyLogoFast(); return; }
-    // Try to turn URL logo into a local data URL once. If CORS blocks it, browser/ServiceWorker cache still displays it and exports use SVG fallback.
-    try{
-      const res = await fetch(src, {mode:"cors", cache:"force-cache", credentials:"omit"});
-      if(!res.ok) throw new Error("logo fetch failed");
-      const blob = await res.blob();
-      if(blob.size > 900000) throw new Error("logo too large for localStorage");
-      const data = await new Promise((resolve,reject)=>{ const fr = new FileReader(); fr.onload=()=>resolve(fr.result); fr.onerror=reject; fr.readAsDataURL(blob); });
-      if(/^data:image\//i.test(String(data))){ localStorage.setItem(STORE_LOGO_DATA, data); localStorage.setItem(STORE_LOGO_SRC, src); applyLogoFast(); }
-    }catch(err){ try{ localStorage.setItem(STORE_LOGO_SRC, src); }catch{} }
-  }
-  function applyLogoFast(){
-    const src = bestLogo();
-    ["topShopLogo","sideShopLogo"].forEach(id => { const img=$(id); if(img && src){ img.loading="eager"; img.decoding="sync"; img.src = src; } });
-    $$(".invoice-logo,img.shop-logo").forEach(img => { if(src){ img.loading="eager"; img.decoding="sync"; img.src = src; }});
-  }
-  function waitFrame(){ return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); }
-  function safeStyles(){
-    let css = "";
-    $$('style').forEach(st => { css += "\n" + (st.textContent || ""); });
-    css += "\n*{box-sizing:border-box!important;animation:none!important;transition:none!important;filter:none!important;text-shadow:none!important}body{margin:0;background:#fff!important}.no-print,button,.sync-popover,.toast,.bottom-nav,.sidebar,.topbar .icon-btn{display:none!important}.invoice-paper,.card{box-shadow:none!important;background:#fff!important}.table-wrap{overflow:visible!important}table{width:100%!important;min-width:0!important;border-collapse:collapse!important}th,td{white-space:normal!important}";
-    return css.replace(/<\/style/gi, "<\\/style");
-  }
-  function prepareClone(node, width){
-    const clone = node.cloneNode(true);
-    clone.removeAttribute("id");
-    clone.querySelectorAll("script,iframe,video,canvas,.no-print,.sync-popover,.toast,#oskarFastExportOverlay,#oskarTurboLoading,#oskarTurboScanner,.floating-scanner,.modal-backdrop:not(.show)").forEach(x => x.remove());
-    clone.querySelectorAll("button").forEach(x => x.remove());
-    clone.querySelectorAll("input,select,textarea").forEach(el => {
-      const span = document.createElement("span");
-      span.textContent = el.tagName === "SELECT" ? (el.options[el.selectedIndex]?.text || el.value || "") : (el.value || el.placeholder || "");
-      span.style.cssText = "display:inline-block;border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px;background:#f8fafc;min-width:80px;";
-      el.replaceWith(span);
-    });
-    clone.querySelectorAll("img").forEach(img => {
-      const src = bestLogo();
-      img.removeAttribute("crossorigin");
-      img.setAttribute("src", /^data:image\//i.test(src) ? src : fallbackLogoSvg());
-      img.style.objectFit = "cover";
-      img.style.background = "#fff";
-    });
-    clone.style.width = width + "px";
-    clone.style.maxWidth = width + "px";
-    clone.style.margin = "0";
-    clone.style.background = "#fff";
-    clone.style.direction = "rtl";
-    return clone;
-  }
-  async function nodeToCanvasFast(node, opts={}){
-    if(!node) throw new Error("node missing");
-    applyLogoFast();
-    try{ if(document.fonts?.ready) await Promise.race([document.fonts.ready, new Promise(r=>setTimeout(r,120))]); }catch{}
-    const rect = node.getBoundingClientRect();
-    const width = Math.max(320, Math.ceil(opts.width || node.scrollWidth || rect.width || 850));
-    const holder = document.createElement("div");
-    holder.style.cssText = "position:fixed;left:-20000px;top:0;width:"+width+"px;background:#fff;direction:rtl;z-index:-1;opacity:1;pointer-events:none;overflow:visible";
-    const clone = prepareClone(node, width);
-    holder.appendChild(clone);
-    document.body.appendChild(holder);
-    await waitFrame();
-    const height = Math.max(120, Math.ceil(clone.scrollHeight || clone.getBoundingClientRect().height || rect.height || 600));
-    let scale = opts.scale || (height > 5000 ? .85 : (window.innerWidth <= 640 ? 1.08 : 1.18));
-    const maxArea = 14000000;
-    if(width * height * scale * scale > maxArea) scale = Math.max(.55, Math.sqrt(maxArea / (width * height)));
-    const xhtml = new XMLSerializer().serializeToString(clone);
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(width*scale)}" height="${Math.ceil(height*scale)}" viewBox="0 0 ${width} ${height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" dir="rtl"><style>${safeStyles()}</style>${xhtml}</div></foreignObject></svg>`;
-    holder.remove();
-    const img = new Image();
-    const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.ceil(width * scale);
-    canvas.height = Math.ceil(height * scale);
-    const ctx = canvas.getContext("2d", {alpha:false});
-    ctx.fillStyle = "#fff"; ctx.fillRect(0,0,canvas.width,canvas.height);
-    await new Promise((resolve,reject)=>{ img.onload=resolve; img.onerror=reject; img.src=url; });
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas;
-  }
-  function saveCanvas(canvas, filename, type="image/png", quality=.88){
-    return new Promise(resolve => {
-      const fallback = () => { const a=document.createElement("a"); a.download=filename; a.href=canvas.toDataURL(type, quality); document.body.appendChild(a); a.click(); a.remove(); resolve(); };
-      if(!canvas.toBlob) return fallback();
-      try{ canvas.toBlob(blob => { if(!blob) return fallback(); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.download=filename; a.href=url; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 1400); resolve(); }, type, quality); }
-      catch{ fallback(); }
-    });
-  }
-  function targetForButton(btn){
-    const id = btn?.id || "";
-    if(id.includes("Invoice") || id.includes("thermal")) return document.querySelector(".oskar-thermal-receipt[data-oskar-thermal-receipt]") || $("invoiceViewBox")?.querySelector(".invoice-paper") || $("invoiceViewBox");
-    if(id.includes("Invoices")) return $("page-invoices")?.querySelector(".card:last-child") || $("page-invoices");
-    if(id.includes("Reports")) return $("page-reports") || $("reportsContent") || document.querySelector("#page-reports .card");
-    return null;
-  }
-  function filenameFor(btn, ext){
-    const title = $("modalTitle")?.textContent || "";
-    const inv = (title.match(/\d+/) || [""])[0] || Date.now();
-    if((btn?.id || "").includes("Reports")) return `reports-${new Date().toISOString().slice(0,10)}.${ext}`;
-    if((btn?.id || "").includes("Invoices") && !(btn?.id || "").includes("InvoiceBtn")) return `invoices-${new Date().toISOString().slice(0,10)}.${ext}`;
-    return `invoice-${inv}.${ext}`;
-  }
-  async function exportImageFast(btn){
-    const node = targetForButton(btn); if(!node) return toast("افتح السجل أو الفاتورة أولاً");
-    setBusy(btn, true); overlay("تنزيل الصورة بسرعة من التخزين المحلي...");
-    try{ const canvas = await nodeToCanvasFast(node, {scale: (btn.id || "").includes("Invoice") ? 1.35 : undefined}); await saveCanvas(canvas, filenameFor(btn,"png"), "image/png", .9); toast("تم تنزيل الصورة بسرعة"); }
-    catch(err){ console.error("fast image export", err); toast("تعذر تنزيل الصورة بهذه الطريقة، استخدم زر الطباعة للحفظ PDF"); }
-    finally{ hideOverlay(); setBusy(btn, false); }
-  }
-  async function waitJsPdf(){
-    if(window.jspdf?.jsPDF) return true;
-    await new Promise(r => setTimeout(r, 450));
-    return !!window.jspdf?.jsPDF;
-  }
-  async function exportPdfFast(btn){
-    const node = targetForButton(btn); if(!node) return toast("افتح السجل أو الفاتورة أولاً");
-    setBusy(btn, true); overlay("تجهيز PDF سريع محليًا...");
-    try{
-      if(!await waitJsPdf()){ hideOverlay(); nativePrintNode(node); toast("تم فتح الطباعة، اختر حفظ كـ PDF"); return; }
-      const canvas = await nodeToCanvasFast(node, {scale: (btn.id || "").includes("Invoice") ? 1.15 : .88});
-      const img = canvas.toDataURL("image/jpeg", .82);
-      const { jsPDF } = window.jspdf;
-      const isThermal = (btn.id || "").includes("thermal") || document.querySelector(".oskar-thermal-receipt[data-oskar-thermal-receipt]");
-      if(isThermal && (btn.id || "").includes("Invoice")){
-        const w = 80, h = Math.max(90, canvas.height * w / canvas.width);
-        const pdf = new jsPDF({orientation:"p", unit:"mm", format:[w,h], compress:true});
-        pdf.addImage(img, "JPEG", 0, 0, w, h, undefined, "FAST");
-        pdf.save(filenameFor(btn,"pdf"));
-      }else{
-        const pdf = new jsPDF("p","mm","a4",true);
-        const pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight(), m = 5;
-        const imgW = pageW - m*2, imgH = canvas.height * imgW / canvas.width;
-        if(imgH <= pageH - m*2) pdf.addImage(img,"JPEG",m,m,imgW,imgH,undefined,"FAST");
-        else{ let y=0, step=pageH-m*2; while(y<imgH){ pdf.addImage(img,"JPEG",m,m-y,imgW,imgH,undefined,"FAST"); y += step; if(y<imgH) pdf.addPage(); } }
-        pdf.save(filenameFor(btn,"pdf"));
-      }
-      toast("تم تجهيز PDF بسرعة");
-    }catch(err){ console.error("fast pdf export", err); nativePrintNode(node); toast("تم فتح الطباعة، اختر حفظ كـ PDF"); }
-    finally{ hideOverlay(); setBusy(btn, false); }
-  }
-  function nativePrintNode(node){
-    if(!node) return;
-    const area = $("printArea") || document.body.appendChild(Object.assign(document.createElement("div"), {id:"printArea"}));
-    const clone = prepareClone(node, Math.max(320, Math.ceil(node.scrollWidth || node.getBoundingClientRect().width || 850)));
-    area.innerHTML = "";
-    area.appendChild(clone);
-    area.style.display = "block";
-    document.body.classList.add("oskar-native-printing");
-    setTimeout(() => { try{ window.print(); } finally{ setTimeout(()=>{ document.body.classList.remove("oskar-native-printing"); area.style.display="none"; area.innerHTML=""; }, 450); } }, 60);
-  }
-
-  async function loadQrLibWarm(){
-    if(window.Html5Qrcode) return true;
-    if(qrLibPromise) return qrLibPromise;
-    qrLibPromise = new Promise(resolve => {
-      const old = [...document.scripts].find(s => (s.src || "").includes("html5-qrcode"));
-      if(old){ old.addEventListener("load",()=>resolve(true),{once:true}); setTimeout(()=>resolve(!!window.Html5Qrcode), 700); return; }
-      const sc = document.createElement("script"); sc.src = QR_SRC; sc.async = true; sc.onload=()=>resolve(true); sc.onerror=()=>resolve(false); document.head.appendChild(sc);
-    });
-    return qrLibPromise;
-  }
-  function installClickAcceleration(){
-    document.addEventListener("pointerdown", function(e){
-      const b = e.target.closest && e.target.closest("button,.product-card,.payment-choice,[data-page],[data-add-product],#addProductBtn,#quickAddBtn,#openScannerBtn,#scanProductBarcodeBtn");
-      if(!b) return;
-      b.classList.add("oskar-fast-pressed");
-      if(b.id === "openScannerBtn" || b.id === "scanProductBarcodeBtn") loadQrLibWarm();
-      setTimeout(()=>b.classList.remove("oskar-fast-pressed"), 180);
-    }, {capture:true, passive:true});
-
-    document.addEventListener("click", function(e){
-      const btn = e.target.closest && e.target.closest("#imageInvoiceBtn,#thermalImageInvoiceBtn,#imageInvoicesBtn,#imageReportsBtn,#pdfInvoiceBtn,#thermalPdfInvoiceBtn,#pdfInvoicesBtn,#pdfReportsBtn,#printInvoiceBtn,#printInvoicesBtn,#printReportsBtn");
-      if(!btn) return;
-      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-      if(btn.id.startsWith("print")) return nativePrintNode(targetForButton(btn));
-      if(btn.id.toLowerCase().includes("image")) return void exportImageFast(btn);
-      if(btn.id.toLowerCase().includes("pdf")) return void exportPdfFast(btn);
-    }, true);
-  }
-
-  function patchLocalFirstSave(){
-    if(window.__oskarUltimateLocalFirstPatched || typeof window.saveLocal !== "function" || typeof window.saveLocalBatch !== "function") return;
-    window.__oskarUltimateLocalFirstPatched = true;
-    const oldSaveLocal = window.saveLocal;
-    const oldSaveBatch = window.saveLocalBatch;
-    // Keep the screen responsive: local IndexedDB save is awaited, Firebase sync remains queued/background.
-    window.saveLocal = async function(store, item, sync=true, meta={}){
-      const saved = await oldSaveLocal.call(this, store, item, sync, meta);
-      if(store === "products") rebuildProductIndex(true);
-      return saved;
-    };
-    window.saveLocalBatch = async function(ops=[], sync=true){
-      const saved = await oldSaveBatch.call(this, ops, sync);
-      if((ops || []).some(op => op?.store === "products")) rebuildProductIndex(true);
-      return saved;
-    };
-  }
-  function init(){
-    installFastSearch();
-    patchLocalFirstSave();
-    installClickAcceleration();
-    applyLogoFast();
-    cacheLogoNow();
-    setTimeout(()=>{ installFastSearch(); patchLocalFirstSave(); renderFastHomeProducts(); }, 500);
-    setTimeout(()=>{ installFastSearch(); cacheLogoNow(); }, 1800);
-    setInterval(()=>{ try{ rebuildProductIndex(false); applyLogoFast(); }catch{} }, 3500);
-  }
-  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, {once:true}); else init();
-  window.addEventListener("load", () => { init(); loadQrLibWarm(); }, {once:true});
-})();
-</script>
 </body>
 </html>
