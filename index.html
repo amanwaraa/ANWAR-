@@ -6644,8 +6644,8 @@
     const currencies = currencyOptions(getBaseCurrency().code);
     el.innerHTML = `<div class="space-y-5">
       <div class="flex justify-between items-center gap-3 flex-wrap"><div><h2 class="text-2xl font-extrabold">الكاشير</h2><p class="text-sm text-slate-500 mt-1">بيع بالقطعة/الكرتونة/الكيلو/اللتر مع دين وحساب دفع</p></div><div class="flex gap-2 flex-wrap"><button onclick="openFeeScanner('fee-cashier-search','cashier')" class="btn bg-slate-900 text-white px-4 py-3 rounded-2xl font-extrabold"><i class="fas fa-camera"></i> باركود</button><button onclick="openManualCashierItemModalPro()" class="btn bg-blue-600 text-white px-4 py-3 rounded-2xl font-extrabold"><i class="fas fa-plus"></i> صنف يدوي</button></div></div>
-      <div class="grid lg:grid-cols-[1fr_390px] gap-4 items-start"><div class="fee-card p-4"><input id="fee-cashier-search" class="input" placeholder="بحث بالاسم أو الباركود..." oninput="feeFilterCashier()"><div id="fee-products-grid" class="fee-product-grid mt-4">${productCards(products)}</div></div>
-      <div class="fee-card p-4 sticky top-[92px]"><h3 class="font-extrabold text-xl mb-3"><i class="fas fa-receipt"></i> السلة</h3><div id="fee-cart-list" class="max-h-[330px] overflow-auto">${cartRows()}</div>
+      <div class="grid fee-cashier-layout lg:grid-cols-[1fr_390px] gap-5 items-start"><div class="fee-card p-4 fee-products-card"><input id="fee-cashier-search" class="input" placeholder="بحث بالاسم أو الباركود..." oninput="feeFilterCashier()"><div id="fee-products-grid" class="fee-product-grid mt-4">${productCards(products)}</div></div>
+      <div class="fee-card p-4 sticky top-[92px] fee-cart-card"><h3 class="font-extrabold text-xl mb-3"><i class="fas fa-receipt"></i> السلة</h3><div id="fee-cart-list" class="max-h-[330px] overflow-auto">${cartRows()}</div>
       <div class="mt-4 fee-two-grid"><div><label class="block text-xs font-bold mb-1">خصم</label><input id="fee-cashier-discount" class="input" type="number" step="0.01" value="0" oninput="updateCartTotalsOnly()"></div><div><label class="block text-xs font-bold mb-1">عملة الخصم/الدفع</label><select id="fee-cashier-currency" class="select" onchange="updateCartTotalsOnly()">${currencies}</select></div><div><label class="block text-xs font-bold mb-1">مدفوع الآن</label><input id="fee-cashier-paid" class="input" type="number" step="0.01" oninput="updateCartTotalsOnly()"></div><div><label class="block text-xs font-bold mb-1">حساب الدفع</label><select id="fee-cashier-account" class="select"><option value="">بدون حساب</option>${accounts}</select></div></div>
       <div class="mt-3"><input id="fee-cashier-customer" class="input" placeholder="اسم الزبون، اتركه فارغ لكاش" oninput="showFeeCustomerQuickSuggest(this.value,'fee-cashier-cust-suggest')"><input id="fee-cashier-customer-id" type="hidden"><div id="fee-cashier-cust-suggest" class="suggestions-box hidden-force"></div></div>
       <div id="fee-cart-totals" class="mt-4 space-y-2 text-sm"></div><button onclick="openCashierPaymentFlowPro()" class="btn w-full mt-4 bg-green-600 text-white py-4 rounded-2xl font-extrabold"><i class="fas fa-arrow-left"></i> التالي</button><button onclick="clearCashierCartPro()" class="btn w-full mt-2 bg-slate-100 text-slate-700 py-3 rounded-2xl font-extrabold">تفريغ السلة</button></div></div></div>`;
@@ -6745,6 +6745,7 @@
     cart=[]; refreshShortages(false); closeModal(); syncAndSave('add_cashier_invoice',{invoiceId:invoice.id, paymentMethod:mode}); showToast('تم إصدار الفاتورة وتحديث الحسابات','success');
     return invoice;
   }
+  window.createCashierInvoicePro = createCashierInvoicePro;
   window.openCashierPaymentFlowPro = function(){
     normalizeProData();
     if(!cart.length){ showToast('السلة فارغة','error'); return; }
@@ -7036,26 +7037,63 @@
     if(!(blob instanceof Blob) || blob.size === 0){ toast('الملف فارغ ولم يتم تنزيله','error'); return false; }
     const safe = uniqueName(filename);
     const url = URL.createObjectURL(blob);
-    const direct = () => {
+    const makeAnchor = (doc=document) => {
+      const a = doc.createElement('a');
+      a.href = url;
+      a.download = safe;
+      a.target = '_self';
+      a.rel = 'noopener';
+      a.textContent = 'تنزيل الملف';
+      a.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:2147483647;background:#2563eb;color:#fff;padding:12px 16px;border-radius:14px;font-weight:800;text-decoration:none;font-family:Arial,sans-serif';
+      return a;
+    };
+    const clickAnchor = (a) => {
       try{
-        const a=document.createElement('a');
-        a.href=url; a.download=safe; a.rel='noopener';
-        a.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:.01;z-index:-1';
-        document.body.appendChild(a); a.click();
-        setTimeout(()=>{try{a.remove();}catch{}},2500);
+        a.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true, view:window}));
         return true;
-      }catch(e){ console.warn(e); return false; }
+      }catch(e){
+        try{ a.click(); return true; }catch(err){ console.warn(err); return false; }
+      }
+    };
+    const direct = () => {
+      let ok = false;
+      try{
+        const a = makeAnchor(document);
+        a.style.cssText='position:fixed;left:0;top:0;width:44px;height:44px;opacity:.01;z-index:2147483647';
+        document.body.appendChild(a);
+        ok = clickAnchor(a);
+        setTimeout(()=>{ try{ a.remove(); }catch{} }, 4000);
+      }catch(e){ console.warn(e); }
+      try{
+        let holder = document.getElementById('fee-last-download-link');
+        if(!holder){
+          holder = document.createElement('div');
+          holder.id = 'fee-last-download-link';
+          holder.style.cssText='position:fixed;left:10px;bottom:86px;z-index:2147483647;display:none;background:#fff;border:1px solid #dbe7ff;border-radius:18px;box-shadow:0 12px 36px rgba(15,23,42,.20);padding:10px;font-family:Arial,sans-serif;direction:rtl';
+          document.body.appendChild(holder);
+        }
+        holder.innerHTML = `<div style="font-weight:800;color:#0f172a;margin-bottom:8px">الملف جاهز</div><a href="${url}" download="${safe}" style="display:inline-flex;background:#2563eb;color:#fff;text-decoration:none;padding:10px 14px;border-radius:12px;font-weight:800">اضغط هنا إذا لم يبدأ التنزيل</a><button type="button" onclick="this.parentElement.style.display='none'" style="margin-right:8px;border:0;background:#f1f5f9;padding:10px 12px;border-radius:12px;font-weight:800">إغلاق</button>`;
+        setTimeout(()=>{ try{ if(holder) holder.style.display='block'; }catch{} }, 700);
+      }catch(e){}
+      try{
+        const frame=document.createElement('iframe');
+        frame.style.cssText='position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;top:-10px';
+        frame.src=url;
+        document.body.appendChild(frame);
+        setTimeout(()=>{try{frame.remove();}catch{}},10000);
+      }catch(e){}
+      return ok;
     };
     if(ticket && !ticket.closed){
       try{
         ticket.document.open();
-        ticket.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تحميل الملف</title><style>body{font-family:Arial,sans-serif;background:#f8fafc;color:#0f172a;text-align:center;padding:28px}.box{background:#fff;border:1px solid #e5e7eb;border-radius:24px;padding:22px;box-shadow:0 16px 45px rgba(15,23,42,.12);max-width:380px;margin:12vh auto}a,button{display:inline-flex;align-items:center;justify-content:center;margin:8px;background:#2563eb;color:#fff;text-decoration:none;padding:13px 18px;border-radius:16px;font-weight:800;border:0}</style></head><body><div class="box"><h2>الملف جاهز</h2><p>لو لم يبدأ التنزيل تلقائيًا اضغط الزر الأزرق.</p><a id="dl" href="${url}" download="${safe}">تنزيل الملف</a><br><button onclick="window.close()">إغلاق</button></div><script>setTimeout(function(){document.getElementById('dl').click()},120);setTimeout(function(){try{window.close()}catch(e){}},2600);<\/script></body></html>`);
+        ticket.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تحميل الملف</title><style>body{font-family:Arial,sans-serif;background:#f8fafc;color:#0f172a;text-align:center;padding:28px}.box{background:#fff;border:1px solid #e5e7eb;border-radius:24px;padding:22px;box-shadow:0 16px 45px rgba(15,23,42,.12);max-width:380px;margin:12vh auto}a,button{display:inline-flex;align-items:center;justify-content:center;margin:8px;background:#2563eb;color:#fff;text-decoration:none;padding:13px 18px;border-radius:16px;font-weight:800;border:0}.muted{color:#64748b;line-height:1.8;font-size:14px}</style></head><body><div class="box"><h2>الملف جاهز</h2><p class="muted">سيبدأ التنزيل تلقائياً. إذا لم يبدأ، اضغط الزر الأزرق. لن تحتاج لتحديث الصفحة.</p><a id="dl" href="${url}" download="${safe}">تنزيل الملف</a><br><button onclick="window.close()">إغلاق</button></div><script>function go(){var a=document.getElementById('dl');try{a.click()}catch(e){} setTimeout(function(){try{location.href=a.href}catch(e){}},450)}; setTimeout(go,80);<\/script></body></html>`);
         ticket.document.close();
       }catch(e){ direct(); }
     } else {
       direct();
     }
-    setTimeout(()=>{ try{URL.revokeObjectURL(url);}catch{} }, 90000);
+    setTimeout(()=>{ try{URL.revokeObjectURL(url);}catch{} }, 180000);
     return true;
   }
   function canvasBlob(canvas,type='image/png',quality=.92){
@@ -7208,6 +7246,58 @@
   window.render = function(){ const res = prevRender.apply(this, arguments); setTimeout(()=>{ try{normalizeBasics(); maybeGenerateMonthlyWages(); fixHeaderAndNav(); ensureMenuAndBackdrop();}catch(e){console.warn(e);} },0); return res; };
   window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{normalizeBasics();fixHeaderAndNav();ensureMenuAndBackdrop();},80));
   setTimeout(()=>{ try{normalizeBasics();fixHeaderAndNav();ensureMenuAndBackdrop();}catch(e){} },120);
+})();
+</script>
+
+
+
+<style id="fee-final-mobile-nav-fixes">
+  html,body{max-width:100%!important;overflow-x:hidden!important;}
+  #appRoot,#app-container{max-width:100vw!important;overflow-x:hidden!important;}
+  #app-container{padding-inline:12px!important;}
+  .glass-header{min-height:62px!important;padding:7px 12px!important;align-items:center!important;gap:8px!important;}
+  .glass-header .w-14.h-14{width:44px!important;height:44px!important;border-radius:16px!important;}
+  .glass-header h1{font-size:17px!important;line-height:1.15!important;margin:0!important;}
+  .glass-header .min-w-0{min-width:0!important;}
+  .glass-header .flex.items-center.gap-3{gap:8px!important;}
+  #feeMenuToggle{order:-10!important;width:42px!important;height:42px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;border-radius:14px!important;background:#fff!important;border:1px solid #e5e7eb!important;}
+  #feeConnectionChip{display:inline-flex;align-items:center;gap:7px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:7px 9px;font-size:12px;font-weight:900;color:#334155;white-space:nowrap;}
+  #feeConnectionChip .online-dot,#feeConnectionChip .offline-dot{width:9px!important;height:9px!important;box-shadow:0 0 0 5px rgba(22,163,74,.12)!important;}
+  #feeConnectionChip .offline-dot{box-shadow:0 0 0 5px rgba(220,38,38,.12)!important;}
+  .fee-header-hidden-status{display:none!important;}
+  .bottom-nav{height:72px!important;z-index:999900!important;display:grid!important;grid-template-columns:repeat(5,1fr)!important;gap:2px!important;overflow:hidden!important;justify-content:stretch!important;}
+  .bottom-nav .nav-btn{display:flex!important;min-width:0!important;flex:1 1 auto!important;border-radius:18px!important;color:#6b7280!important;}
+  .bottom-nav .nav-btn.fee-bottom-active{color:var(--primary)!important;font-weight:1000!important;background:rgba(45,89,216,.08)!important;}
+  .bottom-nav .nav-btn.fee-bottom-active i{color:var(--primary)!important;transform:translateY(-1px);}
+  #feeSideBackdrop{position:fixed;inset:0;z-index:2147482998;background:rgba(15,23,42,.34);backdrop-filter:blur(3px);display:none}.fee-side-open #feeSideBackdrop,#feeSideBackdrop.show{display:block!important;}
+  #feeSideMenu{z-index:2147483000!important;top:0!important;right:0!important;bottom:0!important;width:min(360px,92vw)!important;max-height:100dvh!important;border-radius:0 0 0 28px!important;}
+  .modal-backdrop{position:fixed!important;inset:0!important;width:100vw!important;max-width:100vw!important;align-items:center!important;justify-content:center!important;padding:14px!important;overflow:hidden!important;z-index:2147482500!important;}
+  .modal-panel{margin:auto!important;width:min(920px,calc(100vw - 28px))!important;max-height:calc(100dvh - 34px)!important;overflow:auto!important;border-radius:28px!important;}
+  .fee-cashier-layout{gap:18px!important;align-items:start!important;}
+  .fee-products-card{margin-bottom:4px!important;}
+  .fee-cart-card{margin-top:6px!important;top:72px!important;}
+  .fee-cashier-cart-line{display:grid!important;align-items:center!important;gap:7px!important;min-width:0!important;}
+  .fee-cashier-cart-line .input,.fee-cashier-cart-line .select{min-width:0!important;font-size:14px!important;}
+  @media(max-width:900px){body{padding-bottom:82px!important;}#app-container{padding-inline:10px!important;}.glass-header{position:sticky!important;top:0!important;}.glass-header > div:last-child{gap:5px!important;}.glass-header button{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;border-radius:13px;}#feeConnectionChip{padding:6px 8px;font-size:11px;}.fee-cashier-layout{display:grid!important;grid-template-columns:1fr!important;gap:18px!important;}.fee-cart-card{position:relative!important;top:auto!important;margin-top:8px!important;}.fee-cashier-cart-line{grid-template-columns:minmax(0,1.35fr) 72px 82px 40px!important;}.fee-cashier-cart-line > div:nth-child(4){display:none!important;}.fee-cashier-cart-line > div:first-child{min-width:0!important;}.fee-cashier-cart-line > div:first-child .font-extrabold{white-space:normal!important;line-height:1.25!important;}.fee-cashier-cart-line button{width:38px!important;height:38px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;}}
+  @media(max-width:420px){.glass-header{padding:6px 9px!important;}.glass-header .w-14.h-14{width:40px!important;height:40px!important;}.glass-header h1{font-size:16px!important;max-width:104px!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;}.fee-cashier-cart-line{grid-template-columns:minmax(0,1.15fr) 64px 72px 36px!important;gap:5px!important;}.fee-cashier-cart-line .input,.fee-cashier-cart-line .select{padding:7px 6px!important;min-height:40px!important;font-size:13px!important;}}
+</style>
+<script id="fee-final-mobile-nav-fixes-script">
+(function(){
+  const $ = id => document.getElementById(id);
+  const bottomItems = [['home','fa-home','الرئيسية'],['cashier','fa-cash-register','الكاشير'],['inventory','fa-boxes-stacked','الأصناف'],['invoices','fa-file-invoice','الفواتير'],['customers','fa-users','العملاء']];
+  const sideItems = [['home','fa-home','الرئيسية'], ['cashier','fa-cash-register','الكاشير'], ['inventory','fa-boxes-stacked','الأصناف والمخزون'], ['customers','fa-users','العملاء والديون'], ['invoices','fa-file-invoice','الفواتير'], ['reports','fa-chart-pie','التقارير'], ['purchases','fa-truck-ramp-box','المشتريات'], ['shortages','fa-triangle-exclamation','البضاعة الناقصة'], ['expenses','fa-money-bill-wave','المصاريف'], ['workers','fa-users-gear','أجور العمال'], ['accounts','fa-wallet','حسابات الدفع'], ['supplierPayments','fa-hand-holding-dollar','دفعات التجار'], ['settings','fa-cog','الإعدادات']];
+  function activeFor(key){ const cur = window.state?.currentScreen || 'home'; return key===cur || (key==='customers' && cur==='customerDetail') || (key==='invoices' && cur==='invoiceDetail'); }
+  function rebuildBottomNav(){ const nav = document.querySelector('.bottom-nav'); if(!nav) return; const html = bottomItems.map(([key,icon,label])=>`<button onclick="navigate('${key}')" class="flex flex-col items-center p-2 nav-btn ${activeFor(key)?'fee-bottom-active text-blue-600':'text-gray-500'}" id="nav-${key}"><i class="fas ${icon} text-[22px]"></i><span class="text-[10px] mt-1">${label}</span></button>`).join(''); if(nav.getAttribute('data-fee-final-bottom') !== '1' || nav.innerHTML.indexOf('nav-customers') === -1){ nav.innerHTML = html; nav.setAttribute('data-fee-final-bottom','1'); } nav.querySelectorAll('.nav-btn').forEach(btn=>{ const key=(btn.id||'').replace('nav-',''); const on=activeFor(key); btn.classList.toggle('fee-bottom-active',on); btn.classList.toggle('text-blue-600',on); btn.classList.toggle('text-gray-500',!on); }); }
+  function ensureSideMenu(){ if(!$('feeSideBackdrop')){ const bd=document.createElement('div'); bd.id='feeSideBackdrop'; bd.className='no-print'; bd.onclick=()=>closeSide(); document.body.appendChild(bd); } let side=$('feeSideMenu'); if(!side){ side=document.createElement('aside'); side.id='feeSideMenu'; side.className='no-print'; document.body.appendChild(side); } const cur = window.state?.currentScreen || 'home'; side.innerHTML = `<div class="fee-side-title"><span><i class="fas fa-layer-group"></i> أقسام النظام</span><button class="fee-action-chip" type="button" onclick="document.body.classList.remove('fee-side-open');document.getElementById('feeSideBackdrop')?.classList.remove('show');document.getElementById('feeSideMenu')?.classList.remove('show')"><i class="fas fa-xmark"></i></button></div>` + sideItems.map(([key,icon,label])=>`<button class="fee-side-btn ${key===cur?'active':''}" type="button" onclick="document.body.classList.remove('fee-side-open');document.getElementById('feeSideBackdrop')?.classList.remove('show');document.getElementById('feeSideMenu')?.classList.remove('show');navigate('${key}')"><i class="fas ${icon}"></i><span>${label}</span></button>`).join(''); }
+  function openSide(){ ensureSideMenu(); document.body.classList.add('fee-side-open'); $('feeSideBackdrop')?.classList.add('show'); $('feeSideMenu')?.classList.add('show'); }
+  function closeSide(){ document.body.classList.remove('fee-side-open'); $('feeSideBackdrop')?.classList.remove('show'); $('feeSideMenu')?.classList.remove('show'); }
+  window.openFeeSideMenuFinal = openSide;
+  function compactHeader(){ const header=document.querySelector('header.glass-header'); if(!header) return; const brand=header.querySelector('.flex.items-center.gap-3') || header.firstElementChild; let menu=$('feeMenuToggle'); if(!menu){ menu=document.createElement('button'); menu.id='feeMenuToggle'; menu.type='button'; menu.innerHTML='<i class="fas fa-bars text-lg"></i>'; } menu.className='p-2 hover:bg-white rounded-full transition-colors'; menu.onclick=openSide; if(brand && menu.parentElement!==brand) brand.prepend(menu); const dot=$('connectionDot'), txt=$('connectionText'); if(dot) dot.classList.add('fee-header-hidden-status'); if(txt) txt.classList.add('fee-header-hidden-status'); const actions=header.querySelector('div.flex.items-center.gap-2') || header.lastElementChild; if(actions){ const settingsBtn=[...actions.querySelectorAll('button')].find(b=>(b.getAttribute('onclick')||'').includes("navigate('settings')")); if(settingsBtn) settingsBtn.style.display='none'; const cust=$('feeHeaderCustomersBtn'); if(cust) cust.remove(); let chip=$('feeConnectionChip'); if(!chip){ chip=document.createElement('span'); chip.id='feeConnectionChip'; } const online = navigator.onLine; const text = txt?.textContent || (online?'متصل':'غير متصل'); chip.innerHTML = `<span class="${online?'online-dot':'offline-dot'}"></span><span>${text}</span>`; const syncBtn=[...actions.querySelectorAll('button')].find(b=>(b.getAttribute('onclick')||'').includes('openSyncCenter')) || actions.querySelector('button'); if(syncBtn && chip.parentElement!==actions) syncBtn.insertAdjacentElement('afterend', chip); } }
+  function fixCashierSpacing(){ const search=$('fee-cashier-search'); if(!search) return; const grid=search.closest('.grid'); if(grid) grid.classList.add('fee-cashier-layout'); const prod=search.closest('.fee-card'); if(prod) prod.classList.add('fee-products-card'); const cart=$('fee-cart-list')?.closest('.fee-card'); if(cart) cart.classList.add('fee-cart-card'); }
+  const prevRender = window.render;
+  window.render = function(){ const res = prevRender.apply(this, arguments); setTimeout(()=>{ try{ const container=$('app-container'); if(window.state?.currentScreen==='workers' && typeof window.renderWorkersPro==='function' && container){ window.renderWorkersPro(container); } rebuildBottomNav(); ensureSideMenu(); compactHeader(); fixCashierSpacing(); }catch(e){ console.warn(e); } },0); return res; };
+  document.addEventListener('click', function(e){ const t=e.target.closest && e.target.closest('#feeMenuToggle'); if(t){ e.preventDefault(); openSide(); } }, true);
+  window.addEventListener('online',()=>setTimeout(compactHeader,50)); window.addEventListener('offline',()=>setTimeout(compactHeader,50)); window.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{rebuildBottomNav();ensureSideMenu();compactHeader();fixCashierSpacing();},100)); setTimeout(()=>{rebuildBottomNav();ensureSideMenu();compactHeader();fixCashierSpacing();},180);
 })();
 </script>
 
