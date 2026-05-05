@@ -7301,5 +7301,406 @@
 })();
 </script>
 
+
+
+<!-- fee absolutely final nav/status fix 2026-05-05 -->
+<style id="fee-absolutely-final-nav-status-fix">
+  /* إخفاء حالة الاتصال القديمة تحت اسم المحل */
+  #connectionDot,
+  #connectionText,
+  .fee-header-hidden-status{
+    display:none!important;
+    visibility:hidden!important;
+    width:0!important;
+    height:0!important;
+    overflow:hidden!important;
+  }
+
+  /* هيدر أقصر وأوضح */
+  header.glass-header{
+    min-height:56px!important;
+    padding:6px 10px!important;
+    gap:8px!important;
+    overflow:hidden!important;
+  }
+  header.glass-header > div:first-child{
+    min-width:0!important;
+    gap:8px!important;
+  }
+  header.glass-header .w-14.h-14{
+    width:42px!important;
+    height:42px!important;
+    border-radius:16px!important;
+  }
+  #header-shop-name{
+    font-size:17px!important;
+    line-height:1.15!important;
+    max-width:150px!important;
+    white-space:nowrap!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    margin:0!important;
+  }
+  #feeMenuToggle{
+    order:-20!important;
+    width:42px!important;
+    height:42px!important;
+    min-width:42px!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    border-radius:15px!important;
+    background:#fff!important;
+    border:1px solid #e5e7eb!important;
+    color:#0f172a!important;
+    box-shadow:0 8px 18px rgba(15,23,42,.06)!important;
+  }
+  header.glass-header > div:last-child{
+    gap:5px!important;
+    min-width:0!important;
+    flex-shrink:0!important;
+  }
+  header.glass-header > div:last-child button{
+    width:38px!important;
+    height:38px!important;
+    min-width:38px!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    border-radius:13px!important;
+  }
+
+  /* الحالة بجانب زر المزامنة */
+  #feeConnectionChipFinal{
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:6px!important;
+    height:34px!important;
+    padding:0 9px!important;
+    border-radius:999px!important;
+    background:#f8fafc!important;
+    border:1px solid #e2e8f0!important;
+    color:#334155!important;
+    font-size:11px!important;
+    font-weight:900!important;
+    line-height:1!important;
+    white-space:nowrap!important;
+    box-shadow:0 8px 16px rgba(15,23,42,.04)!important;
+  }
+  #feeConnectionChipFinal .dot{
+    width:9px!important;
+    height:9px!important;
+    min-width:9px!important;
+    border-radius:999px!important;
+    display:inline-block!important;
+    background:#22c55e!important;
+    box-shadow:0 0 0 5px rgba(34,197,94,.14)!important;
+  }
+  #feeConnectionChipFinal.offline .dot{
+    background:#ef4444!important;
+    box-shadow:0 0 0 5px rgba(239,68,68,.14)!important;
+  }
+
+  /* الشريط السفلي النهائي: الرئيسية، الكاشير، الأصناف، الفواتير، العملاء */
+  .bottom-nav{
+    height:72px!important;
+    z-index:2147482000!important;
+    display:grid!important;
+    grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    gap:2px!important;
+    overflow:hidden!important;
+    justify-content:stretch!important;
+    align-items:stretch!important;
+    padding:6px 6px!important;
+  }
+  .bottom-nav .nav-btn{
+    display:flex!important;
+    min-width:0!important;
+    width:100%!important;
+    height:60px!important;
+    flex:1 1 0!important;
+    align-items:center!important;
+    justify-content:center!important;
+    border-radius:18px!important;
+    color:#6b7280!important;
+    background:transparent!important;
+    transition:.15s ease!important;
+  }
+  .bottom-nav .nav-btn i,
+  .bottom-nav .nav-btn span{
+    color:inherit!important;
+  }
+  .bottom-nav .nav-btn.fee-bottom-active,
+  .bottom-nav .nav-btn.text-blue-600{
+    color:var(--primary)!important;
+    background:rgba(45,89,216,.10)!important;
+    font-weight:1000!important;
+  }
+  .bottom-nav .nav-btn.fee-bottom-active i,
+  .bottom-nav .nav-btn.text-blue-600 i{
+    color:var(--primary)!important;
+    transform:translateY(-1px)!important;
+  }
+  .bottom-nav .nav-btn.text-gray-500:not(.fee-bottom-active){
+    color:#6b7280!important;
+  }
+
+  /* هذا يكسر القاعدة القديمة التي كانت تخفي العملاء وتظهر التقارير */
+  #appRoot.fee-sidebar-on .bottom-nav .nav-btn{
+    display:none!important;
+  }
+  #appRoot.fee-sidebar-on .bottom-nav #nav-home,
+  #appRoot.fee-sidebar-on .bottom-nav #nav-cashier,
+  #appRoot.fee-sidebar-on .bottom-nav #nav-inventory,
+  #appRoot.fee-sidebar-on .bottom-nav #nav-invoices,
+  #appRoot.fee-sidebar-on .bottom-nav #nav-customers{
+    display:flex!important;
+  }
+  #appRoot.fee-sidebar-on .bottom-nav #nav-reports,
+  .bottom-nav #nav-reports,
+  .bottom-nav #nav-settings{
+    display:none!important;
+  }
+
+  #feeSideMenu{
+    z-index:2147483000!important;
+  }
+  #feeSideBackdrop{
+    z-index:2147482998!important;
+  }
+
+  @media(max-width:520px){
+    header.glass-header{min-height:54px!important;padding:5px 8px!important;}
+    #header-shop-name{font-size:16px!important;max-width:112px!important;}
+    #feeConnectionChipFinal{font-size:10.5px!important;padding:0 7px!important;height:32px!important;}
+    header.glass-header > div:last-child button{width:35px!important;height:35px!important;min-width:35px!important;}
+    #feeMenuToggle{width:40px!important;height:40px!important;min-width:40px!important;}
+    header.glass-header .w-14.h-14{width:40px!important;height:40px!important;}
+  }
+</style>
+<script id="fee-absolutely-final-nav-status-fix-script">
+(function(){
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const bottomItems = [
+    ['home','fa-home','الرئيسية'],
+    ['cashier','fa-cash-register','الكاشير'],
+    ['inventory','fa-boxes-stacked','الأصناف'],
+    ['invoices','fa-file-invoice','الفواتير'],
+    ['customers','fa-users','العملاء']
+  ];
+  const sideItems = [
+    ['home','fa-home','الرئيسية'],
+    ['cashier','fa-cash-register','الكاشير'],
+    ['inventory','fa-boxes-stacked','الأصناف والمخزون'],
+    ['customers','fa-users','العملاء والديون'],
+    ['invoices','fa-file-invoice','الفواتير'],
+    ['reports','fa-chart-pie','التقارير'],
+    ['purchases','fa-truck-ramp-box','المشتريات'],
+    ['shortages','fa-triangle-exclamation','البضاعة الناقصة'],
+    ['expenses','fa-money-bill-wave','المصاريف'],
+    ['workers','fa-users-gear','أجور العمال'],
+    ['accounts','fa-wallet','حسابات الدفع'],
+    ['supplierPayments','fa-hand-holding-dollar','دفعات التجار'],
+    ['settings','fa-cog','الإعدادات']
+  ];
+  let navLock = false;
+
+  function getScreen(){
+    try{
+      if (typeof state !== 'undefined' && state && state.currentScreen) return state.currentScreen;
+    }catch(e){}
+    return 'home';
+  }
+
+  function isActive(key){
+    const cur = getScreen();
+    return key === cur || (key === 'customers' && cur === 'customerDetail') || (key === 'invoices' && cur === 'invoiceDetail');
+  }
+
+  function buildBottomNav(){
+    const nav = document.querySelector('.bottom-nav');
+    if(!nav) return;
+    const wanted = bottomItems.map(([key,icon,label]) =>
+      `<button onclick="navigate('${key}')" class="flex flex-col items-center p-2 nav-btn" id="nav-${key}" type="button"><i class="fas ${icon} text-[22px]"></i><span class="text-[10px] mt-1">${label}</span></button>`
+    ).join('');
+    if(nav.getAttribute('data-fee-bottom-final-real') !== '1' || nav.innerHTML.indexOf('nav-customers') === -1 || nav.innerHTML.indexOf('nav-reports') !== -1 || nav.children.length !== 5){
+      navLock = true;
+      nav.innerHTML = wanted;
+      nav.setAttribute('data-fee-bottom-final-real','1');
+      setTimeout(()=>{navLock=false;},0);
+    }
+    applyActiveBottomNav();
+  }
+
+  function applyActiveBottomNav(){
+    const nav = document.querySelector('.bottom-nav');
+    if(!nav) return;
+    nav.querySelectorAll('.nav-btn').forEach(btn => {
+      const key = (btn.id || '').replace(/^nav-/, '');
+      const active = isActive(key);
+      btn.classList.toggle('fee-bottom-active', active);
+      btn.classList.toggle('text-blue-600', active);
+      btn.classList.toggle('text-gray-500', !active);
+      btn.style.color = active ? 'var(--primary)' : '#6b7280';
+    });
+  }
+
+  function updateConnectionChip(){
+    const header = document.querySelector('header.glass-header');
+    if(!header) return;
+
+    const oldDot = $('connectionDot');
+    const oldText = $('connectionText');
+    if(oldDot) oldDot.classList.add('fee-header-hidden-status');
+    if(oldText) oldText.classList.add('fee-header-hidden-status');
+
+    const actions = header.querySelector('div.flex.items-center.gap-2') || header.lastElementChild;
+    if(!actions) return;
+    let chip = $('feeConnectionChipFinal');
+    if(!chip){
+      chip = document.createElement('span');
+      chip.id = 'feeConnectionChipFinal';
+    }
+    const online = navigator.onLine;
+    let txt = (oldText && oldText.textContent && oldText.textContent.trim()) || (online ? 'متصل' : 'غير متصل');
+    if(!online && (txt === 'متصل' || txt === 'أونلاين')) txt = 'غير متصل';
+    chip.classList.toggle('offline', !online);
+    chip.innerHTML = `<span class="dot"></span><span>${txt}</span>`;
+
+    const syncBtn = Array.from(actions.querySelectorAll('button')).find(b => (b.getAttribute('onclick') || '').includes('openSyncCenter')) || actions.querySelector('button');
+    if(syncBtn){
+      if(chip.parentElement !== actions || syncBtn.nextElementSibling !== chip) syncBtn.insertAdjacentElement('afterend', chip);
+    }else if(chip.parentElement !== actions){
+      actions.prepend(chip);
+    }
+  }
+
+  function ensureSideMenu(){
+    let backdrop = $('feeSideBackdrop');
+    if(!backdrop){
+      backdrop = document.createElement('div');
+      backdrop.id = 'feeSideBackdrop';
+      backdrop.className = 'no-print';
+      document.body.appendChild(backdrop);
+    }
+    backdrop.onclick = closeSide;
+
+    let side = $('feeSideMenu');
+    if(!side){
+      side = document.createElement('aside');
+      side.id = 'feeSideMenu';
+      side.className = 'no-print';
+      document.body.appendChild(side);
+    }
+    const cur = getScreen();
+    side.innerHTML = `<div class="fee-side-title"><span><i class="fas fa-layer-group"></i> أقسام النظام</span><button class="fee-action-chip" type="button" id="feeCloseSideBtn"><i class="fas fa-xmark"></i></button></div>` +
+      sideItems.map(([key,icon,label]) => `<button class="fee-side-btn ${key===cur?'active':''}" type="button" data-fee-side-screen="${key}"><i class="fas ${icon}"></i><span>${label}</span></button>`).join('');
+    const closeBtn = $('feeCloseSideBtn');
+    if(closeBtn) closeBtn.onclick = closeSide;
+    side.querySelectorAll('[data-fee-side-screen]').forEach(btn => {
+      btn.onclick = () => {
+        const screen = btn.getAttribute('data-fee-side-screen');
+        closeSide();
+        if(typeof navigate === 'function') navigate(screen);
+      };
+    });
+  }
+
+  function openSide(){
+    ensureSideMenu();
+    document.body.classList.add('fee-side-open');
+    $('feeSideBackdrop')?.classList.add('show');
+    $('feeSideMenu')?.classList.add('show');
+  }
+  function closeSide(){
+    document.body.classList.remove('fee-side-open');
+    $('feeSideBackdrop')?.classList.remove('show');
+    $('feeSideMenu')?.classList.remove('show');
+  }
+
+  function compactHeader(){
+    const header = document.querySelector('header.glass-header');
+    if(!header) return;
+    const brand = header.querySelector('.flex.items-center.gap-3') || header.firstElementChild;
+    let menu = $('feeMenuToggle');
+    if(!menu){
+      menu = document.createElement('button');
+      menu.id = 'feeMenuToggle';
+      menu.type = 'button';
+      menu.innerHTML = '<i class="fas fa-bars text-lg"></i>';
+    }
+    menu.className = 'p-2 hover:bg-white rounded-full transition-colors';
+    menu.onclick = openSide;
+    if(brand && menu.parentElement !== brand) brand.prepend(menu);
+
+    const actions = header.querySelector('div.flex.items-center.gap-2') || header.lastElementChild;
+    if(actions){
+      Array.from(actions.querySelectorAll('button')).forEach(b => {
+        const on = b.getAttribute('onclick') || '';
+        if(on.includes("navigate('settings')") || on.includes('navigate("settings")')) b.style.display = 'none';
+        if(b.id === 'feeHeaderCustomersBtn') b.remove();
+      });
+    }
+    updateConnectionChip();
+  }
+
+  function runFixes(){
+    buildBottomNav();
+    ensureSideMenu();
+    compactHeader();
+    applyActiveBottomNav();
+  }
+
+  const oldNavigate = window.navigate;
+  if(typeof oldNavigate === 'function' && !oldNavigate.__feeFinalPatched){
+    const wrapped = function(screen, params){
+      const res = oldNavigate.call(this, screen, params || {});
+      setTimeout(runFixes, 0);
+      setTimeout(runFixes, 40);
+      return res;
+    };
+    wrapped.__feeFinalPatched = true;
+    window.navigate = wrapped;
+  }
+
+  const oldRender = window.render;
+  if(typeof oldRender === 'function' && !oldRender.__feeFinalPatched){
+    const wrappedRender = function(){
+      const res = oldRender.apply(this, arguments);
+      setTimeout(runFixes, 0);
+      setTimeout(runFixes, 50);
+      return res;
+    };
+    wrappedRender.__feeFinalPatched = true;
+    window.render = wrappedRender;
+  }
+
+  document.addEventListener('click', function(e){
+    const menu = e.target.closest && e.target.closest('#feeMenuToggle');
+    if(menu){ e.preventDefault(); openSide(); return; }
+    const bottomBtn = e.target.closest && e.target.closest('.bottom-nav .nav-btn');
+    if(bottomBtn){ setTimeout(applyActiveBottomNav, 0); setTimeout(applyActiveBottomNav, 60); }
+  }, true);
+
+  function observeBottom(){
+    const nav = document.querySelector('.bottom-nav');
+    if(!nav || nav.__feeObservedFinal) return;
+    nav.__feeObservedFinal = true;
+    new MutationObserver(() => {
+      if(navLock) return;
+      setTimeout(buildBottomNav, 0);
+    }).observe(nav, { childList:true });
+  }
+
+  window.addEventListener('online', () => setTimeout(runFixes, 50));
+  window.addEventListener('offline', () => setTimeout(runFixes, 50));
+  window.addEventListener('DOMContentLoaded', () => setTimeout(()=>{runFixes(); observeBottom();}, 120));
+  setTimeout(()=>{runFixes(); observeBottom();}, 80);
+  setTimeout(()=>{runFixes(); observeBottom();}, 500);
+  setInterval(()=>{updateConnectionChip(); applyActiveBottomNav();}, 1500);
+})();
+</script>
 </body>
 </html>
