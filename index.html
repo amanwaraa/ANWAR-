@@ -18722,5 +18722,880 @@
 })();
 </script>
 
+<script id="oskarDeferredInvoicesAndStatements20260505">
+(function(){
+  "use strict";
+  if (window.__OSKAR_DEFERRED_INVOICES_STATEMENTS_20260505__) return;
+  window.__OSKAR_DEFERRED_INVOICES_STATEMENTS_20260505__ = true;
+
+  const byId = id => document.getElementById(id);
+  const qsa = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const n = (v, d=0) => {
+    try { return cleanNumber(v, d); } catch(e) {
+      const x = Number(String(v ?? "").replace(/[^0-9.\-]/g, ""));
+      return Number.isFinite(x) ? x : d;
+    }
+  };
+  const html = v => {
+    try { return escapeHtml(String(v ?? "")); } catch(e) {
+      return String(v ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
+    }
+  };
+  const asMoney = v => { try { return money(v); } catch(e) { return `₪ ${n(v).toFixed(2)}`; } };
+  const asDate = v => { try { return formatDate(v); } catch(e) { return new Date(Number(v)||Date.now()).toLocaleString("ar"); } };
+  const newId = p => { try { return uid(p); } catch(e) { return `${p}_${Date.now()}_${Math.random().toString(16).slice(2)}`; } };
+
+  function getCustomerNameLine(c){
+    return `${c.name || ""}${c.phone ? " - " + c.phone : ""}`.trim();
+  }
+
+  function findCustomerFromText(text){
+    const value = String(text || "").trim();
+    if (!value) return null;
+    const normalized = value.toLowerCase();
+    return (state.customers || []).find(c =>
+      String(c.id) === value ||
+      getCustomerNameLine(c).toLowerCase() === normalized ||
+      String(c.name || "").toLowerCase() === normalized ||
+      (c.phone && normalized.includes(String(c.phone).toLowerCase()))
+    ) || null;
+  }
+
+  function normalizeInvoicePaymentAmounts(inv){
+    if (!inv) return inv;
+    const total = Math.max(0, n(inv.total));
+    let paid;
+    if (inv.paidAmount !== undefined && inv.paidAmount !== null && inv.paidAmount !== "") {
+      paid = n(inv.paidAmount);
+    } else if (inv.status === "paid" || ["cash", "instant_app"].includes(inv.paymentMethod)) {
+      paid = total;
+    } else {
+      paid = 0;
+    }
+    paid = Math.min(total, Math.max(0, paid));
+    inv.paidAmount = paid;
+    inv.remainingAmount = Math.max(0, total - paid);
+    if (inv.remainingAmount <= 0.0005) {
+      inv.remainingAmount = 0;
+      inv.status = "paid";
+    } else if (["debt", "later_app"].includes(inv.paymentMethod)) {
+      inv.status = "unpaid";
+    }
+    return inv;
+  }
+
+  function invoicePaid(inv){
+    return n(normalizeInvoicePaymentAmounts({ ...(inv || {}) }).paidAmount);
+  }
+
+  function invoiceRemaining(inv){
+    return n(normalizeInvoicePaymentAmounts({ ...(inv || {}) }).remainingAmount);
+  }
+
+  function isCustomerInvoice(inv){
+    return !!(inv && (inv.customerId || inv.customerName || inv.customerPhone));
+  }
+
+  function ensureInvoiceCustomer(name, phone, id){
+    let customer = id ? (state.customers || []).find(c => String(c.id) === String(id)) : null;
+    if (!customer) customer = findCustomerFromText(name) || null;
+    if (!customer && typeof findCustomerByNameOrPhone === "function") customer = findCustomerByNameOrPhone(name, phone);
+    if (!customer) {
+      customer = (typeof normalizeCustomer === "function") ? normalizeCustomer({
+        id: newId("cus"),
+        name: String(name || "زبون").trim() || "زبون",
+        phone: String(phone || "").trim(),
+        payments: [],
+        manualDebts: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      }) : {
+        id: newId("cus"), name: String(name || "زبون").trim() || "زبون", phone: String(phone || "").trim(),
+        payments: [], manualDebts: [], createdAt: Date.now(), updatedAt: Date.now()
+      };
+      state.customers.push(customer);
+    }
+    customer.name = String(name || customer.name || "زبون").replace(/\s+-\s+.*$/, "").trim() || customer.name || "زبون";
+    customer.phone = String(phone || customer.phone || "").trim();
+    customer.updatedAt = Date.now();
+    return (typeof normalizeCustomer === "function") ? normalizeCustomer(customer) : customer;
+  }
+
+  function customerOptions(selectedId=""){
+    return (state.customers || []).map(c => `<option value="${html(getCustomerNameLine(c))}" data-id="${html(c.id)}" ${String(c.id)===String(selectedId)?"selected":""}></option>`).join("");
+  }
+
+  function paymentSummaryHtml(total, paid){
+    const t = Math.max(0, n(total));
+    const p = Math.min(t, Math.max(0, n(paid)));
+    const r = Math.max(0, t - p);
+    return `
+      <div class="debt-summary-strip" style="box-shadow:none;margin-top:10px">
+        <div class="debt-summary-item"><span>الإجمالي</span><b>${asMoney(t)}</b></div>
+        <div class="debt-summary-item"><span>الواصل</span><b style="color:#16a34a">${asMoney(p)}</b></div>
+        <div class="debt-summary-item"><span>المتبقي دين</span><b style="color:${r>0?'#dc2626':'#16a34a'}">${asMoney(r)}</b></div>
+        <div class="debt-summary-item"><span>الحالة</span><b>${r>0?'غير مكتملة':'مكتملة'}</b></div>
+      </div>
+    `;
+  }
+
+  function buildEditableLine(line={}, index=0){
+    const id = line.id || newId("line");
+    return `
+      <div class="card oskar-invoice-line-editor" data-edit-line="${html(id)}" data-product-id="${html(line.productId || "")}" style="box-shadow:none;margin-bottom:10px">
+        <div class="form-grid-compact">
+          <div>
+            <label class="field-label">الصنف</label>
+            <input class="input oskar-line-name" value="${html(line.name || "")}" placeholder="مثال: أقلام">
+          </div>
+          <div>
+            <label class="field-label">الكمية</label>
+            <input class="input oskar-line-qty" type="number" inputmode="decimal" min="0" step="0.001" value="${html(line.qty ?? 1)}">
+          </div>
+          <div>
+            <label class="field-label">سعر البيع</label>
+            <input class="input oskar-line-price" type="number" inputmode="decimal" min="0" step="0.001" value="${n(line.price)}">
+          </div>
+          <div>
+            <label class="field-label">سعر الجملة</label>
+            <input class="input oskar-line-cost" type="number" inputmode="decimal" min="0" step="0.001" value="${n(line.costPrice)}">
+          </div>
+        </div>
+        <button class="danger-btn oskar-remove-line" type="button" style="width:100%;margin-top:8px"><i class="fa-solid fa-trash"></i> حذف الصنف</button>
+      </div>
+    `;
+  }
+
+  function collectEditableLines(container, originalItems=[]){
+    const originalById = new Map((originalItems || []).map(x => [String(x.id || ""), x]));
+    return qsa("[data-edit-line]", container).map(el => {
+      const id = el.getAttribute("data-edit-line") || newId("item");
+      const old = originalById.get(String(id)) || {};
+      const qty = n(el.querySelector(".oskar-line-qty")?.value, 0);
+      const price = n(el.querySelector(".oskar-line-price")?.value, 0);
+      const cost = n(el.querySelector(".oskar-line-cost")?.value, 0);
+      const oldQty = n(old.qty, 0);
+      const oldBase = n(old.baseQty, oldQty);
+      const factor = oldQty > 0 ? (oldBase / oldQty) : 1;
+      return {
+        id,
+        productId: el.getAttribute("data-product-id") || old.productId || "",
+        name: String(el.querySelector(".oskar-line-name")?.value || "").trim(),
+        selectedUnit: old.selectedUnit || "free",
+        qty,
+        qtyText: String(qty),
+        baseQty: qty * factor,
+        unitLabel: old.unitLabel || "",
+        price,
+        costPrice: cost,
+        total: qty * price,
+        costTotal: qty * cost,
+        free: !old.productId
+      };
+    }).filter(x => x.name && x.qty > 0 && x.price >= 0);
+  }
+
+  function updateDebtPaymentSummary(prefix, total){
+    const paidEl = byId(`${prefix}PaidAmount`);
+    const wrap = byId(`${prefix}PaymentSummary`);
+    if (!paidEl || !wrap) return;
+    wrap.innerHTML = paymentSummaryHtml(total, paidEl.value);
+  }
+
+  const originalSaveSaleWithPayment = window.saveSaleWithPayment || (typeof saveSaleWithPayment === "function" ? saveSaleWithPayment : null);
+  window.saveSaleWithPayment = saveSaleWithPayment = async function(payment){
+    if (state.__saleSaving) {
+      toast("جاري حفظ الفاتورة، انتظر لحظة...");
+      return;
+    }
+    state.__saleSaving = true;
+    try {
+      const source = payment.source || "cart";
+      if (source === "cart") {
+        if (!state.cart.length) return toast("السلة فارغة");
+        if (typeof validateStockForCart === "function" && !validateStockForCart()) return;
+      }
+      if (source === "free") {
+        if (typeof syncFreeLinesFromDom === "function") syncFreeLinesFromDom();
+        if (!state.freeLines.some(x => x.name && n(x.price) > 0)) return toast("الفاتورة المباشرة فارغة");
+      }
+
+      const totals = source === "free" ? getFreeInvoiceTotals() : calculateCartTotals();
+      const total = Math.max(0, n(totals.total));
+      let paidAmount = payment.paidAmount;
+      if (paidAmount === undefined || paidAmount === null || paidAmount === "") {
+        paidAmount = (["cash", "instant_app"].includes(payment.paymentMethod) || payment.status === "paid") ? total : 0;
+      }
+      paidAmount = Math.min(total, Math.max(0, n(paidAmount)));
+      const remainingAmount = Math.max(0, total - paidAmount);
+      const finalStatus = remainingAmount <= 0.0005 ? "paid" : (payment.status || "unpaid");
+
+      const invoiceNumber = (state.invoices.length ? Math.max(...state.invoices.map(x => n(x.number))) : 0) + 1;
+      const items = buildSaleItems(source);
+      const invoice = normalizeInvoicePaymentAmounts({
+        id: newId("inv"),
+        number: invoiceNumber,
+        dateKey: todayKey(),
+        source,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        employeeId: currentUser()?.id || "",
+        employeeName: currentUser()?.name || "",
+        customerId: payment.customerId || "",
+        customerName: payment.customerName || "",
+        customerPhone: payment.customerPhone || "",
+        paymentMethod: payment.paymentMethod,
+        paymentAccountId: payment.paymentAccountId || "",
+        dueDate: payment.dueDate || "",
+        status: finalStatus,
+        notes: payment.notes || "",
+        paidAmount,
+        remainingAmount,
+        items,
+        subtotal: totals.subtotal,
+        discount: totals.discount,
+        total,
+        cost: totals.cost,
+        profit: total - n(totals.cost)
+      });
+
+      const changedProducts = [];
+      if (source === "cart") {
+        for (const line of state.cart) {
+          const product = getProductById(line.productId);
+          if (!product) continue;
+          product.stock = n(product.stock) - n(line.baseQty);
+          product.updatedAt = Date.now();
+          changedProducts.push(normalizeProduct(product));
+        }
+      }
+
+      if (["debt", "later_app"].includes(invoice.paymentMethod)) {
+        const customer = ensureInvoiceCustomer(payment.customerName, payment.customerPhone, payment.customerId);
+        invoice.customerId = customer.id;
+        invoice.customerName = customer.name;
+        invoice.customerPhone = customer.phone;
+        state.customers = state.customers.map(c => c.id === customer.id ? customer : c);
+      } else if (invoice.paymentMethod === "instant_app" && (payment.customerName || payment.customerPhone)) {
+        const customer = ensureInvoiceCustomer(payment.customerName, payment.customerPhone, payment.customerId);
+        invoice.customerId = customer.id;
+        invoice.customerName = customer.name;
+        invoice.customerPhone = customer.phone;
+        state.customers = state.customers.map(c => c.id === customer.id ? customer : c);
+      }
+
+      state.invoices.push(invoice);
+      state.products = state.products.map(p => changedProducts.find(x => x.id === p.id) || p);
+      rebuildCustomerBalances(false);
+
+      const persistOps = [
+        { store: "invoices", item: invoice },
+        ...changedProducts.map(p => ({ store: "products", item: p }))
+      ];
+      if (invoice.customerId) {
+        const customerAfterBalance = state.customers.find(c => c.id === invoice.customerId);
+        if (customerAfterBalance) persistOps.push({ store: "customers", item: normalizeCustomer(customerAfterBalance) });
+      }
+      await saveLocalBatch(persistOps, true);
+
+      if (source === "cart") state.cart = [];
+      else state.freeLines = [{ id: newId("free"), name: "", qty: 1, cost: 0, price: 0 }];
+
+      renderAll();
+      toast("تم حفظ الفاتورة وحساب الواصل والمتبقي");
+      if (["debt", "later_app"].includes(invoice.paymentMethod) && invoice.customerId) {
+        closeModal();
+        switchPage("debts");
+        setTimeout(() => openCustomerAccount(invoice.customerId), 180);
+      } else {
+        openInvoiceView(invoice);
+      }
+    } catch(e) {
+      console.error("save sale failed", e);
+      if (originalSaveSaleWithPayment) return originalSaveSaleWithPayment(payment);
+      toast("تعذر حفظ الفاتورة محلياً");
+    } finally {
+      state.__saleSaving = false;
+    }
+  };
+
+  window.confirmDebtCustomerSale = confirmDebtCustomerSale = function(source, totals, customer){
+    openModal("تأكيد البيع دين", `
+      <div class="card" style="box-shadow:none">
+        <h3 style="font-size:20px;font-weight:900;margin:0 0 10px">${html(customer.name)}</h3>
+        <div class="muted" style="margin-bottom:10px">${html(customer.phone || "بدون رقم")}</div>
+        <div class="form-grid-compact">
+          <div><label class="field-label">إجمالي الفاتورة</label><input class="input" value="${asMoney(totals.total)}" disabled></div>
+          <div><label class="field-label">المبلغ المدفوع الآن</label><input id="debtPaidAmount" class="input" type="number" inputmode="decimal" min="0" step="0.001" value="0"></div>
+          <div><label class="field-label">تاريخ السداد اختياري</label><input id="debtDueDate" type="date" class="input"></div>
+          <div><label class="field-label">ملاحظات</label><input id="debtNotes" class="input" placeholder="اختياري"></div>
+        </div>
+        <div id="debtPaymentSummary">${paymentSummaryHtml(totals.total, 0)}</div>
+        <button id="confirmDebtSaleBtn" class="gold-btn" style="width:100%;margin-top:16px"><i class="fa-solid fa-check"></i> حفظ على حساب الزبون</button>
+      </div>
+    `);
+    byId("debtPaidAmount").oninput = () => updateDebtPaymentSummary("debt", totals.total);
+    byId("confirmDebtSaleBtn").onclick = () => {
+      const paid = n(byId("debtPaidAmount").value);
+      saveSaleWithPayment({
+        source,
+        paymentMethod: "debt",
+        status: paid >= n(totals.total) ? "paid" : "unpaid",
+        customerId: customer.id,
+        customerName: customer.name,
+        customerPhone: customer.phone,
+        paymentAccountId: "",
+        dueDate: byId("debtDueDate").value || "",
+        paidAmount: paid,
+        notes: byId("debtNotes").value.trim()
+      });
+    };
+  };
+
+  window.openPaymentDetails = openPaymentDetails = function(method, source="cart"){
+    const totals = source === "free" ? getFreeInvoiceTotals() : calculateCartTotals();
+    if (method === "debt") return openDebtCustomerPicker(source, totals);
+    if (method === "cash") {
+      openModal("تأكيد بيع كاش", `<div class="card" style="box-shadow:none"><h3 style="font-size:20px;font-weight:900;margin:0 0 10px">بيع كاش مكتمل</h3><div style="display:flex;justify-content:space-between;font-size:20px"><span>الإجمالي:</span><b class="money">${asMoney(totals.total)}</b></div><button id="confirmPaymentBtn" class="primary-btn" style="width:100%;margin-top:16px"><i class="fa-solid fa-check"></i> حفظ الفاتورة</button></div>`);
+      byId("confirmPaymentBtn").onclick = () => saveSaleWithPayment({ source, paymentMethod:"cash", status:"paid", paymentAccountId:"cash", paidAmount:n(totals.total) });
+      return;
+    }
+    if (method === "instant_app") {
+      openModal("بيع تطبيق فوري", `
+        <form id="paymentDetailsForm"><div class="form-grid-compact">
+          <div style="position:relative"><label class="field-label">اسم الزبون</label><input id="payCustomerName" class="input" placeholder="اسم الزبون" autocomplete="off"></div>
+          <div><label class="field-label">رقم الجوال</label><input id="payCustomerPhone" class="input" placeholder="رقم الجوال"></div>
+          <div><label class="field-label">حساب التحويل / مجلد الفاتورة</label><select id="payAccountId" class="select">${paymentAccountsOptions(false)}</select></div>
+          <div><label class="field-label">الإجمالي</label><input class="input" value="${asMoney(totals.total)}" disabled></div>
+        </div><button class="primary-btn" type="submit" style="width:100%;margin-top:16px"><i class="fa-solid fa-check"></i> حفظ بيع تطبيق فوري</button></form>`);
+      byId("payCustomerName").oninput = () => showCustomerSuggestions(byId("payCustomerName"), byId("payCustomerPhone"));
+      byId("payCustomerName").onblur = hideCustomerSuggestions;
+      byId("paymentDetailsForm").onsubmit = e => {
+        e.preventDefault();
+        const existing = findCustomerByNameOrPhone(byId("payCustomerName").value, byId("payCustomerPhone").value);
+        saveSaleWithPayment({ source, paymentMethod:"instant_app", status:"paid", customerId:existing?.id||"", customerName:byId("payCustomerName").value.trim(), customerPhone:byId("payCustomerPhone").value.trim(), paymentAccountId:byId("payAccountId").value, paidAmount:n(totals.total) });
+      };
+      return;
+    }
+    if (method === "later_app") {
+      openModal("تطبيق لاحق", `
+        <form id="paymentDetailsForm"><div class="form-grid-compact">
+          <div style="position:relative"><label class="field-label">اسم الزبون</label><input id="payCustomerName" class="input" required placeholder="اسم الزبون" autocomplete="off"></div>
+          <div><label class="field-label">رقم الجوال</label><input id="payCustomerPhone" class="input" placeholder="رقم الجوال"></div>
+          <div><label class="field-label">على أي حساب سيحوّل؟</label><select id="payAccountId" class="select">${paymentAccountsOptions(false)}</select></div>
+          <div><label class="field-label">إجمالي الفاتورة</label><input class="input" value="${asMoney(totals.total)}" disabled></div>
+          <div><label class="field-label">المبلغ المدفوع الآن</label><input id="laterPaidAmount" class="input" type="number" inputmode="decimal" min="0" step="0.001" value="0"></div>
+          <div><label class="field-label">تاريخ السداد اختياري</label><input id="payDueDate" type="date" class="input"></div>
+        </div><div id="laterPaymentSummary">${paymentSummaryHtml(totals.total, 0)}</div><button class="gold-btn" type="submit" style="width:100%;margin-top:16px"><i class="fa-solid fa-check"></i> حفظ كدين تطبيق لاحق</button></form>`);
+      byId("payCustomerName").oninput = () => showCustomerSuggestions(byId("payCustomerName"), byId("payCustomerPhone"));
+      byId("payCustomerName").onblur = hideCustomerSuggestions;
+      byId("laterPaidAmount").oninput = () => updateDebtPaymentSummary("later", totals.total);
+      byId("paymentDetailsForm").onsubmit = e => {
+        e.preventDefault();
+        const customer = ensureInvoiceCustomer(byId("payCustomerName").value.trim(), byId("payCustomerPhone").value.trim(), "");
+        const paid = n(byId("laterPaidAmount").value);
+        saveSaleWithPayment({ source, paymentMethod:"later_app", status: paid >= n(totals.total) ? "paid" : "unpaid", customerId:customer.id, customerName:customer.name, customerPhone:customer.phone, paymentAccountId:byId("payAccountId").value, dueDate:byId("payDueDate").value || "", paidAmount:paid });
+      };
+    }
+  };
+
+  window.rebuildCustomerBalances = rebuildCustomerBalances = function(save=true){
+    const before = new Map((state.customers || []).map(c => [String(c.id), JSON.stringify(c)]));
+    const map = new Map();
+    for (const raw of (state.customers || [])) {
+      const c = (typeof normalizeCustomer === "function") ? normalizeCustomer(raw) : { ...raw };
+      c.balance = 0; c.totalSales = 0; c.totalPaid = 0; c.invoicesCount = 0;
+      c.payments = Array.isArray(c.payments) ? c.payments.filter(p => p && !p.deleted) : [];
+      c.manualDebts = Array.isArray(c.manualDebts) ? c.manualDebts.filter(d => d && !d.deleted) : [];
+      map.set(String(c.id), c);
+    }
+    const byPhone = new Map();
+    const byName = new Map();
+    for (const c of map.values()) {
+      if (c.phone && !byPhone.has(String(c.phone))) byPhone.set(String(c.phone), c);
+      if (c.name && !byName.has(String(c.name))) byName.set(String(c.name), c);
+    }
+    for (const inv of (state.invoices || [])) {
+      normalizeInvoicePaymentAmounts(inv);
+      if (!["debt", "later_app", "instant_app"].includes(inv.paymentMethod)) continue;
+      let customer = inv.customerId ? map.get(String(inv.customerId)) : null;
+      if (!customer && inv.customerPhone) customer = byPhone.get(String(inv.customerPhone));
+      if (!customer && inv.customerName) customer = byName.get(String(inv.customerName));
+      if (!customer) continue;
+      customer.totalSales += n(inv.total);
+      customer.totalPaid += invoicePaid(inv);
+      customer.invoicesCount += 1;
+      if (["debt", "later_app"].includes(inv.paymentMethod)) customer.balance += invoiceRemaining(inv);
+    }
+    for (const customer of map.values()) {
+      for (const d of (customer.manualDebts || [])) {
+        if (d.status === "paid") customer.totalPaid += n(d.amount);
+        else customer.balance += n(d.amount);
+      }
+      for (const p of (customer.payments || [])) {
+        if (p.invoiceId || p.manualDebtId) continue;
+        customer.balance -= n(p.amount);
+        customer.totalPaid += n(p.amount);
+      }
+      customer.updatedAt = customer.updatedAt || Date.now();
+    }
+    state.customers = Array.from(map.values()).map(c => (typeof normalizeCustomer === "function") ? normalizeCustomer(c) : c);
+    if (save) {
+      state.customers.forEach(c => {
+        const sig = JSON.stringify(c);
+        if (before.get(String(c.id)) !== sig) saveLocal("customers", c, true).catch(()=>{});
+      });
+    }
+    return state.customers;
+  };
+
+  window.statusBadge = statusBadge = function(status, method="", invoiceId=""){
+    const inv = (state.invoices || []).find(i => String(i.id) === String(invoiceId));
+    const rem = inv ? invoiceRemaining(inv) : 0;
+    const paid = inv ? invoicePaid(inv) : 0;
+    if (["debt", "later_app"].includes(method) && rem > 0 && paid > 0) {
+      return `<span class="badge yellow clickable" ${method === "later_app" ? `data-open-later-status="${html(invoiceId)}"` : ""}><i class="fa-solid fa-scale-balanced"></i> جزئي</span>`;
+    }
+    if (status === "paid" || method === "cash") return `<span class="badge green"><i class="fa-solid fa-circle-check"></i> مكتمل</span>`;
+    if (method === "instant_app") return `<span class="badge blue"><i class="fa-solid fa-mobile-screen-button"></i> تطبيق فوري</span>`;
+    if (method === "later_app") return `<span class="badge yellow clickable" data-open-later-status="${html(invoiceId)}"><i class="fa-solid fa-clock"></i> غير مكتملة</span>`;
+    if (method === "debt") return `<span class="badge red"><i class="fa-solid fa-user-clock"></i> دين</span>`;
+    return `<span class="badge gray">${html(status || "-")}</span>`;
+  };
+
+
+  const originalBuildInvoiceHtml = window.buildInvoiceHtml || (typeof buildInvoiceHtml === "function" ? buildInvoiceHtml : null);
+  if (originalBuildInvoiceHtml) {
+    window.buildInvoiceHtml = buildInvoiceHtml = function(invoice){
+      normalizeInvoicePaymentAmounts(invoice);
+      let out = originalBuildInvoiceHtml(invoice);
+      const extraRows = `<tr><td>الواصل:</td><td class="oskar-thermal-left">${asMoney(invoicePaid(invoice))}</td></tr><tr><td>المتبقي:</td><td class="oskar-thermal-left">${asMoney(invoiceRemaining(invoice))}</td></tr>`;
+      out = out.replace(/(<tr class="oskar-thermal-total-row"><td>الإجمالي:<\/td><td class="oskar-thermal-left">[^<]*<\/td><\/tr>)/, `$1${extraRows}`);
+      return out;
+    };
+  }
+
+  window.renderInvoices = renderInvoices = function(){
+    const all = getFilteredInvoices();
+    const visible = all.slice(0, 360);
+    const rows = visible.map(inv => {
+      normalizeInvoicePaymentAmounts(inv);
+      return `
+        <tr>
+          <td><b>#${html(inv.number)}</b></td>
+          <td>${asDate(inv.createdAt)}</td>
+          <td><b>${html(inv.customerName || "زبون نقدي")}</b></td>
+          <td>${html(inv.customerPhone || "-")}</td>
+          <td>${statusBadge(inv.status, inv.paymentMethod, inv.id)}</td>
+          <td>${html(paymentMethodLabel(inv.paymentMethod))}</td>
+          <td>${html(paymentFolderName(inv))}</td>
+          <td>${asMoney(inv.subtotal)}</td>
+          <td>${asMoney(inv.discount)}</td>
+          <td class="money">${asMoney(inv.total)}</td>
+          <td style="color:#16a34a;font-weight:900">${asMoney(invoicePaid(inv))}</td>
+          <td style="color:${invoiceRemaining(inv)>0?'#dc2626':'#16a34a'};font-weight:900">${asMoney(invoiceRemaining(inv))}</td>
+          <td>
+            <button class="ghost-btn" data-view-invoice="${html(inv.id)}" title="عرض"><i class="fa-solid fa-eye"></i></button>
+            <button class="ghost-btn" data-edit-invoice="${html(inv.id)}" title="تعديل"><i class="fa-solid fa-pen"></i></button>
+            <button class="danger-btn" data-delete-invoice="${html(inv.id)}" title="حذف"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>`;
+    }).join("");
+    const more = all.length > visible.length ? `<tr><td colspan="13" class="muted" style="text-align:center;background:#f8fafc">تم عرض أول ${visible.length} فاتورة — استخدم البحث أو التاريخ للوصول فوراً</td></tr>` : "";
+    const body = byId("invoicesTable");
+    if (body) body.innerHTML = rows + more || `<tr><td colspan="13" class="muted" style="text-align:center">لا توجد فواتير</td></tr>`;
+  };
+
+  window.renderDebts = renderDebts = function(){
+    rebuildCustomerBalances(false);
+    const q = String(byId("debtsSearch")?.value || "").trim().toLowerCase();
+    const sort = byId("debtsSort")?.value || "balance_desc";
+    let list = (state.customers || []).filter(c => !q || String(c.name || "").toLowerCase().includes(q) || String(c.phone || "").includes(q));
+    const lastActivity = c => Math.max(Number(c.updatedAt || 0), ...getCustomerInvoices(c).map(i => Number(i.createdAt || 0)), ...(c.payments||[]).map(p=>Number(p.createdAt||0)), ...(c.manualDebts||[]).map(d=>Number(d.createdAt||0)));
+    if (sort === "balance_desc") list.sort((a,b)=>n(b.balance)-n(a.balance));
+    else if (sort === "credit_desc") list.sort((a,b)=>n(a.balance)-n(b.balance));
+    else if (sort === "name") list.sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"ar"));
+    else list.sort((a,b)=>lastActivity(b)-lastActivity(a));
+    const totalOwed = list.reduce((s,c)=>s+Math.max(0,n(c.balance)),0);
+    const totalCredit = list.reduce((s,c)=>s+Math.max(0,-n(c.balance)),0);
+    if (byId("debtsTotalOwed")) byId("debtsTotalOwed").textContent = asMoney((state.customers||[]).reduce((s,c)=>s+Math.max(0,n(c.balance)),0));
+    if (byId("debtsTotalCredit")) byId("debtsTotalCredit").textContent = asMoney((state.customers||[]).reduce((s,c)=>s+Math.max(0,-n(c.balance)),0));
+    if (byId("debtsCustomersCount")) byId("debtsCustomersCount").textContent = state.customers.length;
+    if (byId("debtsOverdueCount")) byId("debtsOverdueCount").textContent = (state.invoices||[]).filter(i => ["debt","later_app"].includes(i.paymentMethod) && invoiceRemaining(i)>0).length + (state.customers||[]).flatMap(c => (c.manualDebts||[]).filter(d => d.status !== "paid")).length;
+    if (byId("debtsFooterOwed")) byId("debtsFooterOwed").textContent = asMoney((state.customers||[]).reduce((s,c)=>s+Math.max(0,n(c.balance)),0));
+    if (byId("debtsFooterCredit")) byId("debtsFooterCredit").textContent = asMoney((state.customers||[]).reduce((s,c)=>s+Math.max(0,-n(c.balance)),0));
+    if (byId("debtsFooterNet")) byId("debtsFooterNet").textContent = asMoney((state.customers||[]).reduce((s,c)=>s+n(c.balance),0));
+    const visible = list.slice(0, 280);
+    const box = byId("debtsList");
+    if (!box) return;
+    box.innerHTML = visible.map(c => {
+      const bal = customerBalanceText(c.balance);
+      const invoices = getCustomerInvoices(c);
+      const paid = invoices.reduce((s,i)=>s+invoicePaid(i),0) + (c.payments||[]).reduce((s,p)=>s+n(p.amount),0);
+      const total = invoices.reduce((s,i)=>s+n(i.total),0);
+      return `<div class="debt-card" data-open-customer="${html(c.id)}"><div><div class="debt-name">${html(c.name)}</div><div class="debt-sub">${html(c.phone || "بدون رقم")} · فواتير: ${invoices.length} · إجمالي: ${asMoney(total)} · واصل: ${asMoney(paid)}</div></div><div class="debt-amount ${bal.cls}">${bal.text}</div></div>`;
+    }).join("") || `<div class="muted" style="text-align:center;padding:28px">لا توجد حسابات ديون</div>`;
+    if (list.length > visible.length) box.insertAdjacentHTML("beforeend", `<div class="muted" style="text-align:center;padding:12px;background:#f8fafc;border-radius:16px">تم عرض أول ${visible.length} حساب</div>`);
+  };
+
+  function setupLineEditor(containerId, totalCb){
+    const container = byId(containerId);
+    if (!container) return;
+    container.addEventListener("input", () => totalCb && totalCb());
+    container.addEventListener("click", e => {
+      const remove = e.target.closest(".oskar-remove-line");
+      if (remove) {
+        const lines = qsa("[data-edit-line]", container);
+        if (lines.length <= 1) return toast("يجب أن تبقى خانة صنف واحدة على الأقل");
+        remove.closest("[data-edit-line]").remove();
+        totalCb && totalCb();
+      }
+    });
+  }
+
+  function openDeferredInvoiceForm(){
+    const lineId = newId("line");
+    openModal("إضافة فاتورة دين", `
+      <form id="deferredInvoiceForm">
+        <div class="card" style="box-shadow:none;margin-bottom:10px">
+          <div class="form-grid-compact">
+            <div class="full-row" style="position:relative">
+              <label class="field-label">اسم الزبون من القائمة أو اكتب زبون جديد</label>
+              <input id="deferredCustomerInput" class="input" list="deferredCustomersList" required autocomplete="off" placeholder="ابحث باسم الزبون أو الرقم">
+              <datalist id="deferredCustomersList">${customerOptions()}</datalist>
+            </div>
+            <div><label class="field-label">رقم الهاتف</label><input id="deferredCustomerPhone" class="input" placeholder="اختياري"></div>
+            <div><label class="field-label">تاريخ السداد</label><input id="deferredDueDate" class="input" type="date"></div>
+          </div>
+          <button id="deferredNewCustomerBtn" class="ghost-btn" type="button" style="margin-top:10px"><i class="fa-solid fa-user-plus"></i> إضافة زبون جديد</button>
+        </div>
+        <h3 style="margin:12px 0 8px;font-weight:900">الأصناف</h3>
+        <div id="deferredInvoiceLines">${buildEditableLine({ id: lineId, qty:1, price:0, costPrice:0 }, 0)}</div>
+        <button id="deferredAddLineBtn" class="ghost-btn" type="button" style="width:100%;margin-bottom:10px"><i class="fa-solid fa-plus"></i> إضافة صنف</button>
+        <div class="card" style="box-shadow:none">
+          <div class="form-grid-compact">
+            <div><label class="field-label">الإجمالي</label><input id="deferredTotal" class="input" disabled value="${asMoney(0)}"></div>
+            <div><label class="field-label">المبلغ المدفوع</label><input id="deferredPaidAmount" class="input" type="number" inputmode="decimal" min="0" step="0.001" value="0"></div>
+            <div><label class="field-label">المتبقي دين</label><input id="deferredRemaining" class="input" disabled value="${asMoney(0)}"></div>
+            <div><label class="field-label">ملاحظات</label><input id="deferredNotes" class="input" placeholder="اختياري"></div>
+          </div>
+        </div>
+        <button class="gold-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-floppy-disk"></i> حفظ الفاتورة على حساب الزبون</button>
+      </form>
+    `, true);
+    const recalc = () => {
+      const items = collectEditableLines(byId("deferredInvoiceLines"), []);
+      const total = items.reduce((s,x)=>s+n(x.total),0);
+      const paid = Math.min(total, Math.max(0, n(byId("deferredPaidAmount")?.value)));
+      byId("deferredTotal").value = asMoney(total);
+      byId("deferredRemaining").value = asMoney(Math.max(0,total-paid));
+    };
+    setupLineEditor("deferredInvoiceLines", recalc);
+    byId("deferredAddLineBtn").onclick = () => { byId("deferredInvoiceLines").insertAdjacentHTML("beforeend", buildEditableLine({ id:newId("line"), qty:1 }, 0)); recalc(); };
+    byId("deferredPaidAmount").oninput = recalc;
+    byId("deferredNewCustomerBtn").onclick = () => { byId("deferredCustomerInput").value = ""; byId("deferredCustomerPhone").value = ""; byId("deferredCustomerInput").focus(); toast("اكتب اسم الزبون الجديد وسيتم حفظه مع الفاتورة"); };
+    byId("deferredCustomerInput").onchange = () => {
+      const c = findCustomerFromText(byId("deferredCustomerInput").value);
+      if (c) byId("deferredCustomerPhone").value = c.phone || "";
+    };
+    byId("deferredInvoiceForm").onsubmit = async e => {
+      e.preventDefault();
+      const items = collectEditableLines(byId("deferredInvoiceLines"), []);
+      if (!items.length) return toast("أضف صنف واحد على الأقل");
+      const customerText = byId("deferredCustomerInput").value.trim();
+      const existing = findCustomerFromText(customerText);
+      const customer = ensureInvoiceCustomer(existing?.name || customerText, byId("deferredCustomerPhone").value.trim() || existing?.phone || "", existing?.id || "");
+      const subtotal = items.reduce((s,x)=>s+n(x.total),0);
+      const paidAmount = Math.min(subtotal, Math.max(0, n(byId("deferredPaidAmount").value)));
+      const invoiceNumber = (state.invoices.length ? Math.max(...state.invoices.map(x => n(x.number))) : 0) + 1;
+      const invoice = normalizeInvoicePaymentAmounts({
+        id:newId("inv"), number:invoiceNumber, dateKey:todayKey(), source:"deferred_direct", createdAt:Date.now(), updatedAt:Date.now(), employeeId:currentUser()?.id||"", employeeName:currentUser()?.name||"",
+        customerId:customer.id, customerName:customer.name, customerPhone:customer.phone, paymentMethod:"debt", paymentAccountId:"", dueDate:byId("deferredDueDate").value || "", status: paidAmount >= subtotal ? "paid" : "unpaid",
+        notes:byId("deferredNotes").value.trim(), items, subtotal, discount:0, total:subtotal, cost:items.reduce((s,x)=>s+n(x.costTotal),0), profit:subtotal-items.reduce((s,x)=>s+n(x.costTotal),0), paidAmount
+      });
+      state.invoices.push(invoice);
+      state.customers = state.customers.map(c => c.id === customer.id ? customer : c);
+      rebuildCustomerBalances(false);
+      await saveLocalBatch([{store:"invoices", item:invoice}, {store:"customers", item:normalizeCustomer(state.customers.find(c=>c.id===customer.id)||customer)}], true);
+      closeModal(); renderAll(); switchPage("debts"); setTimeout(()=>openCustomerAccount(customer.id),160);
+      toast("تم حفظ فاتورة الدين مع الواصل والمتبقي");
+    };
+    recalc();
+  }
+  window.openDeferredInvoiceForm = openDeferredInvoiceForm;
+
+  window.openEditInvoiceForm = openEditInvoiceForm = function(invoiceId){
+    const invoice = state.invoices.find(i => String(i.id) === String(invoiceId));
+    if (!invoice) return;
+    normalizeInvoicePaymentAmounts(invoice);
+    const oldSnapshot = JSON.parse(JSON.stringify(invoice));
+    openModal(`تعديل فاتورة #${html(invoice.number)}`, `
+      <form id="editInvoiceForm">
+        <div class="form-grid-compact">
+          <div class="full-row"><label class="field-label">اسم الزبون</label><input id="editInvoiceCustomerInput" class="input" list="editInvoiceCustomerList" value="${html(getCustomerNameLine({name:invoice.customerName, phone:invoice.customerPhone}))}" autocomplete="off"><datalist id="editInvoiceCustomerList">${customerOptions(invoice.customerId)}</datalist></div>
+          <div><label class="field-label">رقم الزبون</label><input id="editInvoiceCustomerPhone" class="input" value="${html(invoice.customerPhone || "")}"></div>
+          <div><label class="field-label">طريقة الدفع</label><select id="editInvoicePaymentMethod" class="select"><option value="cash" ${invoice.paymentMethod==="cash"?"selected":""}>كاش</option><option value="instant_app" ${invoice.paymentMethod==="instant_app"?"selected":""}>تطبيق فوري</option><option value="later_app" ${invoice.paymentMethod==="later_app"?"selected":""}>تطبيق لاحق</option><option value="debt" ${invoice.paymentMethod==="debt"?"selected":""}>دين</option></select></div>
+          <div><label class="field-label">حساب الدفع / المجلد</label><select id="editInvoicePaymentAccount" class="select"><option value="">بدون</option>${(state.paymentAccounts||[]).map(acc=>`<option value="${html(acc.id)}" ${invoice.paymentAccountId===acc.id?"selected":""}>${html(acc.name)}</option>`).join("")}</select></div>
+          <div><label class="field-label">الخصم</label><input id="editInvoiceDiscount" type="number" inputmode="decimal" class="input" value="${n(invoice.discount)}" min="0" step="0.001"></div>
+          <div><label class="field-label">المبلغ المدفوع</label><input id="editInvoicePaidAmount" type="number" inputmode="decimal" class="input" value="${invoicePaid(invoice)}" min="0" step="0.001"></div>
+          <div><label class="field-label">تاريخ السداد</label><input id="editInvoiceDueDate" type="date" class="input" value="${html(invoice.dueDate || "")}"></div>
+          <div><label class="field-label">ملاحظات</label><input id="editInvoiceNotes" class="input" value="${html(invoice.notes || "")}"></div>
+        </div>
+        <h3 style="margin:12px 0 8px;font-weight:900">تعديل الأصناف</h3>
+        <div id="editInvoiceLines">${(invoice.items && invoice.items.length ? invoice.items : [{id:newId("item"), name:"", qty:1, price:0, costPrice:0}]).map(buildEditableLine).join("")}</div>
+        <button id="editInvoiceAddLineBtn" class="ghost-btn" type="button" style="width:100%;margin-bottom:10px"><i class="fa-solid fa-plus"></i> إضافة صنف</button>
+        <div id="editInvoicePaymentSummary">${paymentSummaryHtml(invoice.total, invoicePaid(invoice))}</div>
+        <button class="primary-btn" type="submit" style="width:100%;margin-top:14px"><i class="fa-solid fa-floppy-disk"></i> حفظ التعديل وإعادة الحساب</button>
+      </form>
+    `, true);
+    const recalc = () => {
+      const items = collectEditableLines(byId("editInvoiceLines"), invoice.items || []);
+      const subtotal = items.reduce((s,x)=>s+n(x.total),0);
+      const discount = Math.min(subtotal, Math.max(0, n(byId("editInvoiceDiscount").value)));
+      updateDebtPaymentSummary("editInvoice", Math.max(0, subtotal - discount));
+    };
+    setupLineEditor("editInvoiceLines", recalc);
+    byId("editInvoiceAddLineBtn").onclick = () => { byId("editInvoiceLines").insertAdjacentHTML("beforeend", buildEditableLine({id:newId("item"), qty:1},0)); recalc(); };
+    byId("editInvoicePaidAmount").oninput = recalc;
+    byId("editInvoiceDiscount").oninput = recalc;
+    byId("editInvoiceCustomerInput").onchange = () => { const c = findCustomerFromText(byId("editInvoiceCustomerInput").value); if (c) byId("editInvoiceCustomerPhone").value = c.phone || ""; };
+    byId("editInvoiceForm").onsubmit = async e => {
+      e.preventDefault();
+      const items = collectEditableLines(byId("editInvoiceLines"), invoice.items || []);
+      if (!items.length) return toast("أضف صنف واحد على الأقل");
+      const subtotal = items.reduce((s,x)=>s+n(x.total),0);
+      const discount = Math.min(subtotal, Math.max(0, n(byId("editInvoiceDiscount").value)));
+      const total = Math.max(0, subtotal - discount);
+      const paidAmount = Math.min(total, Math.max(0, n(byId("editInvoicePaidAmount").value)));
+      const cost = items.reduce((s,x)=>s+n(x.costTotal),0);
+      const method = byId("editInvoicePaymentMethod").value;
+      const customerText = byId("editInvoiceCustomerInput").value.trim();
+      const existing = findCustomerFromText(customerText);
+      let customer = null;
+      if (customerText || byId("editInvoiceCustomerPhone").value.trim() || ["debt","later_app","instant_app"].includes(method)) {
+        customer = ensureInvoiceCustomer(existing?.name || customerText || invoice.customerName || "زبون", byId("editInvoiceCustomerPhone").value.trim() || existing?.phone || invoice.customerPhone || "", existing?.id || invoice.customerId || "");
+      }
+      if (invoice.source === "cart") await restoreInvoiceStock(oldSnapshot);
+      Object.assign(invoice, normalizeInvoicePaymentAmounts({
+        ...invoice,
+        customerId: customer?.id || "",
+        customerName: customer?.name || "",
+        customerPhone: customer?.phone || "",
+        paymentMethod: method,
+        paymentAccountId: byId("editInvoicePaymentAccount").value,
+        dueDate: byId("editInvoiceDueDate").value || "",
+        notes: byId("editInvoiceNotes").value.trim(),
+        items, subtotal, discount, total, cost, profit: total - cost, paidAmount,
+        updatedAt: Date.now()
+      }));
+      if (invoice.source === "cart") await applyInvoiceStock(invoice);
+      state.invoices = state.invoices.map(i => i.id === invoice.id ? invoice : i);
+      rebuildCustomerBalances(false);
+      const ops = [{store:"invoices", item:invoice}];
+      if (customer) ops.push({store:"customers", item:normalizeCustomer(state.customers.find(c=>c.id===customer.id)||customer)});
+      await saveLocalBatch(ops, true);
+      closeModal(); renderAll(); toast("تم تعديل الفاتورة والأصناف والدفعات");
+    };
+    recalc();
+  };
+
+  window.markLaterInvoicePaid = markLaterInvoicePaid = async function(invoiceId){
+    const invoice = state.invoices.find(i => String(i.id) === String(invoiceId));
+    if (!invoice) return;
+    invoice.paidAmount = n(invoice.total);
+    invoice.remainingAmount = 0;
+    invoice.status = "paid";
+    invoice.paidAt = Date.now();
+    invoice.updatedAt = Date.now();
+    await saveLocal("invoices", invoice, true);
+    state.invoices = state.invoices.map(i => i.id === invoice.id ? invoice : i);
+    rebuildCustomerBalances(true);
+    closeModal(); renderAll(); toast("تم تسديد الفاتورة بالكامل");
+    if (invoice.customerId) setTimeout(() => openCustomerAccount(invoice.customerId, "payments"), 120);
+  };
+
+  function invoiceItemsTable(inv){
+    const items = inv.items || [];
+    return `<table style="width:100%;border-collapse:collapse;min-width:0;margin-top:8px"><thead><tr><th style="border:1px solid #e5e7eb;background:#f8fafc;padding:7px;font-size:11px">الصنف</th><th style="border:1px solid #e5e7eb;background:#f8fafc;padding:7px;font-size:11px">الكمية</th><th style="border:1px solid #e5e7eb;background:#f8fafc;padding:7px;font-size:11px">السعر</th><th style="border:1px solid #e5e7eb;background:#f8fafc;padding:7px;font-size:11px">الإجمالي</th></tr></thead><tbody>${items.map(item=>`<tr><td style="border:1px solid #e5e7eb;padding:7px;font-size:11px">${html(item.name||"-")}</td><td style="border:1px solid #e5e7eb;padding:7px;font-size:11px">${html(item.qtyText || item.qty || "1")}</td><td style="border:1px solid #e5e7eb;padding:7px;font-size:11px">${asMoney(item.price)}</td><td style="border:1px solid #e5e7eb;padding:7px;font-size:11px">${asMoney(item.total)}</td></tr>`).join("") || `<tr><td colspan="4" style="text-align:center;padding:8px">لا توجد أصناف</td></tr>`}</tbody></table>`;
+  }
+
+  function customerDetailedHtml(customer, includeButtons=false){
+    rebuildCustomerBalances(false);
+    const c = state.customers.find(x => x.id === customer.id) || customer;
+    const invs = getCustomerInvoices(c).sort((a,b)=>Number(a.createdAt||0)-Number(b.createdAt||0));
+    const totalInvoices = invs.reduce((s,i)=>s+n(i.total),0);
+    const totalPaid = invs.reduce((s,i)=>s+invoicePaid(i),0) + (c.payments||[]).reduce((s,p)=>s+n(p.amount),0);
+    const balance = n(c.balance);
+    return `
+      <div class="debt-summary-strip" style="box-shadow:none">
+        <div class="debt-summary-item"><span>الزبون</span><b>${html(c.name)}</b></div>
+        <div class="debt-summary-item"><span>إجمالي الفواتير</span><b>${asMoney(totalInvoices)}</b></div>
+        <div class="debt-summary-item"><span>إجمالي الواصل</span><b style="color:#16a34a">${asMoney(totalPaid)}</b></div>
+        <div class="debt-summary-item"><span>الصافي المتبقي</span><b style="color:${balance>0?'#dc2626':'#16a34a'}">${asMoney(balance)}</b></div>
+      </div>
+      ${includeButtons ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="success-btn" data-pay-customer="${html(c.id)}"><i class="fa-solid fa-hand-holding-dollar"></i> إضافة دفعة</button><button class="gold-btn" data-add-manual-debt="${html(c.id)}"><i class="fa-solid fa-plus"></i> إضافة دين</button><button class="ghost-btn" data-edit-debt-customer="${html(c.id)}"><i class="fa-solid fa-pen"></i> تعديل العميل</button><button class="ghost-btn" data-print-customer="${html(c.id)}"><i class="fa-solid fa-print"></i> طباعة</button><button class="danger-btn" data-pdf-customer="${html(c.id)}"><i class="fa-solid fa-file-pdf"></i> PDF</button><button class="success-btn" data-excel-customer="${html(c.id)}"><i class="fa-solid fa-file-excel"></i> Excel</button></div>` : ""}
+      <h3 style="font-weight:900;margin:12px 0">سجل الفواتير التفصيلي</h3>
+      ${invs.map(inv => { normalizeInvoicePaymentAmounts(inv); return `<div class="card" style="box-shadow:none;margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b>فاتورة رقم #${html(inv.number)}</b><div class="muted">بتاريخ ${asDate(inv.createdAt)} · ${html(paymentMethodLabel(inv.paymentMethod))}</div></div><div style="text-align:left"><span class="badge ${invoiceRemaining(inv)>0?'red':'green'}">${invoiceRemaining(inv)>0?'متبقي':'مكتملة'}</span></div></div>${invoiceItemsTable(inv)}<div class="debt-summary-strip" style="box-shadow:none;margin:10px 0 0"><div class="debt-summary-item"><span>إجمالي الفاتورة</span><b>${asMoney(inv.total)}</b></div><div class="debt-summary-item"><span>الواصل</span><b style="color:#16a34a">${asMoney(invoicePaid(inv))}</b></div><div class="debt-summary-item"><span>المتبقي</span><b style="color:${invoiceRemaining(inv)>0?'#dc2626':'#16a34a'}">${asMoney(invoiceRemaining(inv))}</b></div><div class="debt-summary-item"><span>إجراءات</span><b><button class="ghost-btn" data-view-invoice="${html(inv.id)}" style="padding:6px 8px"><i class="fa-solid fa-eye"></i></button> <button class="ghost-btn" data-edit-invoice="${html(inv.id)}" style="padding:6px 8px"><i class="fa-solid fa-pen"></i></button></b></div></div></div>`; }).join("") || `<div class="muted" style="text-align:center;padding:20px">لا توجد فواتير لهذا الزبون</div>`}
+      ${(c.payments||[]).length ? `<h3 style="font-weight:900;margin:12px 0">دفعات مستقلة</h3><table style="width:100%;border-collapse:collapse;min-width:0"><tbody>${(c.payments||[]).map(p=>`<tr><td style="border:1px solid #e5e7eb;padding:7px">${asDate(p.createdAt)}</td><td style="border:1px solid #e5e7eb;padding:7px">${asMoney(p.amount)}</td><td style="border:1px solid #e5e7eb;padding:7px">${html(p.note||"")}</td></tr>`).join("")}</tbody></table>` : ""}
+    `;
+  }
+
+  window.openCustomerAccount = openCustomerAccount = function(customerId, tab="all"){
+    const customer = state.customers.find(c => String(c.id) === String(customerId));
+    if (!customer) return;
+    openModal(`كشف حساب ${html(customer.name)}`, customerDetailedHtml(customer, true), true);
+  };
+
+  window.customerReportHtml = customerReportHtml = function(customer){
+    return reportShell(`كشف حساب تفصيلي - ${customer.name}`, customerDetailedHtml(customer, false));
+  };
+
+  window.excelCustomer = excelCustomer = function(customerId){
+    const customer = state.customers.find(c => String(c.id) === String(customerId));
+    if (!customer) return;
+    const rows = [];
+    getCustomerInvoices(customer).forEach(inv => {
+      normalizeInvoicePaymentAmounts(inv);
+      (inv.items && inv.items.length ? inv.items : [{}]).forEach(item => rows.push({
+        رقم_الفاتورة: inv.number,
+        التاريخ: asDate(inv.createdAt),
+        الزبون: customer.name,
+        الهاتف: customer.phone || "",
+        الصنف: item.name || "",
+        الكمية: item.qtyText || item.qty || "",
+        السعر: n(item.price),
+        إجمالي_الصنف: n(item.total),
+        إجمالي_الفاتورة: n(inv.total),
+        الواصل: invoicePaid(inv),
+        المتبقي: invoiceRemaining(inv),
+        الحالة: invoiceRemaining(inv) > 0 ? "غير مكتملة" : "مكتملة"
+      }));
+    });
+    rows.push({ رقم_الفاتورة:"", التاريخ:"", الزبون:"الخلاصة", الهاتف:"", الصنف:"إجمالي الفواتير", الكمية:"", السعر:"", إجمالي_الصنف:"", إجمالي_الفاتورة: rows.reduce((s,r)=>s+n(r.إجمالي_الفاتورة),0), الواصل: rows.reduce((s,r)=>s+n(r.الواصل),0), المتبقي:n(customer.balance), الحالة:"" });
+    exportExcel(`كشف-تفصيلي-${customer.name}-${todayKey()}.xlsx`, "كشف الحساب", rows);
+  };
+
+  function debtSummaryRows(){
+    rebuildCustomerBalances(false);
+    return (state.customers || []).filter(c => n(c.balance) > 0).map(c => ({
+      الزبون: c.name || "",
+      الهاتف: c.phone || "",
+      إجمالي_الفواتير: getCustomerInvoices(c).reduce((s,i)=>s+n(i.total),0),
+      إجمالي_الواصل: getCustomerInvoices(c).reduce((s,i)=>s+invoicePaid(i),0) + (c.payments||[]).reduce((s,p)=>s+n(p.amount),0),
+      المتبقي_عليه: n(c.balance),
+      عدد_الفواتير: getCustomerInvoices(c).length
+    }));
+  }
+
+  function debtSummaryReportHtml(){
+    const rows = debtSummaryRows();
+    const total = rows.reduce((s,r)=>s+n(r.المتبقي_عليه),0);
+    return reportShell("كشف الحساب العام - ديون الزبائن", `<table style="width:100%;border-collapse:collapse;min-width:0"><thead><tr><th style="border:1px solid #e5e7eb;background:#eff6ff;padding:7px">الزبون</th><th style="border:1px solid #e5e7eb;background:#eff6ff;padding:7px">الهاتف</th><th style="border:1px solid #e5e7eb;background:#eff6ff;padding:7px">إجمالي الفواتير</th><th style="border:1px solid #e5e7eb;background:#eff6ff;padding:7px">الواصل</th><th style="border:1px solid #e5e7eb;background:#eff6ff;padding:7px">المتبقي</th></tr></thead><tbody>${rows.map(r=>`<tr><td style="border:1px solid #e5e7eb;padding:7px">${html(r.الزبون)}</td><td style="border:1px solid #e5e7eb;padding:7px">${html(r.الهاتف)}</td><td style="border:1px solid #e5e7eb;padding:7px">${asMoney(r.إجمالي_الفواتير)}</td><td style="border:1px solid #e5e7eb;padding:7px">${asMoney(r.إجمالي_الواصل)}</td><td style="border:1px solid #e5e7eb;padding:7px;color:#dc2626;font-weight:900">${asMoney(r.المتبقي_عليه)}</td></tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:12px">لا توجد ديون</td></tr>`}</tbody><tfoot><tr><td colspan="4" style="border:1px solid #e5e7eb;padding:9px;font-weight:900">إجمالي الديون في السوق</td><td style="border:1px solid #e5e7eb;padding:9px;color:#dc2626;font-weight:900">${asMoney(total)}</td></tr></tfoot></table>`);
+  }
+
+  function exportHiddenHtml(htmlContent, type, filename){
+    if (type === "print") return printHtml(htmlContent);
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "position:fixed;right:-9999px;top:0;width:1200px;background:white";
+    wrap.innerHTML = htmlContent;
+    document.body.appendChild(wrap);
+    const p = type === "pdf" ? downloadElementPdf(wrap, filename) : downloadElementImage(wrap, filename.replace(/\.pdf$/i,".jpg"));
+    Promise.resolve(p).finally(()=>wrap.remove());
+  }
+
+  window.excelDebts = excelDebts = function(){
+    const rows = debtSummaryRows();
+    rows.push({ الزبون:"إجمالي الديون", الهاتف:"", إجمالي_الفواتير:"", إجمالي_الواصل:"", المتبقي_عليه:rows.reduce((s,r)=>s+n(r.المتبقي_عليه),0), عدد_الفواتير:"" });
+    exportExcel(`ديون-الزبائن-${todayKey()}.xlsx`, "ديون الزبائن", rows);
+  };
+
+  function pdfDebtSummary(){ exportHiddenHtml(debtSummaryReportHtml(), "pdf", `ديون-الزبائن-${todayKey()}.pdf`); }
+
+  function allCustomerInvoiceRows(){
+    return (state.invoices || []).filter(isCustomerInvoice).flatMap(inv => {
+      normalizeInvoicePaymentAmounts(inv);
+      const items = inv.items && inv.items.length ? inv.items : [{}];
+      return items.map(item => ({
+        الزبون: inv.customerName || "",
+        الهاتف: inv.customerPhone || "",
+        رقم_الفاتورة: inv.number,
+        التاريخ: asDate(inv.createdAt),
+        الصنف: item.name || "",
+        الكمية: item.qtyText || item.qty || "",
+        السعر: n(item.price),
+        إجمالي_الصنف: n(item.total),
+        إجمالي_الفاتورة: n(inv.total),
+        الواصل: invoicePaid(inv),
+        المتبقي: invoiceRemaining(inv),
+        طريقة_الدفع: paymentMethodLabel(inv.paymentMethod)
+      }));
+    });
+  }
+
+  function allCustomerInvoicesReportHtml(){
+    const rows = allCustomerInvoiceRows();
+    const total = (state.invoices||[]).filter(isCustomerInvoice).reduce((s,i)=>s+n(i.total),0);
+    const paid = (state.invoices||[]).filter(isCustomerInvoice).reduce((s,i)=>s+invoicePaid(i),0);
+    const rem = (state.invoices||[]).filter(isCustomerInvoice).reduce((s,i)=>s+invoiceRemaining(i),0);
+    return reportShell("تنزيل جميع فواتير الزبائن", `<div class="debt-summary-strip" style="box-shadow:none"><div class="debt-summary-item"><span>إجمالي الفواتير</span><b>${asMoney(total)}</b></div><div class="debt-summary-item"><span>إجمالي الواصل</span><b>${asMoney(paid)}</b></div><div class="debt-summary-item"><span>إجمالي المتبقي</span><b>${asMoney(rem)}</b></div><div class="debt-summary-item"><span>عدد السطور</span><b>${rows.length}</b></div></div><table style="width:100%;border-collapse:collapse;min-width:0"><thead><tr>${["الزبون","رقم الفاتورة","التاريخ","الصنف","الكمية","الإجمالي","الواصل","المتبقي"].map(h=>`<th style="border:1px solid #e5e7eb;background:#eff6ff;padding:7px;font-size:10px">${h}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr><td style="border:1px solid #e5e7eb;padding:7px;font-size:10px">${html(r.الزبون)}</td><td style="border:1px solid #e5e7eb;padding:7px;font-size:10px">#${html(r.رقم_الفاتورة)}</td><td style="border:1px solid #e5e7eb;padding:7px;font-size:10px">${html(r.التاريخ)}</td><td style="border:1px solid #e5e7eb;padding:7px;font-size:10px">${html(r.الصنف)}</td><td style="border:1px solid #e5e7eb;padding:7px;font-size:10px">${html(r.الكمية)}</td><td style="border:1px solid #e5e7eb;padding:7px;font-size:10px">${asMoney(r.إجمالي_الفاتورة)}</td><td style="border:1px solid #e5e7eb;padding:7px;font-size:10px">${asMoney(r.الواصل)}</td><td style="border:1px solid #e5e7eb;padding:7px;font-size:10px">${asMoney(r.المتبقي)}</td></tr>`).join("")}</tbody></table>`);
+  }
+
+  function excelAllCustomerInvoices(){
+    const rows = allCustomerInvoiceRows();
+    rows.push({ الزبون:"الخلاصة", الهاتف:"", رقم_الفاتورة:"", التاريخ:"", الصنف:"إجمالي", الكمية:"", السعر:"", إجمالي_الصنف:"", إجمالي_الفاتورة:(state.invoices||[]).filter(isCustomerInvoice).reduce((s,i)=>s+n(i.total),0), الواصل:(state.invoices||[]).filter(isCustomerInvoice).reduce((s,i)=>s+invoicePaid(i),0), المتبقي:(state.invoices||[]).filter(isCustomerInvoice).reduce((s,i)=>s+invoiceRemaining(i),0), طريقة_الدفع:"" });
+    exportExcel(`جميع-فواتير-الزبائن-${todayKey()}.xlsx`, "فواتير الزبائن", rows);
+  }
+  function pdfAllCustomerInvoices(){ exportHiddenHtml(allCustomerInvoicesReportHtml(), "pdf", `جميع-فواتير-الزبائن-${todayKey()}.pdf`); }
+
+  function updateInvoiceTableHead(){
+    const head = byId("invoicesTable")?.closest("table")?.querySelector("thead tr");
+    if (head && !head.dataset.oskarPaidColumns) {
+      head.innerHTML = `<th>رقم</th><th>التاريخ</th><th>العميل</th><th>الهاتف</th><th>الحالة</th><th>الدفع</th><th>مجلد الدفع</th><th>المجموع قبل الخصم</th><th>الخصم</th><th>الإجمالي</th><th>الواصل</th><th>المتبقي</th><th>الإجراءات</th>`;
+      head.dataset.oskarPaidColumns = "1";
+    }
+  }
+
+  function ensureUi(){
+    updateInvoiceTableHead();
+    [["invoiceSearch","input",renderInvoices],["invoicePeriod","change",renderInvoices],["invoiceStatusFilter","change",renderInvoices],["invoiceCustomDate","change",renderInvoices],["debtsSearch","input",renderDebts],["debtsSort","change",renderDebts]].forEach(([id,evt,fn]) => {
+      const el = byId(id);
+      if (!el || el.__oskarDeferredRebound) return;
+      if (evt === "input") el.oninput = fn; else el.onchange = fn;
+      el.__oskarDeferredRebound = "1";
+    });
+    const debtExcel = byId("excelDebtsBtn");
+    if (debtExcel && debtExcel.onclick !== excelDebts) debtExcel.onclick = excelDebts;
+    const invHead = byId("page-invoices")?.querySelector("div[style*='justify-content:space-between']");
+    if (invHead && !byId("oskarAddDeferredInvoiceBtn")) {
+      const wrap = invHead.querySelector("div[style*='display:flex']") || invHead;
+      wrap.insertAdjacentHTML("beforeend", `<button id="oskarAddDeferredInvoiceBtn" class="gold-btn" type="button"><i class="fa-solid fa-file-circle-plus"></i> إضافة فاتورة دين</button>`);
+    }
+    const debtsHeadButtons = byId("page-debts")?.querySelector("div[style*='display:flex'][style*='flex-wrap']");
+    if (debtsHeadButtons && !byId("oskarDebtSummaryPdfBtn")) {
+      debtsHeadButtons.insertAdjacentHTML("afterbegin", `
+        <button id="oskarDebtSummaryPdfBtn" class="danger-btn" type="button"><i class="fa-solid fa-file-pdf"></i> PDF الديون</button>
+        <button id="oskarAllCustomerInvoicesPdfBtn" class="danger-btn" type="button"><i class="fa-solid fa-file-pdf"></i> تنزيل جميع فواتير الزبائن PDF</button>
+        <button id="oskarAllCustomerInvoicesExcelBtn" class="success-btn" type="button"><i class="fa-solid fa-file-excel"></i> جميع فواتير الزبائن Excel</button>
+      `);
+    }
+  }
+
+  document.addEventListener("click", e => {
+    const target = e.target;
+    if (target.closest("#oskarAddDeferredInvoiceBtn")) { e.preventDefault(); openDeferredInvoiceForm(); return; }
+    if (target.closest("#oskarDebtSummaryPdfBtn")) { e.preventDefault(); pdfDebtSummary(); return; }
+    if (target.closest("#oskarAllCustomerInvoicesPdfBtn")) { e.preventDefault(); pdfAllCustomerInvoices(); return; }
+    if (target.closest("#oskarAllCustomerInvoicesExcelBtn")) { e.preventDefault(); excelAllCustomerInvoices(); return; }
+  }, true);
+
+  function tick(){
+    try { ensureUi(); } catch(e) { console.warn(e); }
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => { tick(); setTimeout(()=>{ tick(); try{ renderAll(); }catch{} }, 400); }, {once:true});
+  else { tick(); setTimeout(()=>{ tick(); try{ renderAll(); }catch{} }, 400); }
+  setInterval(tick, 1200);
+})();
+</script>
+
 </body>
 </html>
