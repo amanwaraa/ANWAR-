@@ -9236,6 +9236,688 @@
             
 
 
+
+
+<script id="oskar-mega-mall-barcode-backup-sync-export-final-2026-05-05">
+(function(){
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const STORE_LIST = [
+    "products","invoices","customers","expenses","purchases","supplierPayments",
+    "paymentAccounts","employees","suppliers","workers","workerWages","accountMovements","settings"
+  ];
+  const QR_SRC = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+  const BACKUP_REMINDER_KEY = "oskar_last_full_backup_at_v2";
+  const BACKUP_SNOOZE_KEY = "oskar_backup_reminder_snooze_until_v2";
+  const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+
+  function safeToast(msg, ms){
+    try{ if(typeof window.toast === "function") return window.toast(msg, ms || 2800); }catch{}
+    let t = $("toast");
+    if(!t){
+      t = document.createElement("div");
+      t.id = "toast";
+      t.style.cssText = "position:fixed;right:16px;left:16px;bottom:26px;z-index:2147483647;background:#020617;color:#fff;border-radius:18px;padding:14px 16px;text-align:center;font-weight:900;box-shadow:0 18px 45px rgba(0,0,0,.28);font-family:Cairo,Arial,sans-serif";
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add("show");
+    t.style.display = "block";
+    clearTimeout(t.__timer);
+    t.__timer = setTimeout(()=>{ t.classList.remove("show"); t.style.display = "none"; }, ms || 2800);
+  }
+
+  function money(v){
+    try{ if(typeof window.money === "function") return window.money(v); }catch{}
+    const cur = window.state?.settings?.currency || "₪";
+    const n = Number(v || 0);
+    return cur + " " + n.toFixed(3).replace(/\.000$/, ".000");
+  }
+
+  function ensureFinalStyle(){
+    if($("oskarMegaMallFinalStyle")) return;
+    const st = document.createElement("style");
+    st.id = "oskarMegaMallFinalStyle";
+    st.textContent = `
+      .oskar-final-camera{position:fixed;inset:0;background:#000;z-index:2147483646;display:none;direction:rtl;font-family:Cairo,Arial,sans-serif;overflow:hidden}.oskar-final-camera.show{display:block}.oskar-final-reader{width:100vw;height:100vh;background:#000}.oskar-final-reader video{width:100vw!important;height:100vh!important;object-fit:cover!important}.oskar-final-reader__dashboard,#oskarFinalReader__dashboard,#oskarFinalReader__scan_region{display:none!important}.oskar-final-frame{pointer-events:none;position:fixed;top:50%;left:50%;width:min(82vw,420px);height:230px;transform:translate(-50%,-50%);border:3px solid rgba(255,255,255,.55);border-radius:26px;z-index:2147483647;transition:.15s ease;box-shadow:0 0 0 9999px rgba(0,0,0,.18),0 0 30px rgba(255,255,255,.15)}.oskar-final-frame:before,.oskar-final-frame:after{content:"";position:absolute;width:54px;height:54px;border-color:#22c55e;border-style:solid;filter:drop-shadow(0 0 12px rgba(34,197,94,.95))}.oskar-final-frame:before{top:-4px;right:-4px;border-width:6px 6px 0 0;border-radius:0 22px 0 0}.oskar-final-frame:after{left:-4px;bottom:-4px;border-width:0 0 6px 6px;border-radius:0 0 0 22px}.oskar-final-laser{position:fixed;top:50%;left:50%;width:min(72vw,360px);height:3px;transform:translate(-50%,-50%);z-index:2147483647;border-radius:999px;background:linear-gradient(90deg,transparent,#22c55e,transparent);box-shadow:0 0 22px #22c55e;animation:oskarFinalLaser 1.02s ease-in-out infinite;pointer-events:none}@keyframes oskarFinalLaser{0%,100%{transform:translate(-50%,calc(-50% - 95px));opacity:.55}50%{transform:translate(-50%,calc(-50% + 95px));opacity:1}}.oskar-final-camera.detected .oskar-final-frame{border-color:#22c55e;box-shadow:0 0 0 9999px rgba(0,0,0,.13),0 0 40px rgba(34,197,94,.9),inset 0 0 35px rgba(34,197,94,.25);animation:oskarFinalGreenPop .28s ease}@keyframes oskarFinalGreenPop{0%{transform:translate(-50%,-50%) scale(.96)}60%{transform:translate(-50%,-50%) scale(1.03)}100%{transform:translate(-50%,-50%) scale(1)}}.oskar-final-close{position:fixed;top:16px;left:16px;width:50px;height:50px;border:0;border-radius:16px;background:rgba(15,23,42,.88);color:#fff;font-size:26px;font-weight:900;z-index:2147483647}.oskar-final-title{position:fixed;top:17px;right:16px;z-index:2147483647;max-width:calc(100vw - 92px);background:rgba(15,23,42,.86);color:#fff;border-radius:16px;padding:10px 14px;font-weight:900;font-size:14px}.oskar-final-title small{display:block;color:#bbf7d0;font-size:12px;font-weight:800;margin-top:2px}.oskar-final-toast{position:fixed;right:16px;left:16px;bottom:28px;z-index:2147483647;padding:15px 18px;border-radius:18px;background:rgba(15,23,42,.96);color:#fff;font-size:16px;font-weight:900;text-align:center;box-shadow:0 18px 45px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.15);transform:translateY(130%);opacity:0;transition:.25s ease;direction:ltr}.oskar-final-toast.show{transform:translateY(0);opacity:1}.oskar-final-added{position:fixed;top:76px;right:12px;left:12px;z-index:2147483647;display:flex;gap:8px;overflow-x:auto;padding:3px}.oskar-final-chip{background:rgba(255,255,255,.96);color:#064e3b;border:1px solid #bbf7d0;border-radius:999px;padding:8px 10px;font-weight:900;font-size:12px;white-space:nowrap;box-shadow:0 12px 26px rgba(0,0,0,.22)}
+      .oskar-backup-reminder{position:fixed;right:14px;left:14px;bottom:96px;z-index:2147483600;background:rgba(255,255,255,.97);border:1px solid #d1fae5;border-radius:24px;padding:14px;box-shadow:0 22px 55px rgba(15,23,42,.18);font-family:Cairo,Arial,sans-serif;display:none;gap:12px;align-items:center;justify-content:space-between}.oskar-backup-reminder.show{display:flex}.oskar-backup-reminder b{font-weight:900;color:#064e3b}.oskar-backup-reminder small{display:block;color:#64748b;font-weight:800;line-height:1.7}.oskar-backup-reminder .actions{display:flex;gap:8px;flex-shrink:0}.oskar-backup-reminder button{border:0;border-radius:16px;padding:10px 12px;font-weight:900}.oskar-backup-reminder .take{background:#059669;color:#fff}.oskar-backup-reminder .later{background:#f1f5f9;color:#0f172a}
+      .oskar-export-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:2147483601;display:none;align-items:center;justify-content:center;font-family:Cairo,Arial,sans-serif}.oskar-export-overlay.show{display:flex}.oskar-export-box{background:#fff;border-radius:24px;padding:18px 22px;box-shadow:0 24px 70px rgba(0,0,0,.24);font-weight:900;text-align:center;min-width:240px}.oskar-export-spinner{width:38px;height:38px;border:4px solid #d1fae5;border-top-color:#059669;border-radius:999px;margin:0 auto 10px;animation:oskarExportSpin .7s linear infinite}@keyframes oskarExportSpin{to{transform:rotate(360deg)}}
+      @media(max-width:560px){.oskar-backup-reminder{align-items:flex-start;flex-direction:column}.oskar-backup-reminder .actions{width:100%}.oskar-backup-reminder button{flex:1}}
+    `;
+    document.head.appendChild(st);
+  }
+
+  /* ===================== كاميرا الباركود النهائية السريعة ===================== */
+  let scanner = null;
+  let scannerRunning = false;
+  let startPromise = null;
+  let scanMode = "sale";
+  let scanTarget = "";
+  let lastCode = "";
+  let lastTime = 0;
+  const scanSound = new Audio("./qr.mp3");
+  scanSound.preload = "auto";
+  scanSound.volume = 1;
+
+  function unlockSound(){
+    scanSound.play().then(()=>{ scanSound.pause(); scanSound.currentTime = 0; }).catch(()=>{});
+  }
+  window.addEventListener("pointerdown", unlockSound, {once:true, passive:true, capture:true});
+  window.addEventListener("touchstart", unlockSound, {once:true, passive:true, capture:true});
+
+  function showScanToast(code){
+    const t = $("oskarFinalScanToast");
+    if(!t) return;
+    t.textContent = code;
+    t.classList.add("show");
+    clearTimeout(t.__timer);
+    t.__timer = setTimeout(()=>t.classList.remove("show"), 1200);
+  }
+  function beep(){ try{ scanSound.pause(); scanSound.currentTime = 0; scanSound.play().catch(()=>{}); }catch{} }
+  function vibrate(){ try{ if(navigator.vibrate) navigator.vibrate([55,25,55]); }catch{} }
+  function markDetected(){
+    const page = $("oskarFinalCameraPage");
+    if(!page) return;
+    page.classList.add("detected");
+    clearTimeout(page.__detectedTimer);
+    page.__detectedTimer = setTimeout(()=>page.classList.remove("detected"), 520);
+  }
+  function ensureCameraDom(){
+    ensureFinalStyle();
+    let page = $("oskarFinalCameraPage");
+    if(page) return page;
+    page = document.createElement("div");
+    page.id = "oskarFinalCameraPage";
+    page.className = "oskar-final-camera";
+    page.innerHTML = `
+      <div id="oskarFinalReader" class="oskar-final-reader"></div>
+      <div class="oskar-final-frame"></div>
+      <div class="oskar-final-laser"></div>
+      <button id="oskarFinalCameraClose" class="oskar-final-close" type="button">×</button>
+      <div id="oskarFinalCameraTitle" class="oskar-final-title">قراءة باركود<small>وجّه الكاميرا نحو الباركود من أي جهة</small></div>
+      <div id="oskarFinalAdded" class="oskar-final-added"></div>
+      <div id="oskarFinalScanToast" class="oskar-final-toast"></div>`;
+    document.body.appendChild(page);
+    $("oskarFinalCameraClose")?.addEventListener("click", stopFinalScanner, {capture:true});
+    return page;
+  }
+  function loadHtml5Qr(){
+    if(window.Html5Qrcode && window.Html5QrcodeSupportedFormats) return Promise.resolve();
+    const existing = Array.from(document.scripts).find(s => String(s.src || "").includes("html5-qrcode"));
+    if(existing){
+      return new Promise((resolve,reject)=>{
+        if(window.Html5Qrcode) return resolve();
+        existing.addEventListener("load", () => resolve(), {once:true});
+        existing.addEventListener("error", reject, {once:true});
+        setTimeout(()=> window.Html5Qrcode ? resolve() : reject(new Error("html5-qrcode-timeout")), 4200);
+      });
+    }
+    return new Promise((resolve,reject)=>{
+      const s = document.createElement("script");
+      s.src = QR_SRC;
+      s.async = true;
+      s.onload = () => resolve();
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  function prepareProductBarcodeIndex(){
+    const map = new Map();
+    const list = Array.isArray(window.state?.products) ? window.state.products : [];
+    for(const p of list){
+      for(const v of [p?.barcode, p?.code, p?.id]){
+        const k = String(v || "").trim();
+        if(k && !map.has(k)) map.set(k, p);
+      }
+    }
+    window.__oskarFastBarcodeMap = map;
+    window.__oskarFastBarcodeMapSize = list.length;
+    return map;
+  }
+  function findByBarcode(code){
+    const c = String(code || "").trim();
+    if(!c) return null;
+    try{
+      if(window.__oskarFastBarcodeMapSize !== (window.state?.products || []).length) prepareProductBarcodeIndex();
+      const hit = window.__oskarFastBarcodeMap?.get(c);
+      if(hit) return hit;
+    }catch{}
+    try{ if(typeof window.getProductByBarcode === "function"){ const p = window.getProductByBarcode(c); if(p) return p; } }catch{}
+    return (window.state?.products || []).find(p => String(p.barcode || "").trim() === c || String(p.code || "").trim() === c || String(p.id || "").trim() === c) || null;
+  }
+  function addSaleProduct(product){
+    if(!product) return false;
+    try{
+      if(typeof window.addToCart === "function"){
+        window.addToCart(product);
+      }else if(window.state?.cart){
+        window.state.cart.push({ id:"cart_"+Date.now()+"_"+Math.random().toString(16).slice(2), productId:product.id, name:product.name, qty:1, price: Number(product.salePrice || product.price || 0), total:Number(product.salePrice || product.price || 0) });
+        try{ window.renderCart?.(); }catch{}
+      }
+      const chips = $("oskarFinalAdded");
+      if(chips){
+        const chip = document.createElement("div");
+        chip.className = "oskar-final-chip";
+        chip.textContent = "✓ " + (product.name || "منتج");
+        chips.prepend(chip);
+        while(chips.children.length > 7) chips.lastElementChild.remove();
+      }
+      return true;
+    }catch(err){ console.warn("add barcode product failed", err); return false; }
+  }
+  async function stopFinalScanner(){
+    startPromise = null;
+    try{ if(scanner && scannerRunning) await scanner.stop(); }catch{}
+    try{ if(scanner) await scanner.clear(); }catch{}
+    scanner = null;
+    scannerRunning = false;
+    const page = $("oskarFinalCameraPage");
+    if(page) page.classList.remove("show");
+    try{ if(window.state?.scanner){ window.state.scanner.active = false; window.state.scanner.locked = false; } }catch{}
+  }
+  function onFinalScan(decodedText, decodedResult){
+    const code = String(decodedText || "").trim();
+    const now = Date.now();
+    if(!code) return;
+    if(code === lastCode && now - lastTime < 1050) return;
+    lastCode = code;
+    lastTime = now;
+    markDetected(); beep(); vibrate(); showScanToast(code);
+    try{ window.dispatchEvent(new CustomEvent("barcode:scanned", {detail:{code, result:decodedResult}})); }catch{}
+
+    if(scanMode === "product" || scanTarget){
+      const input = $(scanTarget || "productBarcode") || $("productBarcode") || document.querySelector('input[name="barcode"],input[id*="Barcode"],input[id*="barcode"]');
+      if(input){
+        input.value = code;
+        input.dispatchEvent(new Event("input", {bubbles:true}));
+        input.dispatchEvent(new Event("change", {bubbles:true}));
+        safeToast("تمت قراءة الباركود ووضعه في خانة المنتج", 1800);
+      }
+      stopFinalScanner();
+      return;
+    }
+
+    const product = findByBarcode(code);
+    if(product){
+      addSaleProduct(product);
+      safeToast("تمت إضافة " + (product.name || "المنتج"), 1300);
+      const keepOpen = localStorage.getItem("oskar_keep_cashier_barcode_camera_open_v1") === "1";
+      if(!keepOpen) stopFinalScanner();
+    }else{
+      safeToast("لم يتم العثور على منتج بهذا الباركود", 1700);
+    }
+  }
+  async function startFinalScanner(mode="sale", target=""){
+    scanMode = mode || "sale";
+    scanTarget = target || "";
+    if(startPromise) return startPromise;
+    startPromise = (async()=>{
+      await loadHtml5Qr();
+      prepareProductBarcodeIndex();
+      await stopFinalScanner();
+      const page = ensureCameraDom();
+      const title = $("oskarFinalCameraTitle");
+      if(title) title.innerHTML = (scanMode === "product" ? "قراءة باركود المنتج" : "قراءة باركود للبيع") + "<small>وجّه الكاميرا نحو الباركود من أي جهة</small>";
+      const chips = $("oskarFinalAdded");
+      if(chips) chips.innerHTML = "";
+      const reader = $("oskarFinalReader");
+      if(reader) reader.innerHTML = "";
+      page.classList.add("show");
+      await new Promise(r => requestAnimationFrame(()=>requestAnimationFrame(r)));
+      const F = window.Html5QrcodeSupportedFormats || {};
+      const formats = [F.QR_CODE,F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.CODE_93,F.ITF,F.CODABAR,F.DATA_MATRIX,F.AZTEC,F.PDF_417].filter(Boolean);
+      scanner = new window.Html5Qrcode("oskarFinalReader", formats.length ? {formatsToSupport:formats, verbose:false} : {verbose:false});
+      const config = {
+        fps: 30,
+        qrbox: function(w,h){ return { width: Math.floor(w * 0.82), height: Math.floor(h * 0.34) }; },
+        aspectRatio: 1.7777778,
+        disableFlip: false,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        videoConstraints: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          advanced: [
+            { focusMode: "continuous" },
+            { exposureMode: "continuous" },
+            { whiteBalanceMode: "continuous" }
+          ]
+        }
+      };
+      try{
+        await Promise.race([
+          scanner.start({facingMode:"environment"}, config, onFinalScan, function(){}),
+          new Promise((_,rej)=>setTimeout(()=>rej(new Error("camera-start-timeout")), 6500))
+        ]);
+      }catch(primaryErr){
+        console.warn("fast camera primary start failed", primaryErr);
+        try{ await scanner.clear(); }catch{}
+        scanner = new window.Html5Qrcode("oskarFinalReader", formats.length ? {formatsToSupport:formats, verbose:false} : {verbose:false});
+        await scanner.start({facingMode:{ideal:"environment"}}, config, onFinalScan, function(){});
+      }
+      scannerRunning = true;
+      try{
+        const video = $("oskarFinalReader")?.querySelector("video");
+        const track = video?.srcObject?.getVideoTracks?.()[0];
+        const caps = track?.getCapabilities?.() || {};
+        const adv = [];
+        if(caps.focusMode && caps.focusMode.includes("continuous")) adv.push({focusMode:"continuous"});
+        if(caps.exposureMode && caps.exposureMode.includes("continuous")) adv.push({exposureMode:"continuous"});
+        if(caps.whiteBalanceMode && caps.whiteBalanceMode.includes("continuous")) adv.push({whiteBalanceMode:"continuous"});
+        if(adv.length) track.applyConstraints({advanced:adv}).catch(()=>{});
+      }catch{}
+      startPromise = null;
+    })().catch(async err => {
+      console.error(err);
+      startPromise = null;
+      await stopFinalScanner();
+      safeToast("اسمح باستخدام الكاميرا وتأكد أن الموقع يعمل على HTTPS", 2600);
+    });
+    return startPromise;
+  }
+
+  function cameraClickHandler(e){
+    const target = e.target && e.target.closest && e.target.closest('#openScannerBtn,#openScannerBtnSuper,[data-oskar-super-camera="sale"],[data-oskar-fast-sale],[data-oskar-super-camera="cashier"]');
+    const product = e.target && e.target.closest && e.target.closest('#scanProductBarcodeBtn,#scanProductBarcodeBtnSuper,[data-oskar-super-camera="product"],[data-oskar-fast-product]');
+    const close = e.target && e.target.closest && e.target.closest('#oskarFinalCameraClose,#floatingScannerCloseBtn,#stopScannerBtn,#barcodeTurboClose,#oskarFastClose,#patchCameraCloseBtn');
+    if(target){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); startFinalScanner("sale", ""); return; }
+    if(product){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); startFinalScanner("product", "productBarcode"); return; }
+    if(close){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); stopFinalScanner(); return; }
+  }
+  window.addEventListener("click", cameraClickHandler, true);
+  window.addEventListener("pointerdown", function(e){
+    const cameraBtn = e.target && e.target.closest && e.target.closest('#openScannerBtn,#openScannerBtnSuper,#scanProductBarcodeBtn,#scanProductBarcodeBtnSuper,[data-oskar-super-camera]');
+    if(cameraBtn){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); cameraClickHandler(e); }
+  }, true);
+  window.openScanner = function(mode, target){ return startFinalScanner(mode || "sale", target || ""); };
+  window.openFloatingProductBarcodeScanner = function(target){ return startFinalScanner("product", target || "productBarcode"); };
+  window.stopScanner = stopFinalScanner;
+  window.stopFloatingScanner = stopFinalScanner;
+  window.OSKAR_FINAL_FAST_BARCODE = startFinalScanner;
+  document.addEventListener("visibilitychange", ()=>{ if(document.hidden && scannerRunning) stopFinalScanner(); });
+  window.addEventListener("beforeunload", ()=>{ try{ if(scannerRunning && scanner) scanner.stop().catch(()=>{}); }catch{} });
+  setTimeout(()=>loadHtml5Qr().catch(()=>{}), 400);
+
+  /* ===================== النسخ الاحتياطية: دمج فوق الموجود بدون حذف القديم ===================== */
+  async function getStore(store){
+    try{ if(typeof window.idbGetAll === "function") return await window.idbGetAll(store) || []; }catch{}
+    const s = window.state || {};
+    if(store === "settings") return s.settings ? [s.settings] : [];
+    return Array.isArray(s[store]) ? s[store] : [];
+  }
+  function currentFirebaseRoot(){ return window.FIREBASE_ROOT || window.OSKAR_FIREBASE_ROOT || "cashier"; }
+  function extraStorageKey(){ return "cashier_extra_final_2026_04_29_" + currentFirebaseRoot(); }
+  function movementsStorageKey(){ return "oskar_account_movements_linked_final_2026_05_03_" + currentFirebaseRoot(); }
+  function persistNonIdbStore(store){
+    try{
+      if(["suppliers","workers","workerWages"].includes(store)){
+        const old = JSON.parse(localStorage.getItem(extraStorageKey()) || "{}");
+        localStorage.setItem(extraStorageKey(), JSON.stringify({
+          ...old,
+          suppliers: Array.isArray(window.state?.suppliers) ? window.state.suppliers : [],
+          workers: Array.isArray(window.state?.workers) ? window.state.workers : [],
+          workerWages: Array.isArray(window.state?.workerWages) ? window.state.workerWages : []
+        }));
+      }
+      if(store === "accountMovements"){
+        localStorage.setItem(movementsStorageKey(), JSON.stringify(Array.isArray(window.state?.accountMovements) ? window.state.accountMovements : []));
+      }
+    }catch(e){ console.warn("persist non-idb store failed", store, e); }
+  }
+  async function putStoreItem(store, item){
+    if(!item) return;
+    const row = store === "settings" ? {...item, id:item.id || "main"} : {...item, id:item.id || item._id || item.code || (store + "_" + Date.now() + "_" + Math.random().toString(16).slice(2))};
+    try{ if(typeof window.idbPut === "function") await window.idbPut(store, row); }catch(e){ console.warn("put store failed", store, e); }
+    const st = window.state;
+    if(st){
+      if(store === "settings") st.settings = {...(st.settings || {}), ...row, id:"main"};
+      else{
+        if(!Array.isArray(st[store])) st[store] = [];
+        const idx = st[store].findIndex(x => String(x.id) === String(row.id));
+        if(idx >= 0) st[store][idx] = {...st[store][idx], ...row};
+        else st[store].push(row);
+      }
+    }
+    persistNonIdbStore(store);
+    return row;
+  }
+  function newer(a,b){
+    const ta = Number(a?.updatedAt || a?.createdAt || a?.date || a?.time || 0);
+    const tb = Number(b?.updatedAt || b?.createdAt || b?.date || b?.time || 0);
+    if(ta && tb) return ta >= tb ? a : b;
+    return {...(a || {}), ...(b || {})};
+  }
+  async function buildFullBackup(){
+    const data = {version:"oskar-full-site-merge-backup-2026-05-05", exportedAt:Date.now(), firebaseRoot:window.FIREBASE_ROOT || "", storageProfile:window.OSKAR_STORAGE_PROFILE || "main"};
+    for(const store of STORE_LIST){ data[store] = await getStore(store); }
+    data.settingsMain = window.state?.settings || (data.settings && data.settings[0]) || null;
+    return data;
+  }
+  function downloadJson(data, name){
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+  }
+  async function exportFullBackup(){
+    const data = await buildFullBackup();
+    const d = new Date().toISOString().slice(0,10);
+    downloadJson(data, "oskar-full-site-backup-" + d + ".json");
+    localStorage.setItem(BACKUP_REMINDER_KEY, String(Date.now()));
+    hideBackupReminder();
+    safeToast("تم أخذ نسخة احتياطية كاملة لكل الموقع", 2200);
+  }
+  async function enqueueImported(store, item){
+    try{
+      if(typeof window.enqueueSync === "function" && store !== "syncQueue"){
+        const data = store === "settings" ? {...item, localLogo:""} : item;
+        await window.enqueueSync({type:"set", store, itemId:item.id || "main", data});
+      }
+    }catch{}
+  }
+  async function mergeBackupFile(file){
+    if(!file) return;
+    try{
+      const data = JSON.parse(await file.text());
+      let added = 0, updated = 0;
+      const incomingStores = STORE_LIST.filter(s => Array.isArray(data[s]) || (s === "settings" && (data.settingsMain || data.settings)));
+      for(const store of incomingStores){
+        let incoming = Array.isArray(data[store]) ? data[store] : [];
+        if(store === "settings" && data.settingsMain) incoming = [data.settingsMain];
+        const current = await getStore(store);
+        const map = new Map();
+        for(const item of current){ if(item && (item.id || store === "settings")) map.set(String(item.id || "main"), item); }
+        for(const raw of incoming){
+          if(!raw) continue;
+          const id = String(raw.id || (store === "settings" ? "main" : raw.code || raw.number || (store + "_" + Date.now() + "_" + Math.random().toString(16).slice(2))));
+          const exists = map.get(id);
+          let merged;
+          if(exists){
+            merged = newer(exists, {...raw, id});
+            updated++;
+          }else{
+            merged = {...raw, id};
+            added++;
+          }
+          if(store === "settings"){
+            merged = {...(window.state?.settings || {}), ...merged, id:"main", localLogo: window.state?.settings?.localLogo || merged.localLogo || ""};
+          }
+          const saved = await putStoreItem(store, merged);
+          await enqueueImported(store, saved);
+        }
+      }
+      try{ await window.loadLocalData?.(true); }catch{}
+      try{ window.renderAll?.(); }catch{}
+      try{ await compactSyncQueue(); }catch{}
+      try{ await updateSyncBadgeOperationCount(); }catch{}
+      safeToast(`تم دمج النسخة فوق الموجودة: جديد ${added} / تحديث ${updated} — لم يتم حذف أي بيانات قديمة`, 4200);
+      if(navigator.onLine) setTimeout(()=>window.syncNow?.(false), 400);
+    }catch(err){ console.error(err); safeToast("فشل استيراد النسخة الاحتياطية"); }
+    const input = $("importBackupInput");
+    if(input) input.value = "";
+  }
+  function backupEventHandler(e){
+    const exportBtn = e.target && e.target.closest && e.target.closest("#exportBackupBtn,[data-oskar-take-backup]");
+    if(exportBtn){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); exportFullBackup(); return; }
+  }
+  window.addEventListener("click", backupEventHandler, true);
+  window.addEventListener("change", function(e){
+    if(e.target && e.target.id === "importBackupInput"){
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      mergeBackupFile(e.target.files && e.target.files[0]);
+    }
+  }, true);
+
+  function ensureBackupReminder(){
+    ensureFinalStyle();
+    if($("oskarBackupReminder")) return $("oskarBackupReminder");
+    const box = document.createElement("div");
+    box.id = "oskarBackupReminder";
+    box.className = "oskar-backup-reminder";
+    box.innerHTML = `<div><b><i class="fa-solid fa-shield-halved"></i> تذكير نسخة احتياطية</b><small>مرّت 12 ساعة تقريباً. خذ نسخة كاملة لكل الموقع حتى لا تضيع البيانات.</small></div><div class="actions"><button class="take" type="button" data-oskar-take-backup="1">أخذ نسخة الآن</button><button class="later" type="button" id="oskarBackupLaterBtn">لاحقاً</button></div>`;
+    document.body.appendChild(box);
+    $("oskarBackupLaterBtn")?.addEventListener("click", ()=>{ localStorage.setItem(BACKUP_SNOOZE_KEY, String(Date.now() + 60*60*1000)); hideBackupReminder(); }, true);
+    return box;
+  }
+  function hideBackupReminder(){ $("oskarBackupReminder")?.classList.remove("show"); }
+  function checkBackupReminder(){
+    try{
+      const last = Number(localStorage.getItem(BACKUP_REMINDER_KEY) || 0);
+      const snooze = Number(localStorage.getItem(BACKUP_SNOOZE_KEY) || 0);
+      if(Date.now() < snooze) return;
+      if(!last || Date.now() - last >= TWELVE_HOURS){ ensureBackupReminder().classList.add("show"); }
+    }catch{}
+  }
+  setTimeout(checkBackupReminder, 2500);
+  setInterval(checkBackupReminder, 30*60*1000);
+
+  /* ===================== المزامنة: العدد = عمليات، ضغط الطابور، وتشغيل تلقائي عند عودة النت ===================== */
+  function syncKey(q){ return [q?.type || "set", q?.store || "", q?.itemId || q?.id || ""].join(":"); }
+  async function compactSyncQueue(){
+    if(typeof window.idbGetAll !== "function" || typeof window.idbClear !== "function" || typeof window.idbPut !== "function") return [];
+    let q = [];
+    try{ q = await window.idbGetAll("syncQueue") || []; }catch{return []}
+    const map = new Map();
+    for(const item of q){
+      const key = syncKey(item);
+      if(!key || key === "set::") continue;
+      const prev = map.get(key);
+      if(!prev) map.set(key, item);
+      else{
+        const newerItem = Number(item.createdAt || item.updatedAt || 0) >= Number(prev.createdAt || prev.updatedAt || 0) ? item : prev;
+        map.set(key, newerItem);
+      }
+    }
+    const arr = Array.from(map.values());
+    if(arr.length !== q.length){
+      try{
+        await window.idbClear("syncQueue");
+        for(const item of arr) await window.idbPut("syncQueue", item);
+      }catch(e){ console.warn("compact sync queue failed", e); }
+    }
+    return arr;
+  }
+  async function updateSyncBadgeOperationCount(){
+    let q = [];
+    try{ q = await compactSyncQueue(); }catch{}
+    if(!q.length){ try{ q = await window.idbGetAll?.("syncQueue") || []; }catch{} }
+    const ops = new Set(q.map(syncKey).filter(Boolean));
+    const count = ops.size;
+    const badge = $("syncCountBadge");
+    if(badge){
+      badge.textContent = count > 999 ? "999+" : String(count);
+      badge.title = count ? `${count} عملية مزامنة` : "لا توجد عمليات مزامنة";
+      badge.style.display = count ? "flex" : "none";
+    }
+    return count;
+  }
+  const oldRefresh = window.refreshPendingCount;
+  window.refreshPendingCount = async function(){
+    try{ return await updateSyncBadgeOperationCount(); }
+    catch(e){ try{ return await oldRefresh?.apply(this, arguments); }catch{} }
+  };
+  const oldSyncNow = window.syncNow;
+  if(typeof oldSyncNow === "function" && !oldSyncNow.__oskarMegaMallWrapped){
+    const wrapped = async function(){
+      try{ await compactSyncQueue(); await updateSyncBadgeOperationCount(); }catch{}
+      const res = await oldSyncNow.apply(this, arguments);
+      try{ await compactSyncQueue(); await updateSyncBadgeOperationCount(); }catch{}
+      return res;
+    };
+    wrapped.__oskarMegaMallWrapped = true;
+    wrapped.__old = oldSyncNow;
+    window.syncNow = wrapped;
+  }
+  window.addEventListener("online", function(){
+    safeToast("عاد الاتصال — جاري مزامنة العمليات المعلقة تلقائياً", 2200);
+    setTimeout(async()=>{ try{ await compactSyncQueue(); await window.syncNow?.(false); await updateSyncBadgeOperationCount(); }catch(e){ console.warn("online sync failed", e); } }, 450);
+  });
+  setInterval(updateSyncBadgeOperationCount, 5000);
+  setTimeout(updateSyncBadgeOperationCount, 1500);
+
+  /* ===================== التنبيهات: لا تُدخل البضاعة الناقصة داخل الجرس ===================== */
+  function unpaidLaterInvoices(){ return (window.state?.invoices || []).filter(i => i.paymentMethod === "later_app" && i.status !== "paid"); }
+  function unpaidManualDebts(){ return (window.state?.customers || []).flatMap(c => (c.manualDebts || []).filter(d => d.status !== "paid").map(d => ({...d, customerName:c.name, customerId:c.id}))); }
+  function updateNotificationsWithoutLowStock(){
+    const count = unpaidLaterInvoices().length + unpaidManualDebts().length;
+    const b = $("notifBadge");
+    if(b){
+      b.textContent = count > 999 ? "999+" : String(count);
+      b.title = count ? `${count} تنبيه ديون/تطبيق لاحق` : "لا توجد تنبيهات";
+      b.style.display = count ? "flex" : "none";
+    }
+  }
+  function openCleanNotifications(){
+    const later = unpaidLaterInvoices();
+    const manual = unpaidManualDebts();
+    const html = `
+      <div class="modal-backdrop show" id="oskarCleanNotifModal" style="z-index:2147483602">
+        <div class="modal large">
+          <div class="modal-head"><div class="modal-title"><i class="fa-solid fa-bell"></i> التنبيهات</div><button class="close-btn" id="oskarCloseCleanNotif" type="button"><i class="fa-solid fa-xmark"></i></button></div>
+          <div class="card" style="box-shadow:none;margin-bottom:12px"><h3 style="margin:0 0 10px;font-weight:900">تطبيق لاحق غير مكتمل</h3>${later.map(inv=>`<div class="debt-card" data-open-later-status="${String(inv.id || "")}"><div><div class="debt-name">فاتورة #${String(inv.number || inv.id || "-")}</div><div class="debt-sub">${String(inv.customerName || "-")} · ${money(inv.total || 0)}</div></div><span class="badge yellow">غير مكتمل</span></div>`).join("") || `<div class="muted">لا توجد فواتير تطبيق لاحق غير مكتملة</div>`}</div>
+          <div class="card" style="box-shadow:none"><h3 style="margin:0 0 10px;font-weight:900">ديون يدوية غير مكتملة</h3>${manual.map(d=>`<div class="debt-card" data-open-customer="${String(d.customerId || "")}"><div><div class="debt-name">${String(d.customerName || "عميل")}</div><div class="debt-sub">${String(d.note || "دين يدوي")} · ${money(d.amount || d.balance || 0)}</div></div><span class="badge red">دين</span></div>`).join("") || `<div class="muted">لا توجد ديون يدوية غير مكتملة</div>`}</div>
+          <div class="muted" style="margin-top:12px;text-align:center">البضاعة الناقصة لم تعد تُضاف داخل جرس التنبيهات، وتبقى موجودة فقط في تقرير البضاعة الناقصة.</div>
+        </div>
+      </div>`;
+    const old = $("oskarCleanNotifModal");
+    if(old) old.remove();
+    document.body.insertAdjacentHTML("beforeend", html);
+    $("oskarCloseCleanNotif")?.addEventListener("click", ()=>$("oskarCleanNotifModal")?.remove(), true);
+  }
+  window.addEventListener("click", function(e){
+    const n = e.target && e.target.closest && e.target.closest("#notificationsBtn");
+    if(n){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); updateNotificationsWithoutLowStock(); openCleanNotifications(); }
+  }, true);
+  setInterval(updateNotificationsWithoutLowStock, 3500);
+  setTimeout(updateNotificationsWithoutLowStock, 1200);
+
+  /* ===================== تصدير صورة/PDF أسرع: التقاط خفيف وفوري قدر الإمكان ===================== */
+  function ensureExportOverlay(){
+    ensureFinalStyle();
+    let o = $("oskarExportOverlay");
+    if(o) return o;
+    o = document.createElement("div");
+    o.id = "oskarExportOverlay";
+    o.className = "oskar-export-overlay";
+    o.innerHTML = `<div class="oskar-export-box"><div class="oskar-export-spinner"></div><div id="oskarExportText">جاري التجهيز...</div></div>`;
+    document.body.appendChild(o);
+    return o;
+  }
+  function showExportOverlay(txt){
+    const o = ensureExportOverlay();
+    const t = $("oskarExportText"); if(t) t.textContent = txt || "جاري التجهيز...";
+    o.classList.add("show");
+  }
+  function hideExportOverlay(){ $("oskarExportOverlay")?.classList.remove("show"); }
+  function dateKey(){ return new Date().toISOString().slice(0,10); }
+  function getExportSource(btn){
+    if(btn.id === "imageInvoiceBtn" || btn.id === "pdfInvoiceBtn" || btn.id === "thermalImageInvoiceBtn" || btn.id === "thermalPdfInvoiceBtn") return $("invoiceViewBox") || document.querySelector(".invoice-paper") || btn.closest(".modal") || document.body;
+    if(btn.id === "imageInvoicesBtn" || btn.id === "pdfInvoicesBtn") return $("page-invoices") || document.querySelector("#page-invoices") || document.body;
+    if(btn.id === "imageReportsBtn" || btn.id === "pdfReportsBtn") return $("page-reports") || document.querySelector("#page-reports") || document.body;
+    if(btn.matches("[data-image-customer],[data-pdf-customer]")) return btn.closest(".modal") || $("page-debts") || document.body;
+    return document.querySelector(".section.active") || document.body;
+  }
+  async function fastCanvasFromElement(src){
+    if(!window.html2canvas) throw new Error("html2canvas_not_ready");
+    const holder = document.createElement("div");
+    holder.style.cssText = "position:fixed;right:-12000px;top:0;width:1080px;background:#fff;color:#0f172a;z-index:-1;opacity:1;pointer-events:none;direction:rtl;font-family:Cairo,Arial,sans-serif";
+    const clone = src.cloneNode(true);
+    clone.style.width = "1080px";
+    clone.style.maxWidth = "1080px";
+    clone.style.background = "#fff";
+    clone.querySelectorAll("button,.no-print,.bottom-nav,.topbar,.sidebar,.fab-add,input,select,textarea").forEach(el=>{
+      if(!el.closest("table")) el.style.display = "none";
+    });
+    clone.querySelectorAll(".table-wrap").forEach(el=>{ el.style.overflow = "visible"; el.style.maxHeight = "none"; });
+    clone.querySelectorAll("table").forEach(t=>{ t.style.minWidth = "0"; t.style.width = "100%"; });
+    clone.querySelectorAll("*").forEach(el=>{ el.style.animation = "none"; el.style.transition = "none"; el.style.transform = "none"; el.style.filter = "none"; });
+    holder.appendChild(clone);
+    document.body.appendChild(holder);
+    try{
+      const imgs = $$('img', clone);
+      await Promise.race([
+        Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(r=>{ img.onload = img.onerror = r; }))),
+        new Promise(r=>setTimeout(r, 350))
+      ]);
+      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+      const w = Math.max(360, Math.ceil(clone.scrollWidth || 1080));
+      const h = Math.max(260, Math.ceil(clone.scrollHeight || clone.getBoundingClientRect().height || 800));
+      return await window.html2canvas(clone, {backgroundColor:"#ffffff", scale:0.78, useCORS:true, allowTaint:true, logging:false, imageTimeout:150, removeContainer:true, scrollX:0, scrollY:0, windowWidth:w, windowHeight:h, width:w, height:h});
+    }finally{
+      holder.remove();
+    }
+  }
+  function saveCanvasImage(canvas, filename){
+    return new Promise(resolve=>{
+      const done = (url) => { const a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 1200); resolve(); };
+      if(canvas.toBlob){ canvas.toBlob(blob => blob ? done(URL.createObjectURL(blob)) : resolve(), "image/jpeg", 0.82); }
+      else{ const a=document.createElement("a"); a.href=canvas.toDataURL("image/jpeg", .82); a.download=filename; a.click(); resolve(); }
+    });
+  }
+  async function saveCanvasPdf(canvas, filename){
+    if(!window.jspdf || !window.jspdf.jsPDF){
+      await saveCanvasImage(canvas, filename.replace(/\.pdf$/i,".jpg"));
+      safeToast("لم تجهز مكتبة PDF، تم حفظ صورة بدلاً منها بسرعة");
+      return;
+    }
+    const { jsPDF } = window.jspdf;
+    const img = canvas.toDataURL("image/jpeg", 0.78);
+    const pdf = new jsPDF("p", "mm", "a4", true);
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 4;
+    const imgW = pageW - margin * 2;
+    const imgH = canvas.height * imgW / canvas.width;
+    if(imgH <= pageH - margin * 2){
+      pdf.addImage(img, "JPEG", margin, margin, imgW, imgH, undefined, "FAST");
+    }else{
+      const usable = pageH - margin * 2;
+      let y = 0;
+      while(y < imgH){
+        pdf.addImage(img, "JPEG", margin, margin - y, imgW, imgH, undefined, "FAST");
+        y += usable;
+        if(y < imgH) pdf.addPage();
+      }
+    }
+    pdf.save(filename);
+  }
+  async function fastExport(btn, type){
+    const source = getExportSource(btn);
+    if(!source) return safeToast("لا يوجد محتوى للتصدير");
+    showExportOverlay(type === "pdf" ? "حفظ PDF سريع..." : "حفظ صورة سريع...");
+    try{
+      const canvas = await fastCanvasFromElement(source);
+      const nameBase = (btn.id || "oskar-export") + "-" + dateKey();
+      if(type === "pdf") await saveCanvasPdf(canvas, nameBase + ".pdf");
+      else await saveCanvasImage(canvas, nameBase + ".jpg");
+      safeToast("تم الحفظ بسرعة");
+    }catch(err){
+      console.error("fast export failed", err);
+      safeToast("تعذر الحفظ السريع، جرّب مرة أخرى بعد ثوانٍ");
+    }finally{ hideExportOverlay(); }
+  }
+  window.addEventListener("click", function(e){
+    const btn = e.target && e.target.closest && e.target.closest("#imageInvoiceBtn,#pdfInvoiceBtn,#thermalImageInvoiceBtn,#thermalPdfInvoiceBtn,#imageInvoicesBtn,#pdfInvoicesBtn,#imageReportsBtn,#pdfReportsBtn,[data-image-customer],[data-pdf-customer]");
+    if(!btn) return;
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    const type = (btn.id || "").toLowerCase().includes("pdf") || btn.hasAttribute("data-pdf-customer") ? "pdf" : "image";
+    fastExport(btn, type);
+  }, true);
+
+  function initFinal(){
+    ensureFinalStyle();
+    updateNotificationsWithoutLowStock();
+    updateSyncBadgeOperationCount();
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", initFinal, {once:true}); else initFinal();
+})();
+</script>
+
 </body>
         </html>
       `;
@@ -15353,7 +16035,688 @@
       const doc = frame.contentWindow.document;
       doc.open();
       doc.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة الفاتورة</title><style>
-        @page{size:auto;margin:8mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#0f172a;direction:rtl;font-family:Cairo,Arial,Tahoma,sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.invoice-paper{width:100%!important;max-width:100%!important;margin:0!important;box-shadow:none!important;background:#fff!important}.invoice-header{background:#eff6ff!important}.invoice-logo{width:46px!important;height:46px!important;object-fit:cover!important;border-radius:14px!important}table{width:100%!important;min-width:0!important;border-collapse:collapse!important}th,td{border:1px solid #e5e7eb!important}.no-print{display:none!important}</style></head><body>${html}</body></html>`);
+        @page{size:auto;margin:8mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#0f172a;direction:rtl;font-family:Cairo,Arial,Tahoma,sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.invoice-paper{width:100%!important;max-width:100%!important;margin:0!important;box-shadow:none!important;background:#fff!important}.invoice-header{background:#eff6ff!important}.invoice-logo{width:46px!important;height:46px!important;object-fit:cover!important;border-radius:14px!important}table{width:100%!important;min-width:0!important;border-collapse:collapse!important}th,td{border:1px solid #e5e7eb!important}.no-print{display:none!important}</style></head><body>${html}
+
+<script id="oskar-mega-mall-barcode-backup-sync-export-final-2026-05-05">
+(function(){
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const STORE_LIST = [
+    "products","invoices","customers","expenses","purchases","supplierPayments",
+    "paymentAccounts","employees","suppliers","workers","workerWages","accountMovements","settings"
+  ];
+  const QR_SRC = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+  const BACKUP_REMINDER_KEY = "oskar_last_full_backup_at_v2";
+  const BACKUP_SNOOZE_KEY = "oskar_backup_reminder_snooze_until_v2";
+  const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+
+  function safeToast(msg, ms){
+    try{ if(typeof window.toast === "function") return window.toast(msg, ms || 2800); }catch{}
+    let t = $("toast");
+    if(!t){
+      t = document.createElement("div");
+      t.id = "toast";
+      t.style.cssText = "position:fixed;right:16px;left:16px;bottom:26px;z-index:2147483647;background:#020617;color:#fff;border-radius:18px;padding:14px 16px;text-align:center;font-weight:900;box-shadow:0 18px 45px rgba(0,0,0,.28);font-family:Cairo,Arial,sans-serif";
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add("show");
+    t.style.display = "block";
+    clearTimeout(t.__timer);
+    t.__timer = setTimeout(()=>{ t.classList.remove("show"); t.style.display = "none"; }, ms || 2800);
+  }
+
+  function money(v){
+    try{ if(typeof window.money === "function") return window.money(v); }catch{}
+    const cur = window.state?.settings?.currency || "₪";
+    const n = Number(v || 0);
+    return cur + " " + n.toFixed(3).replace(/\.000$/, ".000");
+  }
+
+  function ensureFinalStyle(){
+    if($("oskarMegaMallFinalStyle")) return;
+    const st = document.createElement("style");
+    st.id = "oskarMegaMallFinalStyle";
+    st.textContent = `
+      .oskar-final-camera{position:fixed;inset:0;background:#000;z-index:2147483646;display:none;direction:rtl;font-family:Cairo,Arial,sans-serif;overflow:hidden}.oskar-final-camera.show{display:block}.oskar-final-reader{width:100vw;height:100vh;background:#000}.oskar-final-reader video{width:100vw!important;height:100vh!important;object-fit:cover!important}.oskar-final-reader__dashboard,#oskarFinalReader__dashboard,#oskarFinalReader__scan_region{display:none!important}.oskar-final-frame{pointer-events:none;position:fixed;top:50%;left:50%;width:min(82vw,420px);height:230px;transform:translate(-50%,-50%);border:3px solid rgba(255,255,255,.55);border-radius:26px;z-index:2147483647;transition:.15s ease;box-shadow:0 0 0 9999px rgba(0,0,0,.18),0 0 30px rgba(255,255,255,.15)}.oskar-final-frame:before,.oskar-final-frame:after{content:"";position:absolute;width:54px;height:54px;border-color:#22c55e;border-style:solid;filter:drop-shadow(0 0 12px rgba(34,197,94,.95))}.oskar-final-frame:before{top:-4px;right:-4px;border-width:6px 6px 0 0;border-radius:0 22px 0 0}.oskar-final-frame:after{left:-4px;bottom:-4px;border-width:0 0 6px 6px;border-radius:0 0 0 22px}.oskar-final-laser{position:fixed;top:50%;left:50%;width:min(72vw,360px);height:3px;transform:translate(-50%,-50%);z-index:2147483647;border-radius:999px;background:linear-gradient(90deg,transparent,#22c55e,transparent);box-shadow:0 0 22px #22c55e;animation:oskarFinalLaser 1.02s ease-in-out infinite;pointer-events:none}@keyframes oskarFinalLaser{0%,100%{transform:translate(-50%,calc(-50% - 95px));opacity:.55}50%{transform:translate(-50%,calc(-50% + 95px));opacity:1}}.oskar-final-camera.detected .oskar-final-frame{border-color:#22c55e;box-shadow:0 0 0 9999px rgba(0,0,0,.13),0 0 40px rgba(34,197,94,.9),inset 0 0 35px rgba(34,197,94,.25);animation:oskarFinalGreenPop .28s ease}@keyframes oskarFinalGreenPop{0%{transform:translate(-50%,-50%) scale(.96)}60%{transform:translate(-50%,-50%) scale(1.03)}100%{transform:translate(-50%,-50%) scale(1)}}.oskar-final-close{position:fixed;top:16px;left:16px;width:50px;height:50px;border:0;border-radius:16px;background:rgba(15,23,42,.88);color:#fff;font-size:26px;font-weight:900;z-index:2147483647}.oskar-final-title{position:fixed;top:17px;right:16px;z-index:2147483647;max-width:calc(100vw - 92px);background:rgba(15,23,42,.86);color:#fff;border-radius:16px;padding:10px 14px;font-weight:900;font-size:14px}.oskar-final-title small{display:block;color:#bbf7d0;font-size:12px;font-weight:800;margin-top:2px}.oskar-final-toast{position:fixed;right:16px;left:16px;bottom:28px;z-index:2147483647;padding:15px 18px;border-radius:18px;background:rgba(15,23,42,.96);color:#fff;font-size:16px;font-weight:900;text-align:center;box-shadow:0 18px 45px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.15);transform:translateY(130%);opacity:0;transition:.25s ease;direction:ltr}.oskar-final-toast.show{transform:translateY(0);opacity:1}.oskar-final-added{position:fixed;top:76px;right:12px;left:12px;z-index:2147483647;display:flex;gap:8px;overflow-x:auto;padding:3px}.oskar-final-chip{background:rgba(255,255,255,.96);color:#064e3b;border:1px solid #bbf7d0;border-radius:999px;padding:8px 10px;font-weight:900;font-size:12px;white-space:nowrap;box-shadow:0 12px 26px rgba(0,0,0,.22)}
+      .oskar-backup-reminder{position:fixed;right:14px;left:14px;bottom:96px;z-index:2147483600;background:rgba(255,255,255,.97);border:1px solid #d1fae5;border-radius:24px;padding:14px;box-shadow:0 22px 55px rgba(15,23,42,.18);font-family:Cairo,Arial,sans-serif;display:none;gap:12px;align-items:center;justify-content:space-between}.oskar-backup-reminder.show{display:flex}.oskar-backup-reminder b{font-weight:900;color:#064e3b}.oskar-backup-reminder small{display:block;color:#64748b;font-weight:800;line-height:1.7}.oskar-backup-reminder .actions{display:flex;gap:8px;flex-shrink:0}.oskar-backup-reminder button{border:0;border-radius:16px;padding:10px 12px;font-weight:900}.oskar-backup-reminder .take{background:#059669;color:#fff}.oskar-backup-reminder .later{background:#f1f5f9;color:#0f172a}
+      .oskar-export-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:2147483601;display:none;align-items:center;justify-content:center;font-family:Cairo,Arial,sans-serif}.oskar-export-overlay.show{display:flex}.oskar-export-box{background:#fff;border-radius:24px;padding:18px 22px;box-shadow:0 24px 70px rgba(0,0,0,.24);font-weight:900;text-align:center;min-width:240px}.oskar-export-spinner{width:38px;height:38px;border:4px solid #d1fae5;border-top-color:#059669;border-radius:999px;margin:0 auto 10px;animation:oskarExportSpin .7s linear infinite}@keyframes oskarExportSpin{to{transform:rotate(360deg)}}
+      @media(max-width:560px){.oskar-backup-reminder{align-items:flex-start;flex-direction:column}.oskar-backup-reminder .actions{width:100%}.oskar-backup-reminder button{flex:1}}
+    `;
+    document.head.appendChild(st);
+  }
+
+  /* ===================== كاميرا الباركود النهائية السريعة ===================== */
+  let scanner = null;
+  let scannerRunning = false;
+  let startPromise = null;
+  let scanMode = "sale";
+  let scanTarget = "";
+  let lastCode = "";
+  let lastTime = 0;
+  const scanSound = new Audio("./qr.mp3");
+  scanSound.preload = "auto";
+  scanSound.volume = 1;
+
+  function unlockSound(){
+    scanSound.play().then(()=>{ scanSound.pause(); scanSound.currentTime = 0; }).catch(()=>{});
+  }
+  window.addEventListener("pointerdown", unlockSound, {once:true, passive:true, capture:true});
+  window.addEventListener("touchstart", unlockSound, {once:true, passive:true, capture:true});
+
+  function showScanToast(code){
+    const t = $("oskarFinalScanToast");
+    if(!t) return;
+    t.textContent = code;
+    t.classList.add("show");
+    clearTimeout(t.__timer);
+    t.__timer = setTimeout(()=>t.classList.remove("show"), 1200);
+  }
+  function beep(){ try{ scanSound.pause(); scanSound.currentTime = 0; scanSound.play().catch(()=>{}); }catch{} }
+  function vibrate(){ try{ if(navigator.vibrate) navigator.vibrate([55,25,55]); }catch{} }
+  function markDetected(){
+    const page = $("oskarFinalCameraPage");
+    if(!page) return;
+    page.classList.add("detected");
+    clearTimeout(page.__detectedTimer);
+    page.__detectedTimer = setTimeout(()=>page.classList.remove("detected"), 520);
+  }
+  function ensureCameraDom(){
+    ensureFinalStyle();
+    let page = $("oskarFinalCameraPage");
+    if(page) return page;
+    page = document.createElement("div");
+    page.id = "oskarFinalCameraPage";
+    page.className = "oskar-final-camera";
+    page.innerHTML = `
+      <div id="oskarFinalReader" class="oskar-final-reader"></div>
+      <div class="oskar-final-frame"></div>
+      <div class="oskar-final-laser"></div>
+      <button id="oskarFinalCameraClose" class="oskar-final-close" type="button">×</button>
+      <div id="oskarFinalCameraTitle" class="oskar-final-title">قراءة باركود<small>وجّه الكاميرا نحو الباركود من أي جهة</small></div>
+      <div id="oskarFinalAdded" class="oskar-final-added"></div>
+      <div id="oskarFinalScanToast" class="oskar-final-toast"></div>`;
+    document.body.appendChild(page);
+    $("oskarFinalCameraClose")?.addEventListener("click", stopFinalScanner, {capture:true});
+    return page;
+  }
+  function loadHtml5Qr(){
+    if(window.Html5Qrcode && window.Html5QrcodeSupportedFormats) return Promise.resolve();
+    const existing = Array.from(document.scripts).find(s => String(s.src || "").includes("html5-qrcode"));
+    if(existing){
+      return new Promise((resolve,reject)=>{
+        if(window.Html5Qrcode) return resolve();
+        existing.addEventListener("load", () => resolve(), {once:true});
+        existing.addEventListener("error", reject, {once:true});
+        setTimeout(()=> window.Html5Qrcode ? resolve() : reject(new Error("html5-qrcode-timeout")), 4200);
+      });
+    }
+    return new Promise((resolve,reject)=>{
+      const s = document.createElement("script");
+      s.src = QR_SRC;
+      s.async = true;
+      s.onload = () => resolve();
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  function prepareProductBarcodeIndex(){
+    const map = new Map();
+    const list = Array.isArray(window.state?.products) ? window.state.products : [];
+    for(const p of list){
+      for(const v of [p?.barcode, p?.code, p?.id]){
+        const k = String(v || "").trim();
+        if(k && !map.has(k)) map.set(k, p);
+      }
+    }
+    window.__oskarFastBarcodeMap = map;
+    window.__oskarFastBarcodeMapSize = list.length;
+    return map;
+  }
+  function findByBarcode(code){
+    const c = String(code || "").trim();
+    if(!c) return null;
+    try{
+      if(window.__oskarFastBarcodeMapSize !== (window.state?.products || []).length) prepareProductBarcodeIndex();
+      const hit = window.__oskarFastBarcodeMap?.get(c);
+      if(hit) return hit;
+    }catch{}
+    try{ if(typeof window.getProductByBarcode === "function"){ const p = window.getProductByBarcode(c); if(p) return p; } }catch{}
+    return (window.state?.products || []).find(p => String(p.barcode || "").trim() === c || String(p.code || "").trim() === c || String(p.id || "").trim() === c) || null;
+  }
+  function addSaleProduct(product){
+    if(!product) return false;
+    try{
+      if(typeof window.addToCart === "function"){
+        window.addToCart(product);
+      }else if(window.state?.cart){
+        window.state.cart.push({ id:"cart_"+Date.now()+"_"+Math.random().toString(16).slice(2), productId:product.id, name:product.name, qty:1, price: Number(product.salePrice || product.price || 0), total:Number(product.salePrice || product.price || 0) });
+        try{ window.renderCart?.(); }catch{}
+      }
+      const chips = $("oskarFinalAdded");
+      if(chips){
+        const chip = document.createElement("div");
+        chip.className = "oskar-final-chip";
+        chip.textContent = "✓ " + (product.name || "منتج");
+        chips.prepend(chip);
+        while(chips.children.length > 7) chips.lastElementChild.remove();
+      }
+      return true;
+    }catch(err){ console.warn("add barcode product failed", err); return false; }
+  }
+  async function stopFinalScanner(){
+    startPromise = null;
+    try{ if(scanner && scannerRunning) await scanner.stop(); }catch{}
+    try{ if(scanner) await scanner.clear(); }catch{}
+    scanner = null;
+    scannerRunning = false;
+    const page = $("oskarFinalCameraPage");
+    if(page) page.classList.remove("show");
+    try{ if(window.state?.scanner){ window.state.scanner.active = false; window.state.scanner.locked = false; } }catch{}
+  }
+  function onFinalScan(decodedText, decodedResult){
+    const code = String(decodedText || "").trim();
+    const now = Date.now();
+    if(!code) return;
+    if(code === lastCode && now - lastTime < 1050) return;
+    lastCode = code;
+    lastTime = now;
+    markDetected(); beep(); vibrate(); showScanToast(code);
+    try{ window.dispatchEvent(new CustomEvent("barcode:scanned", {detail:{code, result:decodedResult}})); }catch{}
+
+    if(scanMode === "product" || scanTarget){
+      const input = $(scanTarget || "productBarcode") || $("productBarcode") || document.querySelector('input[name="barcode"],input[id*="Barcode"],input[id*="barcode"]');
+      if(input){
+        input.value = code;
+        input.dispatchEvent(new Event("input", {bubbles:true}));
+        input.dispatchEvent(new Event("change", {bubbles:true}));
+        safeToast("تمت قراءة الباركود ووضعه في خانة المنتج", 1800);
+      }
+      stopFinalScanner();
+      return;
+    }
+
+    const product = findByBarcode(code);
+    if(product){
+      addSaleProduct(product);
+      safeToast("تمت إضافة " + (product.name || "المنتج"), 1300);
+      const keepOpen = localStorage.getItem("oskar_keep_cashier_barcode_camera_open_v1") === "1";
+      if(!keepOpen) stopFinalScanner();
+    }else{
+      safeToast("لم يتم العثور على منتج بهذا الباركود", 1700);
+    }
+  }
+  async function startFinalScanner(mode="sale", target=""){
+    scanMode = mode || "sale";
+    scanTarget = target || "";
+    if(startPromise) return startPromise;
+    startPromise = (async()=>{
+      await loadHtml5Qr();
+      prepareProductBarcodeIndex();
+      await stopFinalScanner();
+      const page = ensureCameraDom();
+      const title = $("oskarFinalCameraTitle");
+      if(title) title.innerHTML = (scanMode === "product" ? "قراءة باركود المنتج" : "قراءة باركود للبيع") + "<small>وجّه الكاميرا نحو الباركود من أي جهة</small>";
+      const chips = $("oskarFinalAdded");
+      if(chips) chips.innerHTML = "";
+      const reader = $("oskarFinalReader");
+      if(reader) reader.innerHTML = "";
+      page.classList.add("show");
+      await new Promise(r => requestAnimationFrame(()=>requestAnimationFrame(r)));
+      const F = window.Html5QrcodeSupportedFormats || {};
+      const formats = [F.QR_CODE,F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.CODE_93,F.ITF,F.CODABAR,F.DATA_MATRIX,F.AZTEC,F.PDF_417].filter(Boolean);
+      scanner = new window.Html5Qrcode("oskarFinalReader", formats.length ? {formatsToSupport:formats, verbose:false} : {verbose:false});
+      const config = {
+        fps: 30,
+        qrbox: function(w,h){ return { width: Math.floor(w * 0.82), height: Math.floor(h * 0.34) }; },
+        aspectRatio: 1.7777778,
+        disableFlip: false,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        videoConstraints: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          advanced: [
+            { focusMode: "continuous" },
+            { exposureMode: "continuous" },
+            { whiteBalanceMode: "continuous" }
+          ]
+        }
+      };
+      try{
+        await Promise.race([
+          scanner.start({facingMode:"environment"}, config, onFinalScan, function(){}),
+          new Promise((_,rej)=>setTimeout(()=>rej(new Error("camera-start-timeout")), 6500))
+        ]);
+      }catch(primaryErr){
+        console.warn("fast camera primary start failed", primaryErr);
+        try{ await scanner.clear(); }catch{}
+        scanner = new window.Html5Qrcode("oskarFinalReader", formats.length ? {formatsToSupport:formats, verbose:false} : {verbose:false});
+        await scanner.start({facingMode:{ideal:"environment"}}, config, onFinalScan, function(){});
+      }
+      scannerRunning = true;
+      try{
+        const video = $("oskarFinalReader")?.querySelector("video");
+        const track = video?.srcObject?.getVideoTracks?.()[0];
+        const caps = track?.getCapabilities?.() || {};
+        const adv = [];
+        if(caps.focusMode && caps.focusMode.includes("continuous")) adv.push({focusMode:"continuous"});
+        if(caps.exposureMode && caps.exposureMode.includes("continuous")) adv.push({exposureMode:"continuous"});
+        if(caps.whiteBalanceMode && caps.whiteBalanceMode.includes("continuous")) adv.push({whiteBalanceMode:"continuous"});
+        if(adv.length) track.applyConstraints({advanced:adv}).catch(()=>{});
+      }catch{}
+      startPromise = null;
+    })().catch(async err => {
+      console.error(err);
+      startPromise = null;
+      await stopFinalScanner();
+      safeToast("اسمح باستخدام الكاميرا وتأكد أن الموقع يعمل على HTTPS", 2600);
+    });
+    return startPromise;
+  }
+
+  function cameraClickHandler(e){
+    const target = e.target && e.target.closest && e.target.closest('#openScannerBtn,#openScannerBtnSuper,[data-oskar-super-camera="sale"],[data-oskar-fast-sale],[data-oskar-super-camera="cashier"]');
+    const product = e.target && e.target.closest && e.target.closest('#scanProductBarcodeBtn,#scanProductBarcodeBtnSuper,[data-oskar-super-camera="product"],[data-oskar-fast-product]');
+    const close = e.target && e.target.closest && e.target.closest('#oskarFinalCameraClose,#floatingScannerCloseBtn,#stopScannerBtn,#barcodeTurboClose,#oskarFastClose,#patchCameraCloseBtn');
+    if(target){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); startFinalScanner("sale", ""); return; }
+    if(product){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); startFinalScanner("product", "productBarcode"); return; }
+    if(close){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); stopFinalScanner(); return; }
+  }
+  window.addEventListener("click", cameraClickHandler, true);
+  window.addEventListener("pointerdown", function(e){
+    const cameraBtn = e.target && e.target.closest && e.target.closest('#openScannerBtn,#openScannerBtnSuper,#scanProductBarcodeBtn,#scanProductBarcodeBtnSuper,[data-oskar-super-camera]');
+    if(cameraBtn){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); cameraClickHandler(e); }
+  }, true);
+  window.openScanner = function(mode, target){ return startFinalScanner(mode || "sale", target || ""); };
+  window.openFloatingProductBarcodeScanner = function(target){ return startFinalScanner("product", target || "productBarcode"); };
+  window.stopScanner = stopFinalScanner;
+  window.stopFloatingScanner = stopFinalScanner;
+  window.OSKAR_FINAL_FAST_BARCODE = startFinalScanner;
+  document.addEventListener("visibilitychange", ()=>{ if(document.hidden && scannerRunning) stopFinalScanner(); });
+  window.addEventListener("beforeunload", ()=>{ try{ if(scannerRunning && scanner) scanner.stop().catch(()=>{}); }catch{} });
+  setTimeout(()=>loadHtml5Qr().catch(()=>{}), 400);
+
+  /* ===================== النسخ الاحتياطية: دمج فوق الموجود بدون حذف القديم ===================== */
+  async function getStore(store){
+    try{ if(typeof window.idbGetAll === "function") return await window.idbGetAll(store) || []; }catch{}
+    const s = window.state || {};
+    if(store === "settings") return s.settings ? [s.settings] : [];
+    return Array.isArray(s[store]) ? s[store] : [];
+  }
+  function currentFirebaseRoot(){ return window.FIREBASE_ROOT || window.OSKAR_FIREBASE_ROOT || "cashier"; }
+  function extraStorageKey(){ return "cashier_extra_final_2026_04_29_" + currentFirebaseRoot(); }
+  function movementsStorageKey(){ return "oskar_account_movements_linked_final_2026_05_03_" + currentFirebaseRoot(); }
+  function persistNonIdbStore(store){
+    try{
+      if(["suppliers","workers","workerWages"].includes(store)){
+        const old = JSON.parse(localStorage.getItem(extraStorageKey()) || "{}");
+        localStorage.setItem(extraStorageKey(), JSON.stringify({
+          ...old,
+          suppliers: Array.isArray(window.state?.suppliers) ? window.state.suppliers : [],
+          workers: Array.isArray(window.state?.workers) ? window.state.workers : [],
+          workerWages: Array.isArray(window.state?.workerWages) ? window.state.workerWages : []
+        }));
+      }
+      if(store === "accountMovements"){
+        localStorage.setItem(movementsStorageKey(), JSON.stringify(Array.isArray(window.state?.accountMovements) ? window.state.accountMovements : []));
+      }
+    }catch(e){ console.warn("persist non-idb store failed", store, e); }
+  }
+  async function putStoreItem(store, item){
+    if(!item) return;
+    const row = store === "settings" ? {...item, id:item.id || "main"} : {...item, id:item.id || item._id || item.code || (store + "_" + Date.now() + "_" + Math.random().toString(16).slice(2))};
+    try{ if(typeof window.idbPut === "function") await window.idbPut(store, row); }catch(e){ console.warn("put store failed", store, e); }
+    const st = window.state;
+    if(st){
+      if(store === "settings") st.settings = {...(st.settings || {}), ...row, id:"main"};
+      else{
+        if(!Array.isArray(st[store])) st[store] = [];
+        const idx = st[store].findIndex(x => String(x.id) === String(row.id));
+        if(idx >= 0) st[store][idx] = {...st[store][idx], ...row};
+        else st[store].push(row);
+      }
+    }
+    return row;
+  }
+  function newer(a,b){
+    const ta = Number(a?.updatedAt || a?.createdAt || a?.date || a?.time || 0);
+    const tb = Number(b?.updatedAt || b?.createdAt || b?.date || b?.time || 0);
+    if(ta && tb) return ta >= tb ? a : b;
+    return {...(a || {}), ...(b || {})};
+  }
+  async function buildFullBackup(){
+    const data = {version:"oskar-full-site-merge-backup-2026-05-05", exportedAt:Date.now(), firebaseRoot:window.FIREBASE_ROOT || "", storageProfile:window.OSKAR_STORAGE_PROFILE || "main"};
+    for(const store of STORE_LIST){ data[store] = await getStore(store); }
+    data.settingsMain = window.state?.settings || (data.settings && data.settings[0]) || null;
+    return data;
+  }
+  function downloadJson(data, name){
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+  }
+  async function exportFullBackup(){
+    const data = await buildFullBackup();
+    const d = new Date().toISOString().slice(0,10);
+    downloadJson(data, "oskar-full-site-backup-" + d + ".json");
+    localStorage.setItem(BACKUP_REMINDER_KEY, String(Date.now()));
+    hideBackupReminder();
+    safeToast("تم أخذ نسخة احتياطية كاملة لكل الموقع", 2200);
+  }
+  async function enqueueImported(store, item){
+    try{
+      if(typeof window.enqueueSync === "function" && store !== "syncQueue"){
+        const data = store === "settings" ? {...item, localLogo:""} : item;
+        await window.enqueueSync({type:"set", store, itemId:item.id || "main", data});
+      }
+    }catch{}
+  }
+  async function mergeBackupFile(file){
+    if(!file) return;
+    try{
+      const data = JSON.parse(await file.text());
+      let added = 0, updated = 0;
+      const incomingStores = STORE_LIST.filter(s => Array.isArray(data[s]) || (s === "settings" && (data.settingsMain || data.settings)));
+      for(const store of incomingStores){
+        let incoming = Array.isArray(data[store]) ? data[store] : [];
+        if(store === "settings" && data.settingsMain) incoming = [data.settingsMain];
+        const current = await getStore(store);
+        const map = new Map();
+        for(const item of current){ if(item && (item.id || store === "settings")) map.set(String(item.id || "main"), item); }
+        for(const raw of incoming){
+          if(!raw) continue;
+          const id = String(raw.id || (store === "settings" ? "main" : raw.code || raw.number || (store + "_" + Date.now() + "_" + Math.random().toString(16).slice(2))));
+          const exists = map.get(id);
+          let merged;
+          if(exists){
+            merged = newer(exists, {...raw, id});
+            updated++;
+          }else{
+            merged = {...raw, id};
+            added++;
+          }
+          if(store === "settings"){
+            merged = {...(window.state?.settings || {}), ...merged, id:"main", localLogo: window.state?.settings?.localLogo || merged.localLogo || ""};
+          }
+          const saved = await putStoreItem(store, merged);
+          await enqueueImported(store, saved);
+        }
+      }
+      try{ await window.loadLocalData?.(true); }catch{}
+      try{ window.renderAll?.(); }catch{}
+      try{ await compactSyncQueue(); }catch{}
+      try{ await updateSyncBadgeOperationCount(); }catch{}
+      safeToast(`تم دمج النسخة فوق الموجودة: جديد ${added} / تحديث ${updated} — لم يتم حذف أي بيانات قديمة`, 4200);
+      if(navigator.onLine) setTimeout(()=>window.syncNow?.(false), 400);
+    }catch(err){ console.error(err); safeToast("فشل استيراد النسخة الاحتياطية"); }
+    const input = $("importBackupInput");
+    if(input) input.value = "";
+  }
+  function backupEventHandler(e){
+    const exportBtn = e.target && e.target.closest && e.target.closest("#exportBackupBtn,[data-oskar-take-backup]");
+    if(exportBtn){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); exportFullBackup(); return; }
+  }
+  window.addEventListener("click", backupEventHandler, true);
+  window.addEventListener("change", function(e){
+    if(e.target && e.target.id === "importBackupInput"){
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      mergeBackupFile(e.target.files && e.target.files[0]);
+    }
+  }, true);
+
+  function ensureBackupReminder(){
+    ensureFinalStyle();
+    if($("oskarBackupReminder")) return $("oskarBackupReminder");
+    const box = document.createElement("div");
+    box.id = "oskarBackupReminder";
+    box.className = "oskar-backup-reminder";
+    box.innerHTML = `<div><b><i class="fa-solid fa-shield-halved"></i> تذكير نسخة احتياطية</b><small>مرّت 12 ساعة تقريباً. خذ نسخة كاملة لكل الموقع حتى لا تضيع البيانات.</small></div><div class="actions"><button class="take" type="button" data-oskar-take-backup="1">أخذ نسخة الآن</button><button class="later" type="button" id="oskarBackupLaterBtn">لاحقاً</button></div>`;
+    document.body.appendChild(box);
+    $("oskarBackupLaterBtn")?.addEventListener("click", ()=>{ localStorage.setItem(BACKUP_SNOOZE_KEY, String(Date.now() + 60*60*1000)); hideBackupReminder(); }, true);
+    return box;
+  }
+  function hideBackupReminder(){ $("oskarBackupReminder")?.classList.remove("show"); }
+  function checkBackupReminder(){
+    try{
+      const last = Number(localStorage.getItem(BACKUP_REMINDER_KEY) || 0);
+      const snooze = Number(localStorage.getItem(BACKUP_SNOOZE_KEY) || 0);
+      if(Date.now() < snooze) return;
+      if(!last || Date.now() - last >= TWELVE_HOURS){ ensureBackupReminder().classList.add("show"); }
+    }catch{}
+  }
+  setTimeout(checkBackupReminder, 2500);
+  setInterval(checkBackupReminder, 30*60*1000);
+
+  /* ===================== المزامنة: العدد = عمليات، ضغط الطابور، وتشغيل تلقائي عند عودة النت ===================== */
+  function syncKey(q){ return [q?.type || "set", q?.store || "", q?.itemId || q?.id || ""].join(":"); }
+  async function compactSyncQueue(){
+    if(typeof window.idbGetAll !== "function" || typeof window.idbClear !== "function" || typeof window.idbPut !== "function") return [];
+    let q = [];
+    try{ q = await window.idbGetAll("syncQueue") || []; }catch{return []}
+    const map = new Map();
+    for(const item of q){
+      const key = syncKey(item);
+      if(!key || key === "set::") continue;
+      const prev = map.get(key);
+      if(!prev) map.set(key, item);
+      else{
+        const newerItem = Number(item.createdAt || item.updatedAt || 0) >= Number(prev.createdAt || prev.updatedAt || 0) ? item : prev;
+        map.set(key, newerItem);
+      }
+    }
+    const arr = Array.from(map.values());
+    if(arr.length !== q.length){
+      try{
+        await window.idbClear("syncQueue");
+        for(const item of arr) await window.idbPut("syncQueue", item);
+      }catch(e){ console.warn("compact sync queue failed", e); }
+    }
+    return arr;
+  }
+  async function updateSyncBadgeOperationCount(){
+    let q = [];
+    try{ q = await compactSyncQueue(); }catch{}
+    if(!q.length){ try{ q = await window.idbGetAll?.("syncQueue") || []; }catch{} }
+    const ops = new Set(q.map(syncKey).filter(Boolean));
+    const count = ops.size;
+    const badge = $("syncCountBadge");
+    if(badge){
+      badge.textContent = count > 999 ? "999+" : String(count);
+      badge.title = count ? `${count} عملية مزامنة` : "لا توجد عمليات مزامنة";
+      badge.style.display = count ? "flex" : "none";
+    }
+    return count;
+  }
+  const oldRefresh = window.refreshPendingCount;
+  window.refreshPendingCount = async function(){
+    try{ return await updateSyncBadgeOperationCount(); }
+    catch(e){ try{ return await oldRefresh?.apply(this, arguments); }catch{} }
+  };
+  const oldSyncNow = window.syncNow;
+  if(typeof oldSyncNow === "function" && !oldSyncNow.__oskarMegaMallWrapped){
+    const wrapped = async function(){
+      try{ await compactSyncQueue(); await updateSyncBadgeOperationCount(); }catch{}
+      const res = await oldSyncNow.apply(this, arguments);
+      try{ await compactSyncQueue(); await updateSyncBadgeOperationCount(); }catch{}
+      return res;
+    };
+    wrapped.__oskarMegaMallWrapped = true;
+    wrapped.__old = oldSyncNow;
+    window.syncNow = wrapped;
+  }
+  window.addEventListener("online", function(){
+    safeToast("عاد الاتصال — جاري مزامنة العمليات المعلقة تلقائياً", 2200);
+    setTimeout(async()=>{ try{ await compactSyncQueue(); await window.syncNow?.(false); await updateSyncBadgeOperationCount(); }catch(e){ console.warn("online sync failed", e); } }, 450);
+  });
+  setInterval(updateSyncBadgeOperationCount, 5000);
+  setTimeout(updateSyncBadgeOperationCount, 1500);
+
+  /* ===================== التنبيهات: لا تُدخل البضاعة الناقصة داخل الجرس ===================== */
+  function unpaidLaterInvoices(){ return (window.state?.invoices || []).filter(i => i.paymentMethod === "later_app" && i.status !== "paid"); }
+  function unpaidManualDebts(){ return (window.state?.customers || []).flatMap(c => (c.manualDebts || []).filter(d => d.status !== "paid").map(d => ({...d, customerName:c.name, customerId:c.id}))); }
+  function updateNotificationsWithoutLowStock(){
+    const count = unpaidLaterInvoices().length + unpaidManualDebts().length;
+    const b = $("notifBadge");
+    if(b){
+      b.textContent = count > 999 ? "999+" : String(count);
+      b.title = count ? `${count} تنبيه ديون/تطبيق لاحق` : "لا توجد تنبيهات";
+      b.style.display = count ? "flex" : "none";
+    }
+  }
+  function openCleanNotifications(){
+    const later = unpaidLaterInvoices();
+    const manual = unpaidManualDebts();
+    const html = `
+      <div class="modal-backdrop show" id="oskarCleanNotifModal" style="z-index:2147483602">
+        <div class="modal large">
+          <div class="modal-head"><div class="modal-title"><i class="fa-solid fa-bell"></i> التنبيهات</div><button class="close-btn" id="oskarCloseCleanNotif" type="button"><i class="fa-solid fa-xmark"></i></button></div>
+          <div class="card" style="box-shadow:none;margin-bottom:12px"><h3 style="margin:0 0 10px;font-weight:900">تطبيق لاحق غير مكتمل</h3>${later.map(inv=>`<div class="debt-card" data-open-later-status="${String(inv.id || "")}"><div><div class="debt-name">فاتورة #${String(inv.number || inv.id || "-")}</div><div class="debt-sub">${String(inv.customerName || "-")} · ${money(inv.total || 0)}</div></div><span class="badge yellow">غير مكتمل</span></div>`).join("") || `<div class="muted">لا توجد فواتير تطبيق لاحق غير مكتملة</div>`}</div>
+          <div class="card" style="box-shadow:none"><h3 style="margin:0 0 10px;font-weight:900">ديون يدوية غير مكتملة</h3>${manual.map(d=>`<div class="debt-card" data-open-customer="${String(d.customerId || "")}"><div><div class="debt-name">${String(d.customerName || "عميل")}</div><div class="debt-sub">${String(d.note || "دين يدوي")} · ${money(d.amount || d.balance || 0)}</div></div><span class="badge red">دين</span></div>`).join("") || `<div class="muted">لا توجد ديون يدوية غير مكتملة</div>`}</div>
+          <div class="muted" style="margin-top:12px;text-align:center">البضاعة الناقصة لم تعد تُضاف داخل جرس التنبيهات، وتبقى موجودة فقط في تقرير البضاعة الناقصة.</div>
+        </div>
+      </div>`;
+    const old = $("oskarCleanNotifModal");
+    if(old) old.remove();
+    document.body.insertAdjacentHTML("beforeend", html);
+    $("oskarCloseCleanNotif")?.addEventListener("click", ()=>$("oskarCleanNotifModal")?.remove(), true);
+  }
+  window.addEventListener("click", function(e){
+    const n = e.target && e.target.closest && e.target.closest("#notificationsBtn");
+    if(n){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); updateNotificationsWithoutLowStock(); openCleanNotifications(); }
+  }, true);
+  setInterval(updateNotificationsWithoutLowStock, 3500);
+  setTimeout(updateNotificationsWithoutLowStock, 1200);
+
+  /* ===================== تصدير صورة/PDF أسرع: التقاط خفيف وفوري قدر الإمكان ===================== */
+  function ensureExportOverlay(){
+    ensureFinalStyle();
+    let o = $("oskarExportOverlay");
+    if(o) return o;
+    o = document.createElement("div");
+    o.id = "oskarExportOverlay";
+    o.className = "oskar-export-overlay";
+    o.innerHTML = `<div class="oskar-export-box"><div class="oskar-export-spinner"></div><div id="oskarExportText">جاري التجهيز...</div></div>`;
+    document.body.appendChild(o);
+    return o;
+  }
+  function showExportOverlay(txt){
+    const o = ensureExportOverlay();
+    const t = $("oskarExportText"); if(t) t.textContent = txt || "جاري التجهيز...";
+    o.classList.add("show");
+  }
+  function hideExportOverlay(){ $("oskarExportOverlay")?.classList.remove("show"); }
+  function dateKey(){ return new Date().toISOString().slice(0,10); }
+  function getExportSource(btn){
+    if(btn.id === "imageInvoiceBtn" || btn.id === "pdfInvoiceBtn" || btn.id === "thermalImageInvoiceBtn" || btn.id === "thermalPdfInvoiceBtn") return $("invoiceViewBox") || document.querySelector(".invoice-paper") || btn.closest(".modal") || document.body;
+    if(btn.id === "imageInvoicesBtn" || btn.id === "pdfInvoicesBtn") return $("page-invoices") || document.querySelector("#page-invoices") || document.body;
+    if(btn.id === "imageReportsBtn" || btn.id === "pdfReportsBtn") return $("page-reports") || document.querySelector("#page-reports") || document.body;
+    if(btn.matches("[data-image-customer],[data-pdf-customer]")) return btn.closest(".modal") || $("page-debts") || document.body;
+    return document.querySelector(".section.active") || document.body;
+  }
+  async function fastCanvasFromElement(src){
+    if(!window.html2canvas) throw new Error("html2canvas_not_ready");
+    const holder = document.createElement("div");
+    holder.style.cssText = "position:fixed;right:-12000px;top:0;width:1080px;background:#fff;color:#0f172a;z-index:-1;opacity:1;pointer-events:none;direction:rtl;font-family:Cairo,Arial,sans-serif";
+    const clone = src.cloneNode(true);
+    clone.style.width = "1080px";
+    clone.style.maxWidth = "1080px";
+    clone.style.background = "#fff";
+    clone.querySelectorAll("button,.no-print,.bottom-nav,.topbar,.sidebar,.fab-add,input,select,textarea").forEach(el=>{
+      if(!el.closest("table")) el.style.display = "none";
+    });
+    clone.querySelectorAll(".table-wrap").forEach(el=>{ el.style.overflow = "visible"; el.style.maxHeight = "none"; });
+    clone.querySelectorAll("table").forEach(t=>{ t.style.minWidth = "0"; t.style.width = "100%"; });
+    clone.querySelectorAll("*").forEach(el=>{ el.style.animation = "none"; el.style.transition = "none"; el.style.transform = "none"; el.style.filter = "none"; });
+    holder.appendChild(clone);
+    document.body.appendChild(holder);
+    try{
+      const imgs = $$('img', clone);
+      await Promise.race([
+        Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(r=>{ img.onload = img.onerror = r; }))),
+        new Promise(r=>setTimeout(r, 350))
+      ]);
+      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+      const w = Math.max(360, Math.ceil(clone.scrollWidth || 1080));
+      const h = Math.max(260, Math.ceil(clone.scrollHeight || clone.getBoundingClientRect().height || 800));
+      return await window.html2canvas(clone, {backgroundColor:"#ffffff", scale:0.78, useCORS:true, allowTaint:true, logging:false, imageTimeout:150, removeContainer:true, scrollX:0, scrollY:0, windowWidth:w, windowHeight:h, width:w, height:h});
+    }finally{
+      holder.remove();
+    }
+  }
+  function saveCanvasImage(canvas, filename){
+    return new Promise(resolve=>{
+      const done = (url) => { const a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 1200); resolve(); };
+      if(canvas.toBlob){ canvas.toBlob(blob => blob ? done(URL.createObjectURL(blob)) : resolve(), "image/jpeg", 0.82); }
+      else{ const a=document.createElement("a"); a.href=canvas.toDataURL("image/jpeg", .82); a.download=filename; a.click(); resolve(); }
+    });
+  }
+  async function saveCanvasPdf(canvas, filename){
+    if(!window.jspdf || !window.jspdf.jsPDF){
+      await saveCanvasImage(canvas, filename.replace(/\.pdf$/i,".jpg"));
+      safeToast("لم تجهز مكتبة PDF، تم حفظ صورة بدلاً منها بسرعة");
+      return;
+    }
+    const { jsPDF } = window.jspdf;
+    const img = canvas.toDataURL("image/jpeg", 0.78);
+    const pdf = new jsPDF("p", "mm", "a4", true);
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 4;
+    const imgW = pageW - margin * 2;
+    const imgH = canvas.height * imgW / canvas.width;
+    if(imgH <= pageH - margin * 2){
+      pdf.addImage(img, "JPEG", margin, margin, imgW, imgH, undefined, "FAST");
+    }else{
+      const usable = pageH - margin * 2;
+      let y = 0;
+      while(y < imgH){
+        pdf.addImage(img, "JPEG", margin, margin - y, imgW, imgH, undefined, "FAST");
+        y += usable;
+        if(y < imgH) pdf.addPage();
+      }
+    }
+    pdf.save(filename);
+  }
+  async function fastExport(btn, type){
+    const source = getExportSource(btn);
+    if(!source) return safeToast("لا يوجد محتوى للتصدير");
+    showExportOverlay(type === "pdf" ? "حفظ PDF سريع..." : "حفظ صورة سريع...");
+    try{
+      const canvas = await fastCanvasFromElement(source);
+      const nameBase = (btn.id || "oskar-export") + "-" + dateKey();
+      if(type === "pdf") await saveCanvasPdf(canvas, nameBase + ".pdf");
+      else await saveCanvasImage(canvas, nameBase + ".jpg");
+      safeToast("تم الحفظ بسرعة");
+    }catch(err){
+      console.error("fast export failed", err);
+      safeToast("تعذر الحفظ السريع، جرّب مرة أخرى بعد ثوانٍ");
+    }finally{ hideExportOverlay(); }
+  }
+  window.addEventListener("click", function(e){
+    const btn = e.target && e.target.closest && e.target.closest("#imageInvoiceBtn,#pdfInvoiceBtn,#thermalImageInvoiceBtn,#thermalPdfInvoiceBtn,#imageInvoicesBtn,#pdfInvoicesBtn,#imageReportsBtn,#pdfReportsBtn,[data-image-customer],[data-pdf-customer]");
+    if(!btn) return;
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    const type = (btn.id || "").toLowerCase().includes("pdf") || btn.hasAttribute("data-pdf-customer") ? "pdf" : "image";
+    fastExport(btn, type);
+  }, true);
+
+  function initFinal(){
+    ensureFinalStyle();
+    updateNotificationsWithoutLowStock();
+    updateSyncBadgeOperationCount();
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", initFinal, {once:true}); else initFinal();
+})();
+</script>
+
+</body></html>`);
       doc.close();
       await Promise.all(Array.from(doc.images || []).map(img => waitOneImage(img, 130)));
       setTimeout(() => {
@@ -15836,7 +17199,688 @@
       doc.open();
       doc.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طباعة</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet"><style>
         @page{size:80mm auto;margin:0}*{box-sizing:border-box!important}html,body{margin:0!important;padding:0!important;background:#fff!important;color:#000!important;direction:rtl!important}.oskar-thermal-receipt{width:80mm!important;max-width:80mm!important;min-width:80mm!important;margin:0!important;padding:5mm!important;background:#fff!important;color:#000!important;font-family:"Cairo","Tahoma","Arial",sans-serif!important;font-size:12px!important;line-height:1.42!important;box-shadow:none!important;border:0!important;border-radius:0!important}.oskar-thermal-receipt *{color:#000!important;box-shadow:none!important;text-shadow:none!important;filter:none!important;transform:none!important}.oskar-thermal-header{text-align:center;border-bottom:1px dashed #000;padding-bottom:10px;margin-bottom:10px}.oskar-thermal-header h1{margin:0;font-size:20px!important;font-weight:900!important;text-transform:uppercase}.oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{width:100%!important;border-collapse:collapse!important;margin:0 0 10px!important;min-width:0!important}.oskar-thermal-info td{vertical-align:top!important;padding:1px 0!important;border:0!important;background:#fff!important;font-size:12px!important}.oskar-thermal-left{text-align:left!important}.oskar-thermal-items th{border:0!important;border-bottom:1px solid #000!important;background:#fff!important;text-align:right!important;padding:5px 0!important;font-size:12px!important;font-weight:900!important}.oskar-thermal-items td{border:0!important;border-bottom:1px dotted #000!important;background:#fff!important;padding:5px 0!important;font-size:12px!important}.center{text-align:center!important}.left{text-align:left!important}.oskar-thermal-totals td{border:0!important;background:#fff!important;padding:2px 0!important;font-size:12px!important}.oskar-thermal-total-row td{font-weight:900!important;font-size:16px!important;border-top:1px double #000!important;border-bottom:1px double #000!important;padding:5px 0!important}.oskar-thermal-payment{margin-top:10px;font-size:12px!important}.oskar-thermal-footer{text-align:center;margin-top:20px;font-size:10px!important;border-top:1px dashed #000;padding-top:10px}.oskar-thermal-barcode{display:block;margin:8px auto 0!important;width:50mm!important;max-width:50mm!important;height:13mm!important;overflow:hidden!important}.oskar-thermal-barcode svg{width:50mm!important;height:11mm!important;display:block!important;margin:0 auto!important}.oskar-thermal-code{font-size:10px!important;text-align:center!important;direction:ltr!important;margin-top:2px!important}.oskar-thermal-preview-wrap{display:block!important;background:#fff!important;border:0!important;padding:0!important}.oskar-thermal-receipt{font-family:"Cairo","Tahoma","Arial",sans-serif!important;padding:4mm!important;line-height:1.55!important;overflow:visible!important}.oskar-thermal-receipt *{max-width:100%!important;overflow-wrap:anywhere!important;word-break:normal!important;letter-spacing:0!important}.oskar-thermal-info,.oskar-thermal-items,.oskar-thermal-totals{table-layout:fixed!important}.oskar-thermal-info td{width:50%!important;line-height:1.55!important;vertical-align:top!important}.oskar-thermal-items th,.oskar-thermal-items td{font-size:11px!important;line-height:1.45!important;vertical-align:top!important;overflow:visible!important;white-space:normal!important}.oskar-thermal-items th:nth-child(1),.oskar-thermal-items td:nth-child(1){width:28mm!important;text-align:right!important}.oskar-thermal-items th:nth-child(2),.oskar-thermal-items td:nth-child(2){width:9mm!important;text-align:center!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-items th:nth-child(3),.oskar-thermal-items td:nth-child(3){width:15mm!important;text-align:center!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-items th:nth-child(4),.oskar-thermal-items td:nth-child(4){width:17mm!important;text-align:left!important;direction:ltr!important;white-space:nowrap!important}.oskar-thermal-left{direction:ltr!important;text-align:left!important;unicode-bidi:plaintext!important}.oskar-thermal-totals td{width:50%!important;line-height:1.55!important}.oskar-thermal-total-row td{font-size:17px!important;line-height:1.45!important}.oskar-thermal-barcode{width:50mm!important;height:auto!important;min-height:12mm!important;overflow:visible!important}.oskar-thermal-barcode svg{width:50mm!important;height:11mm!important;overflow:visible!important}
-      </style></head><body>${receipt.outerHTML}</body></html>`);
+      </style></head><body>${receipt.outerHTML}
+
+<script id="oskar-mega-mall-barcode-backup-sync-export-final-2026-05-05">
+(function(){
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const STORE_LIST = [
+    "products","invoices","customers","expenses","purchases","supplierPayments",
+    "paymentAccounts","employees","suppliers","workers","workerWages","accountMovements","settings"
+  ];
+  const QR_SRC = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+  const BACKUP_REMINDER_KEY = "oskar_last_full_backup_at_v2";
+  const BACKUP_SNOOZE_KEY = "oskar_backup_reminder_snooze_until_v2";
+  const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+
+  function safeToast(msg, ms){
+    try{ if(typeof window.toast === "function") return window.toast(msg, ms || 2800); }catch{}
+    let t = $("toast");
+    if(!t){
+      t = document.createElement("div");
+      t.id = "toast";
+      t.style.cssText = "position:fixed;right:16px;left:16px;bottom:26px;z-index:2147483647;background:#020617;color:#fff;border-radius:18px;padding:14px 16px;text-align:center;font-weight:900;box-shadow:0 18px 45px rgba(0,0,0,.28);font-family:Cairo,Arial,sans-serif";
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add("show");
+    t.style.display = "block";
+    clearTimeout(t.__timer);
+    t.__timer = setTimeout(()=>{ t.classList.remove("show"); t.style.display = "none"; }, ms || 2800);
+  }
+
+  function money(v){
+    try{ if(typeof window.money === "function") return window.money(v); }catch{}
+    const cur = window.state?.settings?.currency || "₪";
+    const n = Number(v || 0);
+    return cur + " " + n.toFixed(3).replace(/\.000$/, ".000");
+  }
+
+  function ensureFinalStyle(){
+    if($("oskarMegaMallFinalStyle")) return;
+    const st = document.createElement("style");
+    st.id = "oskarMegaMallFinalStyle";
+    st.textContent = `
+      .oskar-final-camera{position:fixed;inset:0;background:#000;z-index:2147483646;display:none;direction:rtl;font-family:Cairo,Arial,sans-serif;overflow:hidden}.oskar-final-camera.show{display:block}.oskar-final-reader{width:100vw;height:100vh;background:#000}.oskar-final-reader video{width:100vw!important;height:100vh!important;object-fit:cover!important}.oskar-final-reader__dashboard,#oskarFinalReader__dashboard,#oskarFinalReader__scan_region{display:none!important}.oskar-final-frame{pointer-events:none;position:fixed;top:50%;left:50%;width:min(82vw,420px);height:230px;transform:translate(-50%,-50%);border:3px solid rgba(255,255,255,.55);border-radius:26px;z-index:2147483647;transition:.15s ease;box-shadow:0 0 0 9999px rgba(0,0,0,.18),0 0 30px rgba(255,255,255,.15)}.oskar-final-frame:before,.oskar-final-frame:after{content:"";position:absolute;width:54px;height:54px;border-color:#22c55e;border-style:solid;filter:drop-shadow(0 0 12px rgba(34,197,94,.95))}.oskar-final-frame:before{top:-4px;right:-4px;border-width:6px 6px 0 0;border-radius:0 22px 0 0}.oskar-final-frame:after{left:-4px;bottom:-4px;border-width:0 0 6px 6px;border-radius:0 0 0 22px}.oskar-final-laser{position:fixed;top:50%;left:50%;width:min(72vw,360px);height:3px;transform:translate(-50%,-50%);z-index:2147483647;border-radius:999px;background:linear-gradient(90deg,transparent,#22c55e,transparent);box-shadow:0 0 22px #22c55e;animation:oskarFinalLaser 1.02s ease-in-out infinite;pointer-events:none}@keyframes oskarFinalLaser{0%,100%{transform:translate(-50%,calc(-50% - 95px));opacity:.55}50%{transform:translate(-50%,calc(-50% + 95px));opacity:1}}.oskar-final-camera.detected .oskar-final-frame{border-color:#22c55e;box-shadow:0 0 0 9999px rgba(0,0,0,.13),0 0 40px rgba(34,197,94,.9),inset 0 0 35px rgba(34,197,94,.25);animation:oskarFinalGreenPop .28s ease}@keyframes oskarFinalGreenPop{0%{transform:translate(-50%,-50%) scale(.96)}60%{transform:translate(-50%,-50%) scale(1.03)}100%{transform:translate(-50%,-50%) scale(1)}}.oskar-final-close{position:fixed;top:16px;left:16px;width:50px;height:50px;border:0;border-radius:16px;background:rgba(15,23,42,.88);color:#fff;font-size:26px;font-weight:900;z-index:2147483647}.oskar-final-title{position:fixed;top:17px;right:16px;z-index:2147483647;max-width:calc(100vw - 92px);background:rgba(15,23,42,.86);color:#fff;border-radius:16px;padding:10px 14px;font-weight:900;font-size:14px}.oskar-final-title small{display:block;color:#bbf7d0;font-size:12px;font-weight:800;margin-top:2px}.oskar-final-toast{position:fixed;right:16px;left:16px;bottom:28px;z-index:2147483647;padding:15px 18px;border-radius:18px;background:rgba(15,23,42,.96);color:#fff;font-size:16px;font-weight:900;text-align:center;box-shadow:0 18px 45px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.15);transform:translateY(130%);opacity:0;transition:.25s ease;direction:ltr}.oskar-final-toast.show{transform:translateY(0);opacity:1}.oskar-final-added{position:fixed;top:76px;right:12px;left:12px;z-index:2147483647;display:flex;gap:8px;overflow-x:auto;padding:3px}.oskar-final-chip{background:rgba(255,255,255,.96);color:#064e3b;border:1px solid #bbf7d0;border-radius:999px;padding:8px 10px;font-weight:900;font-size:12px;white-space:nowrap;box-shadow:0 12px 26px rgba(0,0,0,.22)}
+      .oskar-backup-reminder{position:fixed;right:14px;left:14px;bottom:96px;z-index:2147483600;background:rgba(255,255,255,.97);border:1px solid #d1fae5;border-radius:24px;padding:14px;box-shadow:0 22px 55px rgba(15,23,42,.18);font-family:Cairo,Arial,sans-serif;display:none;gap:12px;align-items:center;justify-content:space-between}.oskar-backup-reminder.show{display:flex}.oskar-backup-reminder b{font-weight:900;color:#064e3b}.oskar-backup-reminder small{display:block;color:#64748b;font-weight:800;line-height:1.7}.oskar-backup-reminder .actions{display:flex;gap:8px;flex-shrink:0}.oskar-backup-reminder button{border:0;border-radius:16px;padding:10px 12px;font-weight:900}.oskar-backup-reminder .take{background:#059669;color:#fff}.oskar-backup-reminder .later{background:#f1f5f9;color:#0f172a}
+      .oskar-export-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:2147483601;display:none;align-items:center;justify-content:center;font-family:Cairo,Arial,sans-serif}.oskar-export-overlay.show{display:flex}.oskar-export-box{background:#fff;border-radius:24px;padding:18px 22px;box-shadow:0 24px 70px rgba(0,0,0,.24);font-weight:900;text-align:center;min-width:240px}.oskar-export-spinner{width:38px;height:38px;border:4px solid #d1fae5;border-top-color:#059669;border-radius:999px;margin:0 auto 10px;animation:oskarExportSpin .7s linear infinite}@keyframes oskarExportSpin{to{transform:rotate(360deg)}}
+      @media(max-width:560px){.oskar-backup-reminder{align-items:flex-start;flex-direction:column}.oskar-backup-reminder .actions{width:100%}.oskar-backup-reminder button{flex:1}}
+    `;
+    document.head.appendChild(st);
+  }
+
+  /* ===================== كاميرا الباركود النهائية السريعة ===================== */
+  let scanner = null;
+  let scannerRunning = false;
+  let startPromise = null;
+  let scanMode = "sale";
+  let scanTarget = "";
+  let lastCode = "";
+  let lastTime = 0;
+  const scanSound = new Audio("./qr.mp3");
+  scanSound.preload = "auto";
+  scanSound.volume = 1;
+
+  function unlockSound(){
+    scanSound.play().then(()=>{ scanSound.pause(); scanSound.currentTime = 0; }).catch(()=>{});
+  }
+  window.addEventListener("pointerdown", unlockSound, {once:true, passive:true, capture:true});
+  window.addEventListener("touchstart", unlockSound, {once:true, passive:true, capture:true});
+
+  function showScanToast(code){
+    const t = $("oskarFinalScanToast");
+    if(!t) return;
+    t.textContent = code;
+    t.classList.add("show");
+    clearTimeout(t.__timer);
+    t.__timer = setTimeout(()=>t.classList.remove("show"), 1200);
+  }
+  function beep(){ try{ scanSound.pause(); scanSound.currentTime = 0; scanSound.play().catch(()=>{}); }catch{} }
+  function vibrate(){ try{ if(navigator.vibrate) navigator.vibrate([55,25,55]); }catch{} }
+  function markDetected(){
+    const page = $("oskarFinalCameraPage");
+    if(!page) return;
+    page.classList.add("detected");
+    clearTimeout(page.__detectedTimer);
+    page.__detectedTimer = setTimeout(()=>page.classList.remove("detected"), 520);
+  }
+  function ensureCameraDom(){
+    ensureFinalStyle();
+    let page = $("oskarFinalCameraPage");
+    if(page) return page;
+    page = document.createElement("div");
+    page.id = "oskarFinalCameraPage";
+    page.className = "oskar-final-camera";
+    page.innerHTML = `
+      <div id="oskarFinalReader" class="oskar-final-reader"></div>
+      <div class="oskar-final-frame"></div>
+      <div class="oskar-final-laser"></div>
+      <button id="oskarFinalCameraClose" class="oskar-final-close" type="button">×</button>
+      <div id="oskarFinalCameraTitle" class="oskar-final-title">قراءة باركود<small>وجّه الكاميرا نحو الباركود من أي جهة</small></div>
+      <div id="oskarFinalAdded" class="oskar-final-added"></div>
+      <div id="oskarFinalScanToast" class="oskar-final-toast"></div>`;
+    document.body.appendChild(page);
+    $("oskarFinalCameraClose")?.addEventListener("click", stopFinalScanner, {capture:true});
+    return page;
+  }
+  function loadHtml5Qr(){
+    if(window.Html5Qrcode && window.Html5QrcodeSupportedFormats) return Promise.resolve();
+    const existing = Array.from(document.scripts).find(s => String(s.src || "").includes("html5-qrcode"));
+    if(existing){
+      return new Promise((resolve,reject)=>{
+        if(window.Html5Qrcode) return resolve();
+        existing.addEventListener("load", () => resolve(), {once:true});
+        existing.addEventListener("error", reject, {once:true});
+        setTimeout(()=> window.Html5Qrcode ? resolve() : reject(new Error("html5-qrcode-timeout")), 4200);
+      });
+    }
+    return new Promise((resolve,reject)=>{
+      const s = document.createElement("script");
+      s.src = QR_SRC;
+      s.async = true;
+      s.onload = () => resolve();
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  function prepareProductBarcodeIndex(){
+    const map = new Map();
+    const list = Array.isArray(window.state?.products) ? window.state.products : [];
+    for(const p of list){
+      for(const v of [p?.barcode, p?.code, p?.id]){
+        const k = String(v || "").trim();
+        if(k && !map.has(k)) map.set(k, p);
+      }
+    }
+    window.__oskarFastBarcodeMap = map;
+    window.__oskarFastBarcodeMapSize = list.length;
+    return map;
+  }
+  function findByBarcode(code){
+    const c = String(code || "").trim();
+    if(!c) return null;
+    try{
+      if(window.__oskarFastBarcodeMapSize !== (window.state?.products || []).length) prepareProductBarcodeIndex();
+      const hit = window.__oskarFastBarcodeMap?.get(c);
+      if(hit) return hit;
+    }catch{}
+    try{ if(typeof window.getProductByBarcode === "function"){ const p = window.getProductByBarcode(c); if(p) return p; } }catch{}
+    return (window.state?.products || []).find(p => String(p.barcode || "").trim() === c || String(p.code || "").trim() === c || String(p.id || "").trim() === c) || null;
+  }
+  function addSaleProduct(product){
+    if(!product) return false;
+    try{
+      if(typeof window.addToCart === "function"){
+        window.addToCart(product);
+      }else if(window.state?.cart){
+        window.state.cart.push({ id:"cart_"+Date.now()+"_"+Math.random().toString(16).slice(2), productId:product.id, name:product.name, qty:1, price: Number(product.salePrice || product.price || 0), total:Number(product.salePrice || product.price || 0) });
+        try{ window.renderCart?.(); }catch{}
+      }
+      const chips = $("oskarFinalAdded");
+      if(chips){
+        const chip = document.createElement("div");
+        chip.className = "oskar-final-chip";
+        chip.textContent = "✓ " + (product.name || "منتج");
+        chips.prepend(chip);
+        while(chips.children.length > 7) chips.lastElementChild.remove();
+      }
+      return true;
+    }catch(err){ console.warn("add barcode product failed", err); return false; }
+  }
+  async function stopFinalScanner(){
+    startPromise = null;
+    try{ if(scanner && scannerRunning) await scanner.stop(); }catch{}
+    try{ if(scanner) await scanner.clear(); }catch{}
+    scanner = null;
+    scannerRunning = false;
+    const page = $("oskarFinalCameraPage");
+    if(page) page.classList.remove("show");
+    try{ if(window.state?.scanner){ window.state.scanner.active = false; window.state.scanner.locked = false; } }catch{}
+  }
+  function onFinalScan(decodedText, decodedResult){
+    const code = String(decodedText || "").trim();
+    const now = Date.now();
+    if(!code) return;
+    if(code === lastCode && now - lastTime < 1050) return;
+    lastCode = code;
+    lastTime = now;
+    markDetected(); beep(); vibrate(); showScanToast(code);
+    try{ window.dispatchEvent(new CustomEvent("barcode:scanned", {detail:{code, result:decodedResult}})); }catch{}
+
+    if(scanMode === "product" || scanTarget){
+      const input = $(scanTarget || "productBarcode") || $("productBarcode") || document.querySelector('input[name="barcode"],input[id*="Barcode"],input[id*="barcode"]');
+      if(input){
+        input.value = code;
+        input.dispatchEvent(new Event("input", {bubbles:true}));
+        input.dispatchEvent(new Event("change", {bubbles:true}));
+        safeToast("تمت قراءة الباركود ووضعه في خانة المنتج", 1800);
+      }
+      stopFinalScanner();
+      return;
+    }
+
+    const product = findByBarcode(code);
+    if(product){
+      addSaleProduct(product);
+      safeToast("تمت إضافة " + (product.name || "المنتج"), 1300);
+      const keepOpen = localStorage.getItem("oskar_keep_cashier_barcode_camera_open_v1") === "1";
+      if(!keepOpen) stopFinalScanner();
+    }else{
+      safeToast("لم يتم العثور على منتج بهذا الباركود", 1700);
+    }
+  }
+  async function startFinalScanner(mode="sale", target=""){
+    scanMode = mode || "sale";
+    scanTarget = target || "";
+    if(startPromise) return startPromise;
+    startPromise = (async()=>{
+      await loadHtml5Qr();
+      prepareProductBarcodeIndex();
+      await stopFinalScanner();
+      const page = ensureCameraDom();
+      const title = $("oskarFinalCameraTitle");
+      if(title) title.innerHTML = (scanMode === "product" ? "قراءة باركود المنتج" : "قراءة باركود للبيع") + "<small>وجّه الكاميرا نحو الباركود من أي جهة</small>";
+      const chips = $("oskarFinalAdded");
+      if(chips) chips.innerHTML = "";
+      const reader = $("oskarFinalReader");
+      if(reader) reader.innerHTML = "";
+      page.classList.add("show");
+      await new Promise(r => requestAnimationFrame(()=>requestAnimationFrame(r)));
+      const F = window.Html5QrcodeSupportedFormats || {};
+      const formats = [F.QR_CODE,F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.CODE_93,F.ITF,F.CODABAR,F.DATA_MATRIX,F.AZTEC,F.PDF_417].filter(Boolean);
+      scanner = new window.Html5Qrcode("oskarFinalReader", formats.length ? {formatsToSupport:formats, verbose:false} : {verbose:false});
+      const config = {
+        fps: 30,
+        qrbox: function(w,h){ return { width: Math.floor(w * 0.82), height: Math.floor(h * 0.34) }; },
+        aspectRatio: 1.7777778,
+        disableFlip: false,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        videoConstraints: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          advanced: [
+            { focusMode: "continuous" },
+            { exposureMode: "continuous" },
+            { whiteBalanceMode: "continuous" }
+          ]
+        }
+      };
+      try{
+        await Promise.race([
+          scanner.start({facingMode:"environment"}, config, onFinalScan, function(){}),
+          new Promise((_,rej)=>setTimeout(()=>rej(new Error("camera-start-timeout")), 6500))
+        ]);
+      }catch(primaryErr){
+        console.warn("fast camera primary start failed", primaryErr);
+        try{ await scanner.clear(); }catch{}
+        scanner = new window.Html5Qrcode("oskarFinalReader", formats.length ? {formatsToSupport:formats, verbose:false} : {verbose:false});
+        await scanner.start({facingMode:{ideal:"environment"}}, config, onFinalScan, function(){});
+      }
+      scannerRunning = true;
+      try{
+        const video = $("oskarFinalReader")?.querySelector("video");
+        const track = video?.srcObject?.getVideoTracks?.()[0];
+        const caps = track?.getCapabilities?.() || {};
+        const adv = [];
+        if(caps.focusMode && caps.focusMode.includes("continuous")) adv.push({focusMode:"continuous"});
+        if(caps.exposureMode && caps.exposureMode.includes("continuous")) adv.push({exposureMode:"continuous"});
+        if(caps.whiteBalanceMode && caps.whiteBalanceMode.includes("continuous")) adv.push({whiteBalanceMode:"continuous"});
+        if(adv.length) track.applyConstraints({advanced:adv}).catch(()=>{});
+      }catch{}
+      startPromise = null;
+    })().catch(async err => {
+      console.error(err);
+      startPromise = null;
+      await stopFinalScanner();
+      safeToast("اسمح باستخدام الكاميرا وتأكد أن الموقع يعمل على HTTPS", 2600);
+    });
+    return startPromise;
+  }
+
+  function cameraClickHandler(e){
+    const target = e.target && e.target.closest && e.target.closest('#openScannerBtn,#openScannerBtnSuper,[data-oskar-super-camera="sale"],[data-oskar-fast-sale],[data-oskar-super-camera="cashier"]');
+    const product = e.target && e.target.closest && e.target.closest('#scanProductBarcodeBtn,#scanProductBarcodeBtnSuper,[data-oskar-super-camera="product"],[data-oskar-fast-product]');
+    const close = e.target && e.target.closest && e.target.closest('#oskarFinalCameraClose,#floatingScannerCloseBtn,#stopScannerBtn,#barcodeTurboClose,#oskarFastClose,#patchCameraCloseBtn');
+    if(target){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); startFinalScanner("sale", ""); return; }
+    if(product){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); startFinalScanner("product", "productBarcode"); return; }
+    if(close){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); stopFinalScanner(); return; }
+  }
+  window.addEventListener("click", cameraClickHandler, true);
+  window.addEventListener("pointerdown", function(e){
+    const cameraBtn = e.target && e.target.closest && e.target.closest('#openScannerBtn,#openScannerBtnSuper,#scanProductBarcodeBtn,#scanProductBarcodeBtnSuper,[data-oskar-super-camera]');
+    if(cameraBtn){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); cameraClickHandler(e); }
+  }, true);
+  window.openScanner = function(mode, target){ return startFinalScanner(mode || "sale", target || ""); };
+  window.openFloatingProductBarcodeScanner = function(target){ return startFinalScanner("product", target || "productBarcode"); };
+  window.stopScanner = stopFinalScanner;
+  window.stopFloatingScanner = stopFinalScanner;
+  window.OSKAR_FINAL_FAST_BARCODE = startFinalScanner;
+  document.addEventListener("visibilitychange", ()=>{ if(document.hidden && scannerRunning) stopFinalScanner(); });
+  window.addEventListener("beforeunload", ()=>{ try{ if(scannerRunning && scanner) scanner.stop().catch(()=>{}); }catch{} });
+  setTimeout(()=>loadHtml5Qr().catch(()=>{}), 400);
+
+  /* ===================== النسخ الاحتياطية: دمج فوق الموجود بدون حذف القديم ===================== */
+  async function getStore(store){
+    try{ if(typeof window.idbGetAll === "function") return await window.idbGetAll(store) || []; }catch{}
+    const s = window.state || {};
+    if(store === "settings") return s.settings ? [s.settings] : [];
+    return Array.isArray(s[store]) ? s[store] : [];
+  }
+  function currentFirebaseRoot(){ return window.FIREBASE_ROOT || window.OSKAR_FIREBASE_ROOT || "cashier"; }
+  function extraStorageKey(){ return "cashier_extra_final_2026_04_29_" + currentFirebaseRoot(); }
+  function movementsStorageKey(){ return "oskar_account_movements_linked_final_2026_05_03_" + currentFirebaseRoot(); }
+  function persistNonIdbStore(store){
+    try{
+      if(["suppliers","workers","workerWages"].includes(store)){
+        const old = JSON.parse(localStorage.getItem(extraStorageKey()) || "{}");
+        localStorage.setItem(extraStorageKey(), JSON.stringify({
+          ...old,
+          suppliers: Array.isArray(window.state?.suppliers) ? window.state.suppliers : [],
+          workers: Array.isArray(window.state?.workers) ? window.state.workers : [],
+          workerWages: Array.isArray(window.state?.workerWages) ? window.state.workerWages : []
+        }));
+      }
+      if(store === "accountMovements"){
+        localStorage.setItem(movementsStorageKey(), JSON.stringify(Array.isArray(window.state?.accountMovements) ? window.state.accountMovements : []));
+      }
+    }catch(e){ console.warn("persist non-idb store failed", store, e); }
+  }
+  async function putStoreItem(store, item){
+    if(!item) return;
+    const row = store === "settings" ? {...item, id:item.id || "main"} : {...item, id:item.id || item._id || item.code || (store + "_" + Date.now() + "_" + Math.random().toString(16).slice(2))};
+    try{ if(typeof window.idbPut === "function") await window.idbPut(store, row); }catch(e){ console.warn("put store failed", store, e); }
+    const st = window.state;
+    if(st){
+      if(store === "settings") st.settings = {...(st.settings || {}), ...row, id:"main"};
+      else{
+        if(!Array.isArray(st[store])) st[store] = [];
+        const idx = st[store].findIndex(x => String(x.id) === String(row.id));
+        if(idx >= 0) st[store][idx] = {...st[store][idx], ...row};
+        else st[store].push(row);
+      }
+    }
+    return row;
+  }
+  function newer(a,b){
+    const ta = Number(a?.updatedAt || a?.createdAt || a?.date || a?.time || 0);
+    const tb = Number(b?.updatedAt || b?.createdAt || b?.date || b?.time || 0);
+    if(ta && tb) return ta >= tb ? a : b;
+    return {...(a || {}), ...(b || {})};
+  }
+  async function buildFullBackup(){
+    const data = {version:"oskar-full-site-merge-backup-2026-05-05", exportedAt:Date.now(), firebaseRoot:window.FIREBASE_ROOT || "", storageProfile:window.OSKAR_STORAGE_PROFILE || "main"};
+    for(const store of STORE_LIST){ data[store] = await getStore(store); }
+    data.settingsMain = window.state?.settings || (data.settings && data.settings[0]) || null;
+    return data;
+  }
+  function downloadJson(data, name){
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+  }
+  async function exportFullBackup(){
+    const data = await buildFullBackup();
+    const d = new Date().toISOString().slice(0,10);
+    downloadJson(data, "oskar-full-site-backup-" + d + ".json");
+    localStorage.setItem(BACKUP_REMINDER_KEY, String(Date.now()));
+    hideBackupReminder();
+    safeToast("تم أخذ نسخة احتياطية كاملة لكل الموقع", 2200);
+  }
+  async function enqueueImported(store, item){
+    try{
+      if(typeof window.enqueueSync === "function" && store !== "syncQueue"){
+        const data = store === "settings" ? {...item, localLogo:""} : item;
+        await window.enqueueSync({type:"set", store, itemId:item.id || "main", data});
+      }
+    }catch{}
+  }
+  async function mergeBackupFile(file){
+    if(!file) return;
+    try{
+      const data = JSON.parse(await file.text());
+      let added = 0, updated = 0;
+      const incomingStores = STORE_LIST.filter(s => Array.isArray(data[s]) || (s === "settings" && (data.settingsMain || data.settings)));
+      for(const store of incomingStores){
+        let incoming = Array.isArray(data[store]) ? data[store] : [];
+        if(store === "settings" && data.settingsMain) incoming = [data.settingsMain];
+        const current = await getStore(store);
+        const map = new Map();
+        for(const item of current){ if(item && (item.id || store === "settings")) map.set(String(item.id || "main"), item); }
+        for(const raw of incoming){
+          if(!raw) continue;
+          const id = String(raw.id || (store === "settings" ? "main" : raw.code || raw.number || (store + "_" + Date.now() + "_" + Math.random().toString(16).slice(2))));
+          const exists = map.get(id);
+          let merged;
+          if(exists){
+            merged = newer(exists, {...raw, id});
+            updated++;
+          }else{
+            merged = {...raw, id};
+            added++;
+          }
+          if(store === "settings"){
+            merged = {...(window.state?.settings || {}), ...merged, id:"main", localLogo: window.state?.settings?.localLogo || merged.localLogo || ""};
+          }
+          const saved = await putStoreItem(store, merged);
+          await enqueueImported(store, saved);
+        }
+      }
+      try{ await window.loadLocalData?.(true); }catch{}
+      try{ window.renderAll?.(); }catch{}
+      try{ await compactSyncQueue(); }catch{}
+      try{ await updateSyncBadgeOperationCount(); }catch{}
+      safeToast(`تم دمج النسخة فوق الموجودة: جديد ${added} / تحديث ${updated} — لم يتم حذف أي بيانات قديمة`, 4200);
+      if(navigator.onLine) setTimeout(()=>window.syncNow?.(false), 400);
+    }catch(err){ console.error(err); safeToast("فشل استيراد النسخة الاحتياطية"); }
+    const input = $("importBackupInput");
+    if(input) input.value = "";
+  }
+  function backupEventHandler(e){
+    const exportBtn = e.target && e.target.closest && e.target.closest("#exportBackupBtn,[data-oskar-take-backup]");
+    if(exportBtn){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); exportFullBackup(); return; }
+  }
+  window.addEventListener("click", backupEventHandler, true);
+  window.addEventListener("change", function(e){
+    if(e.target && e.target.id === "importBackupInput"){
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      mergeBackupFile(e.target.files && e.target.files[0]);
+    }
+  }, true);
+
+  function ensureBackupReminder(){
+    ensureFinalStyle();
+    if($("oskarBackupReminder")) return $("oskarBackupReminder");
+    const box = document.createElement("div");
+    box.id = "oskarBackupReminder";
+    box.className = "oskar-backup-reminder";
+    box.innerHTML = `<div><b><i class="fa-solid fa-shield-halved"></i> تذكير نسخة احتياطية</b><small>مرّت 12 ساعة تقريباً. خذ نسخة كاملة لكل الموقع حتى لا تضيع البيانات.</small></div><div class="actions"><button class="take" type="button" data-oskar-take-backup="1">أخذ نسخة الآن</button><button class="later" type="button" id="oskarBackupLaterBtn">لاحقاً</button></div>`;
+    document.body.appendChild(box);
+    $("oskarBackupLaterBtn")?.addEventListener("click", ()=>{ localStorage.setItem(BACKUP_SNOOZE_KEY, String(Date.now() + 60*60*1000)); hideBackupReminder(); }, true);
+    return box;
+  }
+  function hideBackupReminder(){ $("oskarBackupReminder")?.classList.remove("show"); }
+  function checkBackupReminder(){
+    try{
+      const last = Number(localStorage.getItem(BACKUP_REMINDER_KEY) || 0);
+      const snooze = Number(localStorage.getItem(BACKUP_SNOOZE_KEY) || 0);
+      if(Date.now() < snooze) return;
+      if(!last || Date.now() - last >= TWELVE_HOURS){ ensureBackupReminder().classList.add("show"); }
+    }catch{}
+  }
+  setTimeout(checkBackupReminder, 2500);
+  setInterval(checkBackupReminder, 30*60*1000);
+
+  /* ===================== المزامنة: العدد = عمليات، ضغط الطابور، وتشغيل تلقائي عند عودة النت ===================== */
+  function syncKey(q){ return [q?.type || "set", q?.store || "", q?.itemId || q?.id || ""].join(":"); }
+  async function compactSyncQueue(){
+    if(typeof window.idbGetAll !== "function" || typeof window.idbClear !== "function" || typeof window.idbPut !== "function") return [];
+    let q = [];
+    try{ q = await window.idbGetAll("syncQueue") || []; }catch{return []}
+    const map = new Map();
+    for(const item of q){
+      const key = syncKey(item);
+      if(!key || key === "set::") continue;
+      const prev = map.get(key);
+      if(!prev) map.set(key, item);
+      else{
+        const newerItem = Number(item.createdAt || item.updatedAt || 0) >= Number(prev.createdAt || prev.updatedAt || 0) ? item : prev;
+        map.set(key, newerItem);
+      }
+    }
+    const arr = Array.from(map.values());
+    if(arr.length !== q.length){
+      try{
+        await window.idbClear("syncQueue");
+        for(const item of arr) await window.idbPut("syncQueue", item);
+      }catch(e){ console.warn("compact sync queue failed", e); }
+    }
+    return arr;
+  }
+  async function updateSyncBadgeOperationCount(){
+    let q = [];
+    try{ q = await compactSyncQueue(); }catch{}
+    if(!q.length){ try{ q = await window.idbGetAll?.("syncQueue") || []; }catch{} }
+    const ops = new Set(q.map(syncKey).filter(Boolean));
+    const count = ops.size;
+    const badge = $("syncCountBadge");
+    if(badge){
+      badge.textContent = count > 999 ? "999+" : String(count);
+      badge.title = count ? `${count} عملية مزامنة` : "لا توجد عمليات مزامنة";
+      badge.style.display = count ? "flex" : "none";
+    }
+    return count;
+  }
+  const oldRefresh = window.refreshPendingCount;
+  window.refreshPendingCount = async function(){
+    try{ return await updateSyncBadgeOperationCount(); }
+    catch(e){ try{ return await oldRefresh?.apply(this, arguments); }catch{} }
+  };
+  const oldSyncNow = window.syncNow;
+  if(typeof oldSyncNow === "function" && !oldSyncNow.__oskarMegaMallWrapped){
+    const wrapped = async function(){
+      try{ await compactSyncQueue(); await updateSyncBadgeOperationCount(); }catch{}
+      const res = await oldSyncNow.apply(this, arguments);
+      try{ await compactSyncQueue(); await updateSyncBadgeOperationCount(); }catch{}
+      return res;
+    };
+    wrapped.__oskarMegaMallWrapped = true;
+    wrapped.__old = oldSyncNow;
+    window.syncNow = wrapped;
+  }
+  window.addEventListener("online", function(){
+    safeToast("عاد الاتصال — جاري مزامنة العمليات المعلقة تلقائياً", 2200);
+    setTimeout(async()=>{ try{ await compactSyncQueue(); await window.syncNow?.(false); await updateSyncBadgeOperationCount(); }catch(e){ console.warn("online sync failed", e); } }, 450);
+  });
+  setInterval(updateSyncBadgeOperationCount, 5000);
+  setTimeout(updateSyncBadgeOperationCount, 1500);
+
+  /* ===================== التنبيهات: لا تُدخل البضاعة الناقصة داخل الجرس ===================== */
+  function unpaidLaterInvoices(){ return (window.state?.invoices || []).filter(i => i.paymentMethod === "later_app" && i.status !== "paid"); }
+  function unpaidManualDebts(){ return (window.state?.customers || []).flatMap(c => (c.manualDebts || []).filter(d => d.status !== "paid").map(d => ({...d, customerName:c.name, customerId:c.id}))); }
+  function updateNotificationsWithoutLowStock(){
+    const count = unpaidLaterInvoices().length + unpaidManualDebts().length;
+    const b = $("notifBadge");
+    if(b){
+      b.textContent = count > 999 ? "999+" : String(count);
+      b.title = count ? `${count} تنبيه ديون/تطبيق لاحق` : "لا توجد تنبيهات";
+      b.style.display = count ? "flex" : "none";
+    }
+  }
+  function openCleanNotifications(){
+    const later = unpaidLaterInvoices();
+    const manual = unpaidManualDebts();
+    const html = `
+      <div class="modal-backdrop show" id="oskarCleanNotifModal" style="z-index:2147483602">
+        <div class="modal large">
+          <div class="modal-head"><div class="modal-title"><i class="fa-solid fa-bell"></i> التنبيهات</div><button class="close-btn" id="oskarCloseCleanNotif" type="button"><i class="fa-solid fa-xmark"></i></button></div>
+          <div class="card" style="box-shadow:none;margin-bottom:12px"><h3 style="margin:0 0 10px;font-weight:900">تطبيق لاحق غير مكتمل</h3>${later.map(inv=>`<div class="debt-card" data-open-later-status="${String(inv.id || "")}"><div><div class="debt-name">فاتورة #${String(inv.number || inv.id || "-")}</div><div class="debt-sub">${String(inv.customerName || "-")} · ${money(inv.total || 0)}</div></div><span class="badge yellow">غير مكتمل</span></div>`).join("") || `<div class="muted">لا توجد فواتير تطبيق لاحق غير مكتملة</div>`}</div>
+          <div class="card" style="box-shadow:none"><h3 style="margin:0 0 10px;font-weight:900">ديون يدوية غير مكتملة</h3>${manual.map(d=>`<div class="debt-card" data-open-customer="${String(d.customerId || "")}"><div><div class="debt-name">${String(d.customerName || "عميل")}</div><div class="debt-sub">${String(d.note || "دين يدوي")} · ${money(d.amount || d.balance || 0)}</div></div><span class="badge red">دين</span></div>`).join("") || `<div class="muted">لا توجد ديون يدوية غير مكتملة</div>`}</div>
+          <div class="muted" style="margin-top:12px;text-align:center">البضاعة الناقصة لم تعد تُضاف داخل جرس التنبيهات، وتبقى موجودة فقط في تقرير البضاعة الناقصة.</div>
+        </div>
+      </div>`;
+    const old = $("oskarCleanNotifModal");
+    if(old) old.remove();
+    document.body.insertAdjacentHTML("beforeend", html);
+    $("oskarCloseCleanNotif")?.addEventListener("click", ()=>$("oskarCleanNotifModal")?.remove(), true);
+  }
+  window.addEventListener("click", function(e){
+    const n = e.target && e.target.closest && e.target.closest("#notificationsBtn");
+    if(n){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); updateNotificationsWithoutLowStock(); openCleanNotifications(); }
+  }, true);
+  setInterval(updateNotificationsWithoutLowStock, 3500);
+  setTimeout(updateNotificationsWithoutLowStock, 1200);
+
+  /* ===================== تصدير صورة/PDF أسرع: التقاط خفيف وفوري قدر الإمكان ===================== */
+  function ensureExportOverlay(){
+    ensureFinalStyle();
+    let o = $("oskarExportOverlay");
+    if(o) return o;
+    o = document.createElement("div");
+    o.id = "oskarExportOverlay";
+    o.className = "oskar-export-overlay";
+    o.innerHTML = `<div class="oskar-export-box"><div class="oskar-export-spinner"></div><div id="oskarExportText">جاري التجهيز...</div></div>`;
+    document.body.appendChild(o);
+    return o;
+  }
+  function showExportOverlay(txt){
+    const o = ensureExportOverlay();
+    const t = $("oskarExportText"); if(t) t.textContent = txt || "جاري التجهيز...";
+    o.classList.add("show");
+  }
+  function hideExportOverlay(){ $("oskarExportOverlay")?.classList.remove("show"); }
+  function dateKey(){ return new Date().toISOString().slice(0,10); }
+  function getExportSource(btn){
+    if(btn.id === "imageInvoiceBtn" || btn.id === "pdfInvoiceBtn" || btn.id === "thermalImageInvoiceBtn" || btn.id === "thermalPdfInvoiceBtn") return $("invoiceViewBox") || document.querySelector(".invoice-paper") || btn.closest(".modal") || document.body;
+    if(btn.id === "imageInvoicesBtn" || btn.id === "pdfInvoicesBtn") return $("page-invoices") || document.querySelector("#page-invoices") || document.body;
+    if(btn.id === "imageReportsBtn" || btn.id === "pdfReportsBtn") return $("page-reports") || document.querySelector("#page-reports") || document.body;
+    if(btn.matches("[data-image-customer],[data-pdf-customer]")) return btn.closest(".modal") || $("page-debts") || document.body;
+    return document.querySelector(".section.active") || document.body;
+  }
+  async function fastCanvasFromElement(src){
+    if(!window.html2canvas) throw new Error("html2canvas_not_ready");
+    const holder = document.createElement("div");
+    holder.style.cssText = "position:fixed;right:-12000px;top:0;width:1080px;background:#fff;color:#0f172a;z-index:-1;opacity:1;pointer-events:none;direction:rtl;font-family:Cairo,Arial,sans-serif";
+    const clone = src.cloneNode(true);
+    clone.style.width = "1080px";
+    clone.style.maxWidth = "1080px";
+    clone.style.background = "#fff";
+    clone.querySelectorAll("button,.no-print,.bottom-nav,.topbar,.sidebar,.fab-add,input,select,textarea").forEach(el=>{
+      if(!el.closest("table")) el.style.display = "none";
+    });
+    clone.querySelectorAll(".table-wrap").forEach(el=>{ el.style.overflow = "visible"; el.style.maxHeight = "none"; });
+    clone.querySelectorAll("table").forEach(t=>{ t.style.minWidth = "0"; t.style.width = "100%"; });
+    clone.querySelectorAll("*").forEach(el=>{ el.style.animation = "none"; el.style.transition = "none"; el.style.transform = "none"; el.style.filter = "none"; });
+    holder.appendChild(clone);
+    document.body.appendChild(holder);
+    try{
+      const imgs = $$('img', clone);
+      await Promise.race([
+        Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(r=>{ img.onload = img.onerror = r; }))),
+        new Promise(r=>setTimeout(r, 350))
+      ]);
+      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+      const w = Math.max(360, Math.ceil(clone.scrollWidth || 1080));
+      const h = Math.max(260, Math.ceil(clone.scrollHeight || clone.getBoundingClientRect().height || 800));
+      return await window.html2canvas(clone, {backgroundColor:"#ffffff", scale:0.78, useCORS:true, allowTaint:true, logging:false, imageTimeout:150, removeContainer:true, scrollX:0, scrollY:0, windowWidth:w, windowHeight:h, width:w, height:h});
+    }finally{
+      holder.remove();
+    }
+  }
+  function saveCanvasImage(canvas, filename){
+    return new Promise(resolve=>{
+      const done = (url) => { const a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 1200); resolve(); };
+      if(canvas.toBlob){ canvas.toBlob(blob => blob ? done(URL.createObjectURL(blob)) : resolve(), "image/jpeg", 0.82); }
+      else{ const a=document.createElement("a"); a.href=canvas.toDataURL("image/jpeg", .82); a.download=filename; a.click(); resolve(); }
+    });
+  }
+  async function saveCanvasPdf(canvas, filename){
+    if(!window.jspdf || !window.jspdf.jsPDF){
+      await saveCanvasImage(canvas, filename.replace(/\.pdf$/i,".jpg"));
+      safeToast("لم تجهز مكتبة PDF، تم حفظ صورة بدلاً منها بسرعة");
+      return;
+    }
+    const { jsPDF } = window.jspdf;
+    const img = canvas.toDataURL("image/jpeg", 0.78);
+    const pdf = new jsPDF("p", "mm", "a4", true);
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 4;
+    const imgW = pageW - margin * 2;
+    const imgH = canvas.height * imgW / canvas.width;
+    if(imgH <= pageH - margin * 2){
+      pdf.addImage(img, "JPEG", margin, margin, imgW, imgH, undefined, "FAST");
+    }else{
+      const usable = pageH - margin * 2;
+      let y = 0;
+      while(y < imgH){
+        pdf.addImage(img, "JPEG", margin, margin - y, imgW, imgH, undefined, "FAST");
+        y += usable;
+        if(y < imgH) pdf.addPage();
+      }
+    }
+    pdf.save(filename);
+  }
+  async function fastExport(btn, type){
+    const source = getExportSource(btn);
+    if(!source) return safeToast("لا يوجد محتوى للتصدير");
+    showExportOverlay(type === "pdf" ? "حفظ PDF سريع..." : "حفظ صورة سريع...");
+    try{
+      const canvas = await fastCanvasFromElement(source);
+      const nameBase = (btn.id || "oskar-export") + "-" + dateKey();
+      if(type === "pdf") await saveCanvasPdf(canvas, nameBase + ".pdf");
+      else await saveCanvasImage(canvas, nameBase + ".jpg");
+      safeToast("تم الحفظ بسرعة");
+    }catch(err){
+      console.error("fast export failed", err);
+      safeToast("تعذر الحفظ السريع، جرّب مرة أخرى بعد ثوانٍ");
+    }finally{ hideExportOverlay(); }
+  }
+  window.addEventListener("click", function(e){
+    const btn = e.target && e.target.closest && e.target.closest("#imageInvoiceBtn,#pdfInvoiceBtn,#thermalImageInvoiceBtn,#thermalPdfInvoiceBtn,#imageInvoicesBtn,#pdfInvoicesBtn,#imageReportsBtn,#pdfReportsBtn,[data-image-customer],[data-pdf-customer]");
+    if(!btn) return;
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    const type = (btn.id || "").toLowerCase().includes("pdf") || btn.hasAttribute("data-pdf-customer") ? "pdf" : "image";
+    fastExport(btn, type);
+  }, true);
+
+  function initFinal(){
+    ensureFinalStyle();
+    updateNotificationsWithoutLowStock();
+    updateSyncBadgeOperationCount();
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", initFinal, {once:true}); else initFinal();
+})();
+</script>
+
+</body></html>`);
       doc.close();
       setTimeout(() => { try{ frame.contentWindow.focus(); frame.contentWindow.print(); } finally{ setTimeout(()=>frame.remove(), 650); } }, 80);
     }catch(err){ console.error(err); toast("تعذر فتح الطباعة الآن"); }
@@ -18498,6 +20542,687 @@
     if(close){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); stopTurboScanner(); }
   }, true);
   document.addEventListener("visibilitychange", ()=>{ if(document.hidden && running) stopTurboScanner(); });
+})();
+</script>
+
+
+
+<script id="oskar-mega-mall-barcode-backup-sync-export-final-2026-05-05">
+(function(){
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const STORE_LIST = [
+    "products","invoices","customers","expenses","purchases","supplierPayments",
+    "paymentAccounts","employees","suppliers","workers","workerWages","accountMovements","settings"
+  ];
+  const QR_SRC = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+  const BACKUP_REMINDER_KEY = "oskar_last_full_backup_at_v2";
+  const BACKUP_SNOOZE_KEY = "oskar_backup_reminder_snooze_until_v2";
+  const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+
+  function safeToast(msg, ms){
+    try{ if(typeof window.toast === "function") return window.toast(msg, ms || 2800); }catch{}
+    let t = $("toast");
+    if(!t){
+      t = document.createElement("div");
+      t.id = "toast";
+      t.style.cssText = "position:fixed;right:16px;left:16px;bottom:26px;z-index:2147483647;background:#020617;color:#fff;border-radius:18px;padding:14px 16px;text-align:center;font-weight:900;box-shadow:0 18px 45px rgba(0,0,0,.28);font-family:Cairo,Arial,sans-serif";
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add("show");
+    t.style.display = "block";
+    clearTimeout(t.__timer);
+    t.__timer = setTimeout(()=>{ t.classList.remove("show"); t.style.display = "none"; }, ms || 2800);
+  }
+
+  function money(v){
+    try{ if(typeof window.money === "function") return window.money(v); }catch{}
+    const cur = window.state?.settings?.currency || "₪";
+    const n = Number(v || 0);
+    return cur + " " + n.toFixed(3).replace(/\.000$/, ".000");
+  }
+
+  function ensureFinalStyle(){
+    if($("oskarMegaMallFinalStyle")) return;
+    const st = document.createElement("style");
+    st.id = "oskarMegaMallFinalStyle";
+    st.textContent = `
+      .oskar-final-camera{position:fixed;inset:0;background:#000;z-index:2147483646;display:none;direction:rtl;font-family:Cairo,Arial,sans-serif;overflow:hidden}.oskar-final-camera.show{display:block}.oskar-final-reader{width:100vw;height:100vh;background:#000}.oskar-final-reader video{width:100vw!important;height:100vh!important;object-fit:cover!important}.oskar-final-reader__dashboard,#oskarFinalReader__dashboard,#oskarFinalReader__scan_region{display:none!important}.oskar-final-frame{pointer-events:none;position:fixed;top:50%;left:50%;width:min(82vw,420px);height:230px;transform:translate(-50%,-50%);border:3px solid rgba(255,255,255,.55);border-radius:26px;z-index:2147483647;transition:.15s ease;box-shadow:0 0 0 9999px rgba(0,0,0,.18),0 0 30px rgba(255,255,255,.15)}.oskar-final-frame:before,.oskar-final-frame:after{content:"";position:absolute;width:54px;height:54px;border-color:#22c55e;border-style:solid;filter:drop-shadow(0 0 12px rgba(34,197,94,.95))}.oskar-final-frame:before{top:-4px;right:-4px;border-width:6px 6px 0 0;border-radius:0 22px 0 0}.oskar-final-frame:after{left:-4px;bottom:-4px;border-width:0 0 6px 6px;border-radius:0 0 0 22px}.oskar-final-laser{position:fixed;top:50%;left:50%;width:min(72vw,360px);height:3px;transform:translate(-50%,-50%);z-index:2147483647;border-radius:999px;background:linear-gradient(90deg,transparent,#22c55e,transparent);box-shadow:0 0 22px #22c55e;animation:oskarFinalLaser 1.02s ease-in-out infinite;pointer-events:none}@keyframes oskarFinalLaser{0%,100%{transform:translate(-50%,calc(-50% - 95px));opacity:.55}50%{transform:translate(-50%,calc(-50% + 95px));opacity:1}}.oskar-final-camera.detected .oskar-final-frame{border-color:#22c55e;box-shadow:0 0 0 9999px rgba(0,0,0,.13),0 0 40px rgba(34,197,94,.9),inset 0 0 35px rgba(34,197,94,.25);animation:oskarFinalGreenPop .28s ease}@keyframes oskarFinalGreenPop{0%{transform:translate(-50%,-50%) scale(.96)}60%{transform:translate(-50%,-50%) scale(1.03)}100%{transform:translate(-50%,-50%) scale(1)}}.oskar-final-close{position:fixed;top:16px;left:16px;width:50px;height:50px;border:0;border-radius:16px;background:rgba(15,23,42,.88);color:#fff;font-size:26px;font-weight:900;z-index:2147483647}.oskar-final-title{position:fixed;top:17px;right:16px;z-index:2147483647;max-width:calc(100vw - 92px);background:rgba(15,23,42,.86);color:#fff;border-radius:16px;padding:10px 14px;font-weight:900;font-size:14px}.oskar-final-title small{display:block;color:#bbf7d0;font-size:12px;font-weight:800;margin-top:2px}.oskar-final-toast{position:fixed;right:16px;left:16px;bottom:28px;z-index:2147483647;padding:15px 18px;border-radius:18px;background:rgba(15,23,42,.96);color:#fff;font-size:16px;font-weight:900;text-align:center;box-shadow:0 18px 45px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.15);transform:translateY(130%);opacity:0;transition:.25s ease;direction:ltr}.oskar-final-toast.show{transform:translateY(0);opacity:1}.oskar-final-added{position:fixed;top:76px;right:12px;left:12px;z-index:2147483647;display:flex;gap:8px;overflow-x:auto;padding:3px}.oskar-final-chip{background:rgba(255,255,255,.96);color:#064e3b;border:1px solid #bbf7d0;border-radius:999px;padding:8px 10px;font-weight:900;font-size:12px;white-space:nowrap;box-shadow:0 12px 26px rgba(0,0,0,.22)}
+      .oskar-backup-reminder{position:fixed;right:14px;left:14px;bottom:96px;z-index:2147483600;background:rgba(255,255,255,.97);border:1px solid #d1fae5;border-radius:24px;padding:14px;box-shadow:0 22px 55px rgba(15,23,42,.18);font-family:Cairo,Arial,sans-serif;display:none;gap:12px;align-items:center;justify-content:space-between}.oskar-backup-reminder.show{display:flex}.oskar-backup-reminder b{font-weight:900;color:#064e3b}.oskar-backup-reminder small{display:block;color:#64748b;font-weight:800;line-height:1.7}.oskar-backup-reminder .actions{display:flex;gap:8px;flex-shrink:0}.oskar-backup-reminder button{border:0;border-radius:16px;padding:10px 12px;font-weight:900}.oskar-backup-reminder .take{background:#059669;color:#fff}.oskar-backup-reminder .later{background:#f1f5f9;color:#0f172a}
+      .oskar-export-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:2147483601;display:none;align-items:center;justify-content:center;font-family:Cairo,Arial,sans-serif}.oskar-export-overlay.show{display:flex}.oskar-export-box{background:#fff;border-radius:24px;padding:18px 22px;box-shadow:0 24px 70px rgba(0,0,0,.24);font-weight:900;text-align:center;min-width:240px}.oskar-export-spinner{width:38px;height:38px;border:4px solid #d1fae5;border-top-color:#059669;border-radius:999px;margin:0 auto 10px;animation:oskarExportSpin .7s linear infinite}@keyframes oskarExportSpin{to{transform:rotate(360deg)}}
+      @media(max-width:560px){.oskar-backup-reminder{align-items:flex-start;flex-direction:column}.oskar-backup-reminder .actions{width:100%}.oskar-backup-reminder button{flex:1}}
+    `;
+    document.head.appendChild(st);
+  }
+
+  /* ===================== كاميرا الباركود النهائية السريعة ===================== */
+  let scanner = null;
+  let scannerRunning = false;
+  let startPromise = null;
+  let scanMode = "sale";
+  let scanTarget = "";
+  let lastCode = "";
+  let lastTime = 0;
+  const scanSound = new Audio("./qr.mp3");
+  scanSound.preload = "auto";
+  scanSound.volume = 1;
+
+  function unlockSound(){
+    scanSound.play().then(()=>{ scanSound.pause(); scanSound.currentTime = 0; }).catch(()=>{});
+  }
+  window.addEventListener("pointerdown", unlockSound, {once:true, passive:true, capture:true});
+  window.addEventListener("touchstart", unlockSound, {once:true, passive:true, capture:true});
+
+  function showScanToast(code){
+    const t = $("oskarFinalScanToast");
+    if(!t) return;
+    t.textContent = code;
+    t.classList.add("show");
+    clearTimeout(t.__timer);
+    t.__timer = setTimeout(()=>t.classList.remove("show"), 1200);
+  }
+  function beep(){ try{ scanSound.pause(); scanSound.currentTime = 0; scanSound.play().catch(()=>{}); }catch{} }
+  function vibrate(){ try{ if(navigator.vibrate) navigator.vibrate([55,25,55]); }catch{} }
+  function markDetected(){
+    const page = $("oskarFinalCameraPage");
+    if(!page) return;
+    page.classList.add("detected");
+    clearTimeout(page.__detectedTimer);
+    page.__detectedTimer = setTimeout(()=>page.classList.remove("detected"), 520);
+  }
+  function ensureCameraDom(){
+    ensureFinalStyle();
+    let page = $("oskarFinalCameraPage");
+    if(page) return page;
+    page = document.createElement("div");
+    page.id = "oskarFinalCameraPage";
+    page.className = "oskar-final-camera";
+    page.innerHTML = `
+      <div id="oskarFinalReader" class="oskar-final-reader"></div>
+      <div class="oskar-final-frame"></div>
+      <div class="oskar-final-laser"></div>
+      <button id="oskarFinalCameraClose" class="oskar-final-close" type="button">×</button>
+      <div id="oskarFinalCameraTitle" class="oskar-final-title">قراءة باركود<small>وجّه الكاميرا نحو الباركود من أي جهة</small></div>
+      <div id="oskarFinalAdded" class="oskar-final-added"></div>
+      <div id="oskarFinalScanToast" class="oskar-final-toast"></div>`;
+    document.body.appendChild(page);
+    $("oskarFinalCameraClose")?.addEventListener("click", stopFinalScanner, {capture:true});
+    return page;
+  }
+  function loadHtml5Qr(){
+    if(window.Html5Qrcode && window.Html5QrcodeSupportedFormats) return Promise.resolve();
+    const existing = Array.from(document.scripts).find(s => String(s.src || "").includes("html5-qrcode"));
+    if(existing){
+      return new Promise((resolve,reject)=>{
+        if(window.Html5Qrcode) return resolve();
+        existing.addEventListener("load", () => resolve(), {once:true});
+        existing.addEventListener("error", reject, {once:true});
+        setTimeout(()=> window.Html5Qrcode ? resolve() : reject(new Error("html5-qrcode-timeout")), 4200);
+      });
+    }
+    return new Promise((resolve,reject)=>{
+      const s = document.createElement("script");
+      s.src = QR_SRC;
+      s.async = true;
+      s.onload = () => resolve();
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  function prepareProductBarcodeIndex(){
+    const map = new Map();
+    const list = Array.isArray(window.state?.products) ? window.state.products : [];
+    for(const p of list){
+      for(const v of [p?.barcode, p?.code, p?.id]){
+        const k = String(v || "").trim();
+        if(k && !map.has(k)) map.set(k, p);
+      }
+    }
+    window.__oskarFastBarcodeMap = map;
+    window.__oskarFastBarcodeMapSize = list.length;
+    return map;
+  }
+  function findByBarcode(code){
+    const c = String(code || "").trim();
+    if(!c) return null;
+    try{
+      if(window.__oskarFastBarcodeMapSize !== (window.state?.products || []).length) prepareProductBarcodeIndex();
+      const hit = window.__oskarFastBarcodeMap?.get(c);
+      if(hit) return hit;
+    }catch{}
+    try{ if(typeof window.getProductByBarcode === "function"){ const p = window.getProductByBarcode(c); if(p) return p; } }catch{}
+    return (window.state?.products || []).find(p => String(p.barcode || "").trim() === c || String(p.code || "").trim() === c || String(p.id || "").trim() === c) || null;
+  }
+  function addSaleProduct(product){
+    if(!product) return false;
+    try{
+      if(typeof window.addToCart === "function"){
+        window.addToCart(product);
+      }else if(window.state?.cart){
+        window.state.cart.push({ id:"cart_"+Date.now()+"_"+Math.random().toString(16).slice(2), productId:product.id, name:product.name, qty:1, price: Number(product.salePrice || product.price || 0), total:Number(product.salePrice || product.price || 0) });
+        try{ window.renderCart?.(); }catch{}
+      }
+      const chips = $("oskarFinalAdded");
+      if(chips){
+        const chip = document.createElement("div");
+        chip.className = "oskar-final-chip";
+        chip.textContent = "✓ " + (product.name || "منتج");
+        chips.prepend(chip);
+        while(chips.children.length > 7) chips.lastElementChild.remove();
+      }
+      return true;
+    }catch(err){ console.warn("add barcode product failed", err); return false; }
+  }
+  async function stopFinalScanner(){
+    startPromise = null;
+    try{ if(scanner && scannerRunning) await scanner.stop(); }catch{}
+    try{ if(scanner) await scanner.clear(); }catch{}
+    scanner = null;
+    scannerRunning = false;
+    const page = $("oskarFinalCameraPage");
+    if(page) page.classList.remove("show");
+    try{ if(window.state?.scanner){ window.state.scanner.active = false; window.state.scanner.locked = false; } }catch{}
+  }
+  function onFinalScan(decodedText, decodedResult){
+    const code = String(decodedText || "").trim();
+    const now = Date.now();
+    if(!code) return;
+    if(code === lastCode && now - lastTime < 1050) return;
+    lastCode = code;
+    lastTime = now;
+    markDetected(); beep(); vibrate(); showScanToast(code);
+    try{ window.dispatchEvent(new CustomEvent("barcode:scanned", {detail:{code, result:decodedResult}})); }catch{}
+
+    if(scanMode === "product" || scanTarget){
+      const input = $(scanTarget || "productBarcode") || $("productBarcode") || document.querySelector('input[name="barcode"],input[id*="Barcode"],input[id*="barcode"]');
+      if(input){
+        input.value = code;
+        input.dispatchEvent(new Event("input", {bubbles:true}));
+        input.dispatchEvent(new Event("change", {bubbles:true}));
+        safeToast("تمت قراءة الباركود ووضعه في خانة المنتج", 1800);
+      }
+      stopFinalScanner();
+      return;
+    }
+
+    const product = findByBarcode(code);
+    if(product){
+      addSaleProduct(product);
+      safeToast("تمت إضافة " + (product.name || "المنتج"), 1300);
+      const keepOpen = localStorage.getItem("oskar_keep_cashier_barcode_camera_open_v1") === "1";
+      if(!keepOpen) stopFinalScanner();
+    }else{
+      safeToast("لم يتم العثور على منتج بهذا الباركود", 1700);
+    }
+  }
+  async function startFinalScanner(mode="sale", target=""){
+    scanMode = mode || "sale";
+    scanTarget = target || "";
+    if(startPromise) return startPromise;
+    startPromise = (async()=>{
+      await loadHtml5Qr();
+      prepareProductBarcodeIndex();
+      await stopFinalScanner();
+      const page = ensureCameraDom();
+      const title = $("oskarFinalCameraTitle");
+      if(title) title.innerHTML = (scanMode === "product" ? "قراءة باركود المنتج" : "قراءة باركود للبيع") + "<small>وجّه الكاميرا نحو الباركود من أي جهة</small>";
+      const chips = $("oskarFinalAdded");
+      if(chips) chips.innerHTML = "";
+      const reader = $("oskarFinalReader");
+      if(reader) reader.innerHTML = "";
+      page.classList.add("show");
+      await new Promise(r => requestAnimationFrame(()=>requestAnimationFrame(r)));
+      const F = window.Html5QrcodeSupportedFormats || {};
+      const formats = [F.QR_CODE,F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.CODE_93,F.ITF,F.CODABAR,F.DATA_MATRIX,F.AZTEC,F.PDF_417].filter(Boolean);
+      scanner = new window.Html5Qrcode("oskarFinalReader", formats.length ? {formatsToSupport:formats, verbose:false} : {verbose:false});
+      const config = {
+        fps: 30,
+        qrbox: function(w,h){ return { width: Math.floor(w * 0.82), height: Math.floor(h * 0.34) }; },
+        aspectRatio: 1.7777778,
+        disableFlip: false,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        videoConstraints: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          advanced: [
+            { focusMode: "continuous" },
+            { exposureMode: "continuous" },
+            { whiteBalanceMode: "continuous" }
+          ]
+        }
+      };
+      try{
+        await Promise.race([
+          scanner.start({facingMode:"environment"}, config, onFinalScan, function(){}),
+          new Promise((_,rej)=>setTimeout(()=>rej(new Error("camera-start-timeout")), 6500))
+        ]);
+      }catch(primaryErr){
+        console.warn("fast camera primary start failed", primaryErr);
+        try{ await scanner.clear(); }catch{}
+        scanner = new window.Html5Qrcode("oskarFinalReader", formats.length ? {formatsToSupport:formats, verbose:false} : {verbose:false});
+        await scanner.start({facingMode:{ideal:"environment"}}, config, onFinalScan, function(){});
+      }
+      scannerRunning = true;
+      try{
+        const video = $("oskarFinalReader")?.querySelector("video");
+        const track = video?.srcObject?.getVideoTracks?.()[0];
+        const caps = track?.getCapabilities?.() || {};
+        const adv = [];
+        if(caps.focusMode && caps.focusMode.includes("continuous")) adv.push({focusMode:"continuous"});
+        if(caps.exposureMode && caps.exposureMode.includes("continuous")) adv.push({exposureMode:"continuous"});
+        if(caps.whiteBalanceMode && caps.whiteBalanceMode.includes("continuous")) adv.push({whiteBalanceMode:"continuous"});
+        if(adv.length) track.applyConstraints({advanced:adv}).catch(()=>{});
+      }catch{}
+      startPromise = null;
+    })().catch(async err => {
+      console.error(err);
+      startPromise = null;
+      await stopFinalScanner();
+      safeToast("اسمح باستخدام الكاميرا وتأكد أن الموقع يعمل على HTTPS", 2600);
+    });
+    return startPromise;
+  }
+
+  function cameraClickHandler(e){
+    const target = e.target && e.target.closest && e.target.closest('#openScannerBtn,#openScannerBtnSuper,[data-oskar-super-camera="sale"],[data-oskar-fast-sale],[data-oskar-super-camera="cashier"]');
+    const product = e.target && e.target.closest && e.target.closest('#scanProductBarcodeBtn,#scanProductBarcodeBtnSuper,[data-oskar-super-camera="product"],[data-oskar-fast-product]');
+    const close = e.target && e.target.closest && e.target.closest('#oskarFinalCameraClose,#floatingScannerCloseBtn,#stopScannerBtn,#barcodeTurboClose,#oskarFastClose,#patchCameraCloseBtn');
+    if(target){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); startFinalScanner("sale", ""); return; }
+    if(product){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); startFinalScanner("product", "productBarcode"); return; }
+    if(close){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); stopFinalScanner(); return; }
+  }
+  window.addEventListener("click", cameraClickHandler, true);
+  window.addEventListener("pointerdown", function(e){
+    const cameraBtn = e.target && e.target.closest && e.target.closest('#openScannerBtn,#openScannerBtnSuper,#scanProductBarcodeBtn,#scanProductBarcodeBtnSuper,[data-oskar-super-camera]');
+    if(cameraBtn){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); cameraClickHandler(e); }
+  }, true);
+  window.openScanner = function(mode, target){ return startFinalScanner(mode || "sale", target || ""); };
+  window.openFloatingProductBarcodeScanner = function(target){ return startFinalScanner("product", target || "productBarcode"); };
+  window.stopScanner = stopFinalScanner;
+  window.stopFloatingScanner = stopFinalScanner;
+  window.OSKAR_FINAL_FAST_BARCODE = startFinalScanner;
+  document.addEventListener("visibilitychange", ()=>{ if(document.hidden && scannerRunning) stopFinalScanner(); });
+  window.addEventListener("beforeunload", ()=>{ try{ if(scannerRunning && scanner) scanner.stop().catch(()=>{}); }catch{} });
+  setTimeout(()=>loadHtml5Qr().catch(()=>{}), 400);
+
+  /* ===================== النسخ الاحتياطية: دمج فوق الموجود بدون حذف القديم ===================== */
+  async function getStore(store){
+    try{ if(typeof window.idbGetAll === "function") return await window.idbGetAll(store) || []; }catch{}
+    const s = window.state || {};
+    if(store === "settings") return s.settings ? [s.settings] : [];
+    return Array.isArray(s[store]) ? s[store] : [];
+  }
+  function currentFirebaseRoot(){ return window.FIREBASE_ROOT || window.OSKAR_FIREBASE_ROOT || "cashier"; }
+  function extraStorageKey(){ return "cashier_extra_final_2026_04_29_" + currentFirebaseRoot(); }
+  function movementsStorageKey(){ return "oskar_account_movements_linked_final_2026_05_03_" + currentFirebaseRoot(); }
+  function persistNonIdbStore(store){
+    try{
+      if(["suppliers","workers","workerWages"].includes(store)){
+        const old = JSON.parse(localStorage.getItem(extraStorageKey()) || "{}");
+        localStorage.setItem(extraStorageKey(), JSON.stringify({
+          ...old,
+          suppliers: Array.isArray(window.state?.suppliers) ? window.state.suppliers : [],
+          workers: Array.isArray(window.state?.workers) ? window.state.workers : [],
+          workerWages: Array.isArray(window.state?.workerWages) ? window.state.workerWages : []
+        }));
+      }
+      if(store === "accountMovements"){
+        localStorage.setItem(movementsStorageKey(), JSON.stringify(Array.isArray(window.state?.accountMovements) ? window.state.accountMovements : []));
+      }
+    }catch(e){ console.warn("persist non-idb store failed", store, e); }
+  }
+  async function putStoreItem(store, item){
+    if(!item) return;
+    const row = store === "settings" ? {...item, id:item.id || "main"} : {...item, id:item.id || item._id || item.code || (store + "_" + Date.now() + "_" + Math.random().toString(16).slice(2))};
+    try{ if(typeof window.idbPut === "function") await window.idbPut(store, row); }catch(e){ console.warn("put store failed", store, e); }
+    const st = window.state;
+    if(st){
+      if(store === "settings") st.settings = {...(st.settings || {}), ...row, id:"main"};
+      else{
+        if(!Array.isArray(st[store])) st[store] = [];
+        const idx = st[store].findIndex(x => String(x.id) === String(row.id));
+        if(idx >= 0) st[store][idx] = {...st[store][idx], ...row};
+        else st[store].push(row);
+      }
+    }
+    return row;
+  }
+  function newer(a,b){
+    const ta = Number(a?.updatedAt || a?.createdAt || a?.date || a?.time || 0);
+    const tb = Number(b?.updatedAt || b?.createdAt || b?.date || b?.time || 0);
+    if(ta && tb) return ta >= tb ? a : b;
+    return {...(a || {}), ...(b || {})};
+  }
+  async function buildFullBackup(){
+    const data = {version:"oskar-full-site-merge-backup-2026-05-05", exportedAt:Date.now(), firebaseRoot:window.FIREBASE_ROOT || "", storageProfile:window.OSKAR_STORAGE_PROFILE || "main"};
+    for(const store of STORE_LIST){ data[store] = await getStore(store); }
+    data.settingsMain = window.state?.settings || (data.settings && data.settings[0]) || null;
+    return data;
+  }
+  function downloadJson(data, name){
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+  }
+  async function exportFullBackup(){
+    const data = await buildFullBackup();
+    const d = new Date().toISOString().slice(0,10);
+    downloadJson(data, "oskar-full-site-backup-" + d + ".json");
+    localStorage.setItem(BACKUP_REMINDER_KEY, String(Date.now()));
+    hideBackupReminder();
+    safeToast("تم أخذ نسخة احتياطية كاملة لكل الموقع", 2200);
+  }
+  async function enqueueImported(store, item){
+    try{
+      if(typeof window.enqueueSync === "function" && store !== "syncQueue"){
+        const data = store === "settings" ? {...item, localLogo:""} : item;
+        await window.enqueueSync({type:"set", store, itemId:item.id || "main", data});
+      }
+    }catch{}
+  }
+  async function mergeBackupFile(file){
+    if(!file) return;
+    try{
+      const data = JSON.parse(await file.text());
+      let added = 0, updated = 0;
+      const incomingStores = STORE_LIST.filter(s => Array.isArray(data[s]) || (s === "settings" && (data.settingsMain || data.settings)));
+      for(const store of incomingStores){
+        let incoming = Array.isArray(data[store]) ? data[store] : [];
+        if(store === "settings" && data.settingsMain) incoming = [data.settingsMain];
+        const current = await getStore(store);
+        const map = new Map();
+        for(const item of current){ if(item && (item.id || store === "settings")) map.set(String(item.id || "main"), item); }
+        for(const raw of incoming){
+          if(!raw) continue;
+          const id = String(raw.id || (store === "settings" ? "main" : raw.code || raw.number || (store + "_" + Date.now() + "_" + Math.random().toString(16).slice(2))));
+          const exists = map.get(id);
+          let merged;
+          if(exists){
+            merged = newer(exists, {...raw, id});
+            updated++;
+          }else{
+            merged = {...raw, id};
+            added++;
+          }
+          if(store === "settings"){
+            merged = {...(window.state?.settings || {}), ...merged, id:"main", localLogo: window.state?.settings?.localLogo || merged.localLogo || ""};
+          }
+          const saved = await putStoreItem(store, merged);
+          await enqueueImported(store, saved);
+        }
+      }
+      try{ await window.loadLocalData?.(true); }catch{}
+      try{ window.renderAll?.(); }catch{}
+      try{ await compactSyncQueue(); }catch{}
+      try{ await updateSyncBadgeOperationCount(); }catch{}
+      safeToast(`تم دمج النسخة فوق الموجودة: جديد ${added} / تحديث ${updated} — لم يتم حذف أي بيانات قديمة`, 4200);
+      if(navigator.onLine) setTimeout(()=>window.syncNow?.(false), 400);
+    }catch(err){ console.error(err); safeToast("فشل استيراد النسخة الاحتياطية"); }
+    const input = $("importBackupInput");
+    if(input) input.value = "";
+  }
+  function backupEventHandler(e){
+    const exportBtn = e.target && e.target.closest && e.target.closest("#exportBackupBtn,[data-oskar-take-backup]");
+    if(exportBtn){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); exportFullBackup(); return; }
+  }
+  window.addEventListener("click", backupEventHandler, true);
+  window.addEventListener("change", function(e){
+    if(e.target && e.target.id === "importBackupInput"){
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      mergeBackupFile(e.target.files && e.target.files[0]);
+    }
+  }, true);
+
+  function ensureBackupReminder(){
+    ensureFinalStyle();
+    if($("oskarBackupReminder")) return $("oskarBackupReminder");
+    const box = document.createElement("div");
+    box.id = "oskarBackupReminder";
+    box.className = "oskar-backup-reminder";
+    box.innerHTML = `<div><b><i class="fa-solid fa-shield-halved"></i> تذكير نسخة احتياطية</b><small>مرّت 12 ساعة تقريباً. خذ نسخة كاملة لكل الموقع حتى لا تضيع البيانات.</small></div><div class="actions"><button class="take" type="button" data-oskar-take-backup="1">أخذ نسخة الآن</button><button class="later" type="button" id="oskarBackupLaterBtn">لاحقاً</button></div>`;
+    document.body.appendChild(box);
+    $("oskarBackupLaterBtn")?.addEventListener("click", ()=>{ localStorage.setItem(BACKUP_SNOOZE_KEY, String(Date.now() + 60*60*1000)); hideBackupReminder(); }, true);
+    return box;
+  }
+  function hideBackupReminder(){ $("oskarBackupReminder")?.classList.remove("show"); }
+  function checkBackupReminder(){
+    try{
+      const last = Number(localStorage.getItem(BACKUP_REMINDER_KEY) || 0);
+      const snooze = Number(localStorage.getItem(BACKUP_SNOOZE_KEY) || 0);
+      if(Date.now() < snooze) return;
+      if(!last || Date.now() - last >= TWELVE_HOURS){ ensureBackupReminder().classList.add("show"); }
+    }catch{}
+  }
+  setTimeout(checkBackupReminder, 2500);
+  setInterval(checkBackupReminder, 30*60*1000);
+
+  /* ===================== المزامنة: العدد = عمليات، ضغط الطابور، وتشغيل تلقائي عند عودة النت ===================== */
+  function syncKey(q){ return [q?.type || "set", q?.store || "", q?.itemId || q?.id || ""].join(":"); }
+  async function compactSyncQueue(){
+    if(typeof window.idbGetAll !== "function" || typeof window.idbClear !== "function" || typeof window.idbPut !== "function") return [];
+    let q = [];
+    try{ q = await window.idbGetAll("syncQueue") || []; }catch{return []}
+    const map = new Map();
+    for(const item of q){
+      const key = syncKey(item);
+      if(!key || key === "set::") continue;
+      const prev = map.get(key);
+      if(!prev) map.set(key, item);
+      else{
+        const newerItem = Number(item.createdAt || item.updatedAt || 0) >= Number(prev.createdAt || prev.updatedAt || 0) ? item : prev;
+        map.set(key, newerItem);
+      }
+    }
+    const arr = Array.from(map.values());
+    if(arr.length !== q.length){
+      try{
+        await window.idbClear("syncQueue");
+        for(const item of arr) await window.idbPut("syncQueue", item);
+      }catch(e){ console.warn("compact sync queue failed", e); }
+    }
+    return arr;
+  }
+  async function updateSyncBadgeOperationCount(){
+    let q = [];
+    try{ q = await compactSyncQueue(); }catch{}
+    if(!q.length){ try{ q = await window.idbGetAll?.("syncQueue") || []; }catch{} }
+    const ops = new Set(q.map(syncKey).filter(Boolean));
+    const count = ops.size;
+    const badge = $("syncCountBadge");
+    if(badge){
+      badge.textContent = count > 999 ? "999+" : String(count);
+      badge.title = count ? `${count} عملية مزامنة` : "لا توجد عمليات مزامنة";
+      badge.style.display = count ? "flex" : "none";
+    }
+    return count;
+  }
+  const oldRefresh = window.refreshPendingCount;
+  window.refreshPendingCount = async function(){
+    try{ return await updateSyncBadgeOperationCount(); }
+    catch(e){ try{ return await oldRefresh?.apply(this, arguments); }catch{} }
+  };
+  const oldSyncNow = window.syncNow;
+  if(typeof oldSyncNow === "function" && !oldSyncNow.__oskarMegaMallWrapped){
+    const wrapped = async function(){
+      try{ await compactSyncQueue(); await updateSyncBadgeOperationCount(); }catch{}
+      const res = await oldSyncNow.apply(this, arguments);
+      try{ await compactSyncQueue(); await updateSyncBadgeOperationCount(); }catch{}
+      return res;
+    };
+    wrapped.__oskarMegaMallWrapped = true;
+    wrapped.__old = oldSyncNow;
+    window.syncNow = wrapped;
+  }
+  window.addEventListener("online", function(){
+    safeToast("عاد الاتصال — جاري مزامنة العمليات المعلقة تلقائياً", 2200);
+    setTimeout(async()=>{ try{ await compactSyncQueue(); await window.syncNow?.(false); await updateSyncBadgeOperationCount(); }catch(e){ console.warn("online sync failed", e); } }, 450);
+  });
+  setInterval(updateSyncBadgeOperationCount, 5000);
+  setTimeout(updateSyncBadgeOperationCount, 1500);
+
+  /* ===================== التنبيهات: لا تُدخل البضاعة الناقصة داخل الجرس ===================== */
+  function unpaidLaterInvoices(){ return (window.state?.invoices || []).filter(i => i.paymentMethod === "later_app" && i.status !== "paid"); }
+  function unpaidManualDebts(){ return (window.state?.customers || []).flatMap(c => (c.manualDebts || []).filter(d => d.status !== "paid").map(d => ({...d, customerName:c.name, customerId:c.id}))); }
+  function updateNotificationsWithoutLowStock(){
+    const count = unpaidLaterInvoices().length + unpaidManualDebts().length;
+    const b = $("notifBadge");
+    if(b){
+      b.textContent = count > 999 ? "999+" : String(count);
+      b.title = count ? `${count} تنبيه ديون/تطبيق لاحق` : "لا توجد تنبيهات";
+      b.style.display = count ? "flex" : "none";
+    }
+  }
+  function openCleanNotifications(){
+    const later = unpaidLaterInvoices();
+    const manual = unpaidManualDebts();
+    const html = `
+      <div class="modal-backdrop show" id="oskarCleanNotifModal" style="z-index:2147483602">
+        <div class="modal large">
+          <div class="modal-head"><div class="modal-title"><i class="fa-solid fa-bell"></i> التنبيهات</div><button class="close-btn" id="oskarCloseCleanNotif" type="button"><i class="fa-solid fa-xmark"></i></button></div>
+          <div class="card" style="box-shadow:none;margin-bottom:12px"><h3 style="margin:0 0 10px;font-weight:900">تطبيق لاحق غير مكتمل</h3>${later.map(inv=>`<div class="debt-card" data-open-later-status="${String(inv.id || "")}"><div><div class="debt-name">فاتورة #${String(inv.number || inv.id || "-")}</div><div class="debt-sub">${String(inv.customerName || "-")} · ${money(inv.total || 0)}</div></div><span class="badge yellow">غير مكتمل</span></div>`).join("") || `<div class="muted">لا توجد فواتير تطبيق لاحق غير مكتملة</div>`}</div>
+          <div class="card" style="box-shadow:none"><h3 style="margin:0 0 10px;font-weight:900">ديون يدوية غير مكتملة</h3>${manual.map(d=>`<div class="debt-card" data-open-customer="${String(d.customerId || "")}"><div><div class="debt-name">${String(d.customerName || "عميل")}</div><div class="debt-sub">${String(d.note || "دين يدوي")} · ${money(d.amount || d.balance || 0)}</div></div><span class="badge red">دين</span></div>`).join("") || `<div class="muted">لا توجد ديون يدوية غير مكتملة</div>`}</div>
+          <div class="muted" style="margin-top:12px;text-align:center">البضاعة الناقصة لم تعد تُضاف داخل جرس التنبيهات، وتبقى موجودة فقط في تقرير البضاعة الناقصة.</div>
+        </div>
+      </div>`;
+    const old = $("oskarCleanNotifModal");
+    if(old) old.remove();
+    document.body.insertAdjacentHTML("beforeend", html);
+    $("oskarCloseCleanNotif")?.addEventListener("click", ()=>$("oskarCleanNotifModal")?.remove(), true);
+  }
+  window.addEventListener("click", function(e){
+    const n = e.target && e.target.closest && e.target.closest("#notificationsBtn");
+    if(n){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); updateNotificationsWithoutLowStock(); openCleanNotifications(); }
+  }, true);
+  setInterval(updateNotificationsWithoutLowStock, 3500);
+  setTimeout(updateNotificationsWithoutLowStock, 1200);
+
+  /* ===================== تصدير صورة/PDF أسرع: التقاط خفيف وفوري قدر الإمكان ===================== */
+  function ensureExportOverlay(){
+    ensureFinalStyle();
+    let o = $("oskarExportOverlay");
+    if(o) return o;
+    o = document.createElement("div");
+    o.id = "oskarExportOverlay";
+    o.className = "oskar-export-overlay";
+    o.innerHTML = `<div class="oskar-export-box"><div class="oskar-export-spinner"></div><div id="oskarExportText">جاري التجهيز...</div></div>`;
+    document.body.appendChild(o);
+    return o;
+  }
+  function showExportOverlay(txt){
+    const o = ensureExportOverlay();
+    const t = $("oskarExportText"); if(t) t.textContent = txt || "جاري التجهيز...";
+    o.classList.add("show");
+  }
+  function hideExportOverlay(){ $("oskarExportOverlay")?.classList.remove("show"); }
+  function dateKey(){ return new Date().toISOString().slice(0,10); }
+  function getExportSource(btn){
+    if(btn.id === "imageInvoiceBtn" || btn.id === "pdfInvoiceBtn" || btn.id === "thermalImageInvoiceBtn" || btn.id === "thermalPdfInvoiceBtn") return $("invoiceViewBox") || document.querySelector(".invoice-paper") || btn.closest(".modal") || document.body;
+    if(btn.id === "imageInvoicesBtn" || btn.id === "pdfInvoicesBtn") return $("page-invoices") || document.querySelector("#page-invoices") || document.body;
+    if(btn.id === "imageReportsBtn" || btn.id === "pdfReportsBtn") return $("page-reports") || document.querySelector("#page-reports") || document.body;
+    if(btn.matches("[data-image-customer],[data-pdf-customer]")) return btn.closest(".modal") || $("page-debts") || document.body;
+    return document.querySelector(".section.active") || document.body;
+  }
+  async function fastCanvasFromElement(src){
+    if(!window.html2canvas) throw new Error("html2canvas_not_ready");
+    const holder = document.createElement("div");
+    holder.style.cssText = "position:fixed;right:-12000px;top:0;width:1080px;background:#fff;color:#0f172a;z-index:-1;opacity:1;pointer-events:none;direction:rtl;font-family:Cairo,Arial,sans-serif";
+    const clone = src.cloneNode(true);
+    clone.style.width = "1080px";
+    clone.style.maxWidth = "1080px";
+    clone.style.background = "#fff";
+    clone.querySelectorAll("button,.no-print,.bottom-nav,.topbar,.sidebar,.fab-add,input,select,textarea").forEach(el=>{
+      if(!el.closest("table")) el.style.display = "none";
+    });
+    clone.querySelectorAll(".table-wrap").forEach(el=>{ el.style.overflow = "visible"; el.style.maxHeight = "none"; });
+    clone.querySelectorAll("table").forEach(t=>{ t.style.minWidth = "0"; t.style.width = "100%"; });
+    clone.querySelectorAll("*").forEach(el=>{ el.style.animation = "none"; el.style.transition = "none"; el.style.transform = "none"; el.style.filter = "none"; });
+    holder.appendChild(clone);
+    document.body.appendChild(holder);
+    try{
+      const imgs = $$('img', clone);
+      await Promise.race([
+        Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(r=>{ img.onload = img.onerror = r; }))),
+        new Promise(r=>setTimeout(r, 350))
+      ]);
+      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+      const w = Math.max(360, Math.ceil(clone.scrollWidth || 1080));
+      const h = Math.max(260, Math.ceil(clone.scrollHeight || clone.getBoundingClientRect().height || 800));
+      return await window.html2canvas(clone, {backgroundColor:"#ffffff", scale:0.78, useCORS:true, allowTaint:true, logging:false, imageTimeout:150, removeContainer:true, scrollX:0, scrollY:0, windowWidth:w, windowHeight:h, width:w, height:h});
+    }finally{
+      holder.remove();
+    }
+  }
+  function saveCanvasImage(canvas, filename){
+    return new Promise(resolve=>{
+      const done = (url) => { const a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 1200); resolve(); };
+      if(canvas.toBlob){ canvas.toBlob(blob => blob ? done(URL.createObjectURL(blob)) : resolve(), "image/jpeg", 0.82); }
+      else{ const a=document.createElement("a"); a.href=canvas.toDataURL("image/jpeg", .82); a.download=filename; a.click(); resolve(); }
+    });
+  }
+  async function saveCanvasPdf(canvas, filename){
+    if(!window.jspdf || !window.jspdf.jsPDF){
+      await saveCanvasImage(canvas, filename.replace(/\.pdf$/i,".jpg"));
+      safeToast("لم تجهز مكتبة PDF، تم حفظ صورة بدلاً منها بسرعة");
+      return;
+    }
+    const { jsPDF } = window.jspdf;
+    const img = canvas.toDataURL("image/jpeg", 0.78);
+    const pdf = new jsPDF("p", "mm", "a4", true);
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 4;
+    const imgW = pageW - margin * 2;
+    const imgH = canvas.height * imgW / canvas.width;
+    if(imgH <= pageH - margin * 2){
+      pdf.addImage(img, "JPEG", margin, margin, imgW, imgH, undefined, "FAST");
+    }else{
+      const usable = pageH - margin * 2;
+      let y = 0;
+      while(y < imgH){
+        pdf.addImage(img, "JPEG", margin, margin - y, imgW, imgH, undefined, "FAST");
+        y += usable;
+        if(y < imgH) pdf.addPage();
+      }
+    }
+    pdf.save(filename);
+  }
+  async function fastExport(btn, type){
+    const source = getExportSource(btn);
+    if(!source) return safeToast("لا يوجد محتوى للتصدير");
+    showExportOverlay(type === "pdf" ? "حفظ PDF سريع..." : "حفظ صورة سريع...");
+    try{
+      const canvas = await fastCanvasFromElement(source);
+      const nameBase = (btn.id || "oskar-export") + "-" + dateKey();
+      if(type === "pdf") await saveCanvasPdf(canvas, nameBase + ".pdf");
+      else await saveCanvasImage(canvas, nameBase + ".jpg");
+      safeToast("تم الحفظ بسرعة");
+    }catch(err){
+      console.error("fast export failed", err);
+      safeToast("تعذر الحفظ السريع، جرّب مرة أخرى بعد ثوانٍ");
+    }finally{ hideExportOverlay(); }
+  }
+  window.addEventListener("click", function(e){
+    const btn = e.target && e.target.closest && e.target.closest("#imageInvoiceBtn,#pdfInvoiceBtn,#thermalImageInvoiceBtn,#thermalPdfInvoiceBtn,#imageInvoicesBtn,#pdfInvoicesBtn,#imageReportsBtn,#pdfReportsBtn,[data-image-customer],[data-pdf-customer]");
+    if(!btn) return;
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    const type = (btn.id || "").toLowerCase().includes("pdf") || btn.hasAttribute("data-pdf-customer") ? "pdf" : "image";
+    fastExport(btn, type);
+  }, true);
+
+  function initFinal(){
+    ensureFinalStyle();
+    updateNotificationsWithoutLowStock();
+    updateSyncBadgeOperationCount();
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", initFinal, {once:true}); else initFinal();
 })();
 </script>
 
