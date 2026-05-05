@@ -7182,7 +7182,63 @@
   window.downloadCustomerImage = async function(customerId){ const ticket=prepareDownloadWindow('تجهيز كشف العميل'); try{ const canvas=await canvasFromHTML(customerHTML(customerId),2); const blob=await canvasBlob(canvas,'image/png'); downloadBlob(blob,'customer.png',ticket); toast('تم تجهيز صورة كشف العميل','success'); }catch(e){console.error(e);toast('تعذر تنزيل الصورة','error');try{ticket&&ticket.close();}catch{}} };
   window.downloadCustomerPDF = async function(customerId){ const ticket=prepareDownloadWindow('تجهيز PDF'); try{ const canvas=await canvasFromHTML(customerHTML(customerId),2); await pdfFromCanvas(canvas,'customer.pdf',ticket); toast('تم تجهيز PDF','success'); }catch(e){console.error(e);toast('تعذر تنزيل PDF','error');try{ticket&&ticket.close();}catch{}} };
   window.downloadCustomerExcel = function(customerId){ try{ const c=getCustomerById(customerId)||{}; const rows=[['كشف حساب',c.name||''],['الهاتف',c.phone||''],[],['الفاتورة','التاريخ','الإجمالي','الواصل','المتبقي']]; arr2('invoices').filter(i=>i.customerId===customerId).forEach(inv=>{ const t=calculateInvoiceTotals(inv); rows.push([inv.invoiceNumber||inv.id,fmtDate(inv.date),t.total,t.paid,t.remaining]); }); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'كشف العميل'); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); downloadBlob(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'customer.xlsx'); toast('تم تنزيل Excel','success'); }catch(e){console.error(e);toast('تعذر تنزيل Excel','error');} };
-  window.downloadCustomerWord = function(customerId){ try{ downloadBlob(new Blob(['\ufeff','<!doctype html><html dir="rtl"><head><meta charset="utf-8"></head><body>'+customerHTML(customerId)+'</body></html>'],{type:'application/msword;charset=utf-8'}),'customer.doc'); toast('تم تنزيل Word','success'); }catch(e){console.error(e);toast('تعذر تنزيل Word','error');} };
+  window.downloadCustomerWord = function(customerId){ try{ downloadBlob(new Blob(['\ufeff','<!doctype html><html dir="rtl"><head><meta charset="utf-8">
+
+<style id="fee-scanner-always-top-fix-2026-05-05">
+  /* كاميرا الباركود دائمًا فوق نافذة إضافة الصنف وأي نافذة أخرى */
+  #feeScannerPage.fee-scan-page{
+    position:fixed!important;
+    inset:0!important;
+    width:100vw!important;
+    height:100dvh!important;
+    max-width:100vw!important;
+    max-height:100dvh!important;
+    background:#000!important;
+    z-index:2147483600!important;
+    overflow:hidden!important;
+    isolation:isolate!important;
+    transform:none!important;
+    margin:0!important;
+    padding:0!important;
+  }
+  #feeScannerPage.fee-scan-page.show{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
+    pointer-events:auto!important;
+  }
+  #feeScannerPage .fee-scan-reader,
+  #feeScannerPage #feeScanReader{
+    position:fixed!important;
+    inset:0!important;
+    width:100vw!important;
+    height:100dvh!important;
+    z-index:2147483601!important;
+    background:#000!important;
+  }
+  #feeScannerPage .fee-scan-reader video,
+  #feeScannerPage #feeScanReader video{
+    width:100vw!important;
+    height:100dvh!important;
+    object-fit:cover!important;
+    position:fixed!important;
+    inset:0!important;
+  }
+  #feeScannerPage .fee-scan-frame{z-index:2147483610!important;}
+  #feeScannerPage .fee-laser{z-index:2147483611!important;}
+  #feeScannerPage .fee-scan-toast{z-index:2147483612!important;}
+  #feeScannerPage .fee-scan-close{z-index:2147483613!important;}
+  body.fee-scanner-open{overflow:hidden!important;touch-action:none!important;}
+  body.fee-scanner-open #modal-root,
+  body.fee-scanner-open .modal-backdrop,
+  body.fee-scanner-open #feeSideMenu,
+  body.fee-scanner-open #feeSideBackdrop,
+  body.fee-scanner-open .bottom-nav,
+  body.fee-scanner-open header{pointer-events:none!important;}
+  body.fee-scanner-open #feeScannerPage,
+  body.fee-scanner-open #feeScannerPage *{pointer-events:auto!important;}
+</style>
+</head><body>'+customerHTML(customerId)+'</body></html>'],{type:'application/msword;charset=utf-8'}),'customer.doc'); toast('تم تنزيل Word','success'); }catch(e){console.error(e);toast('تعذر تنزيل Word','error');} };
   window.downloadAllCustomerInvoicesPDF = async function(){ const ticket=prepareDownloadWindow('تجهيز كشف الديون'); try{ const html=reportsHTML(); const canvas=await canvasFromHTML(html,2); await pdfFromCanvas(canvas,'all_customer_debts.pdf',ticket); toast('تم تجهيز كشف الديون','success'); }catch(e){console.error(e);toast('تعذر تنزيل كشف الديون','error');try{ticket&&ticket.close();}catch{}} };
   window.downloadAllCustomerInvoicesExcel = function(){ try{ const rows=[['الزبون','الهاتف','إجمالي الدين'],...arr2('customers').filter(c=>n(c.balance)>0).map(c=>[c.name,c.phone||'',n(c.balance)])]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'ديون الزبائن'); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); downloadBlob(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'all_customer_debts.xlsx'); toast('تم تنزيل Excel','success'); }catch(e){console.error(e);toast('تعذر تنزيل Excel','error');} };
   function currencyOpts(sel){ return arr2('currencies').map(c=>`<option value="${safeText(c.code)}" ${c.code===sel?'selected':''}>${safeText(c.name)} (${safeText(c.symbol||c.code)})</option>`).join(''); }
@@ -7700,6 +7756,75 @@
   setTimeout(()=>{runFixes(); observeBottom();}, 80);
   setTimeout(()=>{runFixes(); observeBottom();}, 500);
   setInterval(()=>{updateConnectionChip(); applyActiveBottomNav();}, 1500);
+})();
+</script>
+
+
+<script id="fee-scanner-open-above-modals-fix-2026-05-05">
+(function(){
+  function liftScanner(){
+    var page = document.getElementById('feeScannerPage');
+    if(!page) return;
+    try{ document.body.appendChild(page); }catch(e){}
+    page.style.setProperty('z-index','2147483600','important');
+    page.style.setProperty('position','fixed','important');
+    page.style.setProperty('inset','0','important');
+    page.style.setProperty('width','100vw','important');
+    page.style.setProperty('height','100dvh','important');
+    page.style.setProperty('overflow','hidden','important');
+  }
+
+  function patchScannerFns(){
+    if(window.__feeScannerTopPatchApplied) return true;
+    if(typeof window.openFeeScanner !== 'function' || typeof window.stopFeeScanner !== 'function') return false;
+    window.__feeScannerTopPatchApplied = true;
+    var originalOpen = window.openFeeScanner;
+    var originalStop = window.stopFeeScanner;
+
+    window.openFeeScanner = async function(){
+      document.body.classList.add('fee-scanner-open');
+      liftScanner();
+      try{
+        var result = originalOpen.apply(this, arguments);
+        liftScanner();
+        setTimeout(liftScanner, 25);
+        setTimeout(liftScanner, 150);
+        setTimeout(liftScanner, 400);
+        return await result;
+      }catch(err){
+        document.body.classList.remove('fee-scanner-open');
+        throw err;
+      }
+    };
+
+    window.stopFeeScanner = async function(){
+      try{
+        return await originalStop.apply(this, arguments);
+      }finally{
+        document.body.classList.remove('fee-scanner-open');
+      }
+    };
+    return true;
+  }
+
+  function waitPatch(){
+    if(patchScannerFns()) return;
+    var tries = 0;
+    var timer = setInterval(function(){
+      tries++;
+      if(patchScannerFns() || tries > 80) clearInterval(timer);
+    }, 100);
+  }
+
+  waitPatch();
+  document.addEventListener('click', function(e){
+    var btn = e.target && e.target.closest && e.target.closest('[onclick*="openFeeScanner"]');
+    if(btn){
+      document.body.classList.add('fee-scanner-open');
+      setTimeout(liftScanner, 0);
+      setTimeout(liftScanner, 120);
+    }
+  }, true);
 })();
 </script>
 </body>
