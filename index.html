@@ -11264,6 +11264,32 @@
       }
     }
 
+    function ensureBootEventTargets() {
+      const containerId = "oskarHiddenSafeEventTargets";
+      let box = document.getElementById(containerId);
+      if (!box) {
+        box = document.createElement("div");
+        box.id = containerId;
+        box.style.cssText = "display:none!important;width:0;height:0;overflow:hidden;position:absolute;opacity:0;pointer-events:none";
+        document.body.appendChild(box);
+      }
+      const make = (id, tag = "button", type = "button") => {
+        if (document.getElementById(id)) return;
+        const el = document.createElement(tag);
+        el.id = id;
+        if (tag === "button") el.type = type;
+        if (tag === "input" && type) el.type = type;
+        box.appendChild(el);
+      };
+      ["modalCloseBtn","openMenuBtn","quickAddBtn","syncNowBtn","closeSyncPopoverBtn","notificationsBtn","addProductBtn","addPurchaseBtn","addSupplierPaymentBtn","addExpenseBtn","addDebtCustomerBtn","addPaymentAccountBtn","addFreeLineBtn","completeSaleBtn","completeFreeInvoiceBtn","clearCartBtn","goFreeInvoiceBtn","openScannerBtn","manualBarcodeBtn","saveSettingsBtn","saveAdminPasswordBtn","exportBackupBtn","clearLocalBtn","printInvoicesBtn","imageInvoicesBtn","pdfInvoicesBtn","excelInvoicesBtn","printReportsBtn","imageReportsBtn","pdfReportsBtn","excelReportsBtn","excelInventoryBtn","excelDebtsBtn","excelPurchasesBtn","excelSupplierPaymentsBtn","excelExpensesBtn","excelLowStockBtn","topLogoutBtn","logoutBtn"].forEach(id => make(id, "button"));
+      ["cashierSearch","homeProductSearch","inventorySearch","invoiceSearch","invoiceCustomDate","debtsSearch","purchaseTableSearch","supplierPaymentsSearch","expensesSearch","reportsCustomDate","discountValue"].forEach(id => make(id, "input", id.toLowerCase().includes("date") ? "date" : "text"));
+      ["invoicePeriod","invoiceStatusFilter","debtsSort","reportsPeriod","discountType"].forEach(id => make(id, "select"));
+      make("importBackupInput", "input", "file");
+      if (!document.getElementById("modalBackdrop")) { const el = document.createElement("div"); el.id = "modalBackdrop"; box.appendChild(el); }
+      if (!document.getElementById("sidebar")) { const el = document.createElement("aside"); el.id = "sidebar"; box.appendChild(el); }
+      if (!document.getElementById("floatingScanner")) { const el = document.createElement("div"); el.id = "floatingScanner"; box.appendChild(el); }
+    }
+
     async function boot() {
       await openDB();
 
@@ -11271,8 +11297,15 @@
       ensureAuthTopButtons();
       ensureSettingsAuthBoxes();
       ensureExcelButtons();
+      ensureBootEventTargets();
 
-      bindEvents();
+      try {
+        bindEvents();
+      } catch (bindErr) {
+        console.warn("safe bindEvents recovery", bindErr);
+        ensureBootEventTargets();
+        bindEvents();
+      }
 
       updateSyncUi({
         spin: true,
@@ -12325,7 +12358,7 @@
     let page=$("patchCameraPage"); if (page) return page;
     page=document.createElement("div"); page.id="patchCameraPage"; page.className="patch-camera-page";
     page.innerHTML=`<div id="patchHtml5Reader"></div><div class="patch-scan-frame"></div><div class="patch-laser"></div><button id="patchCameraCloseBtn" class="patch-camera-close" type="button">×</button><div id="patchCameraTitle" class="patch-camera-title">قراءة باركود المنتج</div><div id="patchScanHint" class="patch-scan-hint">وجّه الكاميرا نحو الباركود</div>`;
-    document.body.appendChild(page); $("patchCameraCloseBtn").onclick=stopPatchScanner; return page;
+    document.body.appendChild(page); const closeBtn = page.querySelector("#patchCameraCloseBtn"); if (closeBtn) closeBtn.onclick = stopPatchScanner; return page;
   }
   function markDetected(){ const p=$("patchCameraPage"); if(!p)return; p.classList.add("detected"); clearTimeout(p.__timer); p.__timer=setTimeout(()=>p.classList.remove("detected"),550); }
   async function stopPatchScanner(){
@@ -13100,7 +13133,7 @@
     let page=$("oskarFastScanner"); if(page) return page;
     page=document.createElement("div"); page.id="oskarFastScanner"; page.className="oskar-fast-scanner";
     page.innerHTML=`<div id="oskarFastReader" class="oskar-fast-reader"></div><div class="oskar-fast-frame"></div><div class="oskar-fast-laser"></div><button id="oskarFastClose" class="oskar-fast-close" type="button">×</button><div id="oskarFastTitle" class="oskar-fast-title">قراءة باركود للبيع</div><div id="oskarFastAdded" class="oskar-fast-added"></div>`;
-    document.body.appendChild(page); $("oskarFastClose").onclick=()=>stopScanner(); return page;
+    document.body.appendChild(page); const closeBtn = page.querySelector("#oskarFastClose"); if (closeBtn) closeBtn.onclick = () => stopScanner(); return page;
   }
   async function stopScanner(){
     try{ if(scanner && running) await scanner.stop(); }catch{}
@@ -13173,7 +13206,7 @@
       const F = window.Html5QrcodeSupportedFormats;
       const formats = F ? [F.QR_CODE,F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.CODE_93,F.ITF,F.CODABAR,F.DATA_MATRIX,F.AZTEC,F.PDF_417] : undefined;
       scanner=new Html5Qrcode("oskarFastReader", formats?{formatsToSupport:formats,verbose:false}:undefined);
-      const fastConfig={fps:18,qrbox:(w,h)=>({width:Math.floor(Math.min(w*.88,560)),height:Math.floor(Math.min(h*.34,260))}),disableFlip:false,rememberLastUsedCamera:true,experimentalFeatures:{useBarCodeDetectorIfSupported:true},videoConstraints:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}}};
+      const fastConfig={fps:30,qrbox:(w,h)=>({width:Math.floor(w*.82),height:Math.floor(h*.34)}),aspectRatio:1.7777778,disableFlip:false,rememberLastUsedCamera:true,experimentalFeatures:{useBarCodeDetectorIfSupported:true},videoConstraints:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080},advanced:[{focusMode:"continuous"},{exposureMode:"continuous"},{whiteBalanceMode:"continuous"}]}};
       const onScan=(txt)=>{ const c=String(txt||"").trim(); const t=Date.now(); if(!c) return; if(c===lastCode && t-lastAt<900) return; lastCode=c; lastAt=t; handleCode(c); };
       const start = scanner.start({facingMode:{ideal:"environment"}}, fastConfig, onScan, ()=>{});
       await Promise.race([start, new Promise((_,rej)=>setTimeout(()=>rej(new Error("camera-start-timeout")),8500))]);
@@ -18315,6 +18348,156 @@
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, {once:true}); else init();
   document.addEventListener("visibilitychange", function(){ if(document.hidden && isRunning) stopSuperScanner(); });
   window.addEventListener("beforeunload", function(){ if(isRunning && scanner) scanner.stop().catch(()=>{}); });
+})();
+</script>
+
+
+<script id="oskar-null-onclick-and-barcode-final-guard-2026-05-05">
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  function toast(msg, ms){
+    if(typeof window.toast === "function") return window.toast(msg, ms || 2600);
+    const el = $("toast");
+    if(el){ el.textContent = msg; el.classList.add("show"); clearTimeout(el.__guardToast); el.__guardToast = setTimeout(()=>el.classList.remove("show"), ms || 2600); }
+  }
+  window.addEventListener("error", function(e){
+    const msg = String(e.message || "");
+    if(msg.includes("Cannot set properties of null") && msg.includes("onclick")){
+      e.preventDefault();
+      console.warn("تم تجاوز ربط زر غير موجود بدون إيقاف التطبيق", msg);
+      toast("تم إصلاح ربط زر ناقص تلقائياً");
+      return true;
+    }
+  }, true);
+  const QR_SOUND_SRC = "./qr.mp3";
+  const HTML5_QRCODE_SRC = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+  const scanSound = new Audio(QR_SOUND_SRC);
+  scanSound.preload = "auto";
+  scanSound.volume = 1;
+  function unlockSound(){ scanSound.play().then(()=>{ scanSound.pause(); scanSound.currentTime = 0; }).catch(()=>{}); }
+  document.addEventListener("click", unlockSound, { once:true, passive:true });
+  document.addEventListener("touchstart", unlockSound, { once:true, passive:true });
+  function beep(){ try{ scanSound.pause(); scanSound.currentTime = 0; scanSound.play().catch(()=>{}); }catch{} }
+  function vibrate(){ if(navigator.vibrate) navigator.vibrate([55,25,55]); }
+  function ensureStyle(){
+    if($("oskarBarcodeTurboFinalStyle")) return;
+    const st = document.createElement("style");
+    st.id = "oskarBarcodeTurboFinalStyle";
+    st.textContent = '.barcode-turbo-page{position:fixed;inset:0;background:#000;z-index:999999;display:none;direction:rtl}.barcode-turbo-page.show{display:block}.barcode-turbo-reader{width:100vw;height:100vh;background:#000}.barcode-turbo-reader video{width:100vw!important;height:100vh!important;object-fit:cover!important}.barcode-turbo-reader__dashboard,#barcodeTurboReader__dashboard,#barcodeTurboReader__scan_region{display:none!important}.barcode-turbo-frame{pointer-events:none;position:fixed;top:50%;left:50%;width:min(82vw,420px);height:230px;transform:translate(-50%,-50%);border:3px solid rgba(255,255,255,.55);border-radius:26px;z-index:1000001;transition:.15s ease;box-shadow:0 0 0 9999px rgba(0,0,0,.18),0 0 30px rgba(255,255,255,.15)}.barcode-turbo-frame:before,.barcode-turbo-frame:after{content:"";position:absolute;width:54px;height:54px;border-color:#22c55e;border-style:solid;filter:drop-shadow(0 0 12px rgba(34,197,94,.95))}.barcode-turbo-frame:before{top:-4px;right:-4px;border-width:6px 6px 0 0;border-radius:0 22px 0 0}.barcode-turbo-frame:after{left:-4px;bottom:-4px;border-width:0 0 6px 6px;border-radius:0 0 0 22px}.barcode-turbo-laser{position:fixed;top:50%;left:50%;width:min(72vw,360px);height:3px;transform:translate(-50%,-50%);z-index:1000002;border-radius:999px;background:linear-gradient(90deg,transparent,#22c55e,transparent);box-shadow:0 0 22px #22c55e;animation:barcodeTurboLaser 1.05s ease-in-out infinite;pointer-events:none}@keyframes barcodeTurboLaser{0%,100%{transform:translate(-50%,calc(-50% - 95px));opacity:.55}50%{transform:translate(-50%,calc(-50% + 95px));opacity:1}}.barcode-turbo-page.detected .barcode-turbo-frame{border-color:#22c55e;box-shadow:0 0 0 9999px rgba(0,0,0,.13),0 0 40px rgba(34,197,94,.9),inset 0 0 35px rgba(34,197,94,.25);animation:barcodeTurboPop .28s ease}@keyframes barcodeTurboPop{0%{transform:translate(-50%,-50%) scale(.96)}60%{transform:translate(-50%,-50%) scale(1.03)}100%{transform:translate(-50%,-50%) scale(1)}}.barcode-turbo-close{position:fixed;top:16px;left:16px;width:48px;height:48px;border:0;border-radius:16px;background:rgba(15,23,42,.86);color:#fff;font-size:25px;font-weight:900;z-index:1000005}.barcode-turbo-title{position:fixed;top:17px;right:16px;z-index:1000005;max-width:calc(100vw - 90px);background:rgba(15,23,42,.86);color:#fff;border-radius:16px;padding:10px 14px;font-family:Cairo,Arial,sans-serif;font-weight:900;font-size:14px}.barcode-turbo-hint{position:fixed;right:16px;left:16px;bottom:24px;z-index:1000005;padding:13px 16px;border-radius:18px;background:rgba(15,23,42,.88);color:#fff;font-weight:900;text-align:center;font-family:Cairo,Arial,sans-serif;border:1px solid rgba(255,255,255,.14)}';
+    document.head.appendChild(st);
+  }
+  function loadQr(){
+    if(window.Html5Qrcode) return Promise.resolve(true);
+    return new Promise((resolve,reject)=>{
+      const old = Array.from(document.scripts).find(s => (s.src || "").includes("html5-qrcode"));
+      if(old){ old.addEventListener("load", ()=>resolve(true), {once:true}); old.addEventListener("error", reject, {once:true}); setTimeout(()=>window.Html5Qrcode ? resolve(true) : reject(new Error("qr-load-timeout")), 4000); return; }
+      const sc = document.createElement("script"); sc.src = HTML5_QRCODE_SRC; sc.async = true; sc.onload = ()=>resolve(true); sc.onerror = reject; document.head.appendChild(sc);
+    });
+  }
+  function scannerDom(){
+    ensureStyle();
+    let page = $("barcodeTurboPage");
+    if(page) return page;
+    page = document.createElement("div");
+    page.id = "barcodeTurboPage";
+    page.className = "barcode-turbo-page";
+    page.innerHTML = '<div id="barcodeTurboReader" class="barcode-turbo-reader"></div><div class="barcode-turbo-frame"></div><div class="barcode-turbo-laser"></div><button id="barcodeTurboClose" class="barcode-turbo-close" type="button">×</button><div id="barcodeTurboTitle" class="barcode-turbo-title">قراءة باركود</div><div class="barcode-turbo-hint">وجّه الكاميرا نحو الباركود من أي جهة</div>';
+    document.body.appendChild(page);
+    const close = page.querySelector("#barcodeTurboClose");
+    if(close) close.onclick = () => stopTurboScanner();
+    return page;
+  }
+  let scanner = null, running = false, mode = "sale", target = "", lastCode = "", lastAt = 0;
+  async function stopTurboScanner(){
+    if(scanner && running){ try{ await scanner.stop(); }catch{} }
+    if(scanner){ try{ await scanner.clear(); }catch{} }
+    scanner = null; running = false;
+    const page = $("barcodeTurboPage");
+    if(page) page.classList.remove("show");
+    try{ if(window.state?.scanner){ window.state.scanner.locked = false; window.state.scanner.active = false; } }catch{}
+  }
+  function markDetected(){
+    const page = $("barcodeTurboPage");
+    if(!page) return;
+    page.classList.add("detected");
+    clearTimeout(page.__detectedTimer);
+    page.__detectedTimer = setTimeout(()=>page.classList.remove("detected"), 550);
+  }
+  function findProduct(code){
+    const c = String(code || "").trim();
+    if(!c) return null;
+    try{ if(typeof window.getProductByBarcode === "function"){ const p = window.getProductByBarcode(c); if(p) return p; } }catch{}
+    return (window.state?.products || []).find(p => String(p.barcode || "").trim() === c || String(p.code || "").trim() === c || String(p.id || "").trim() === c) || null;
+  }
+  function addProduct(product){
+    if(!product) return;
+    try{
+      const st = window.state;
+      const line = st?.cart?.find(x => x.productId === product.id);
+      if(line && typeof window.updateCartLine === "function") return window.updateCartLine(line.id, { qty: Number(line.qty || 0) + 1 }, true);
+      if(typeof window.addToCart === "function") return window.addToCart(product);
+    }catch{}
+  }
+  function handleCode(code){
+    code = String(code || "").trim();
+    if(!code) return;
+    markDetected(); beep(); vibrate();
+    if(mode === "product" || target){
+      const input = $(target || "productBarcode");
+      if(input){ input.value = code; input.dispatchEvent(new Event("input", {bubbles:true})); input.dispatchEvent(new Event("change", {bubbles:true})); }
+      toast("تمت قراءة الباركود ووضعه في خانة المنتج");
+      stopTurboScanner();
+      return;
+    }
+    const product = findProduct(code);
+    if(product){ addProduct(product); toast("تمت إضافة " + (product.name || "المنتج")); stopTurboScanner(); }
+    else toast("لم يتم العثور على منتج بهذا الباركود");
+  }
+  async function openTurboScanner(nextMode, inputId){
+    mode = nextMode || "sale"; target = inputId || "";
+    try{ await loadQr(); }catch{ return toast("تعذر تحميل قارئ الباركود"); }
+    if(!window.Html5Qrcode) return toast("تعذر تشغيل قارئ الباركود");
+    await stopTurboScanner();
+    const page = scannerDom();
+    const reader = $("barcodeTurboReader");
+    if(reader) reader.innerHTML = "";
+    const title = $("barcodeTurboTitle");
+    if(title) title.textContent = mode === "product" ? "قراءة باركود المنتج" : "قراءة باركود للبيع";
+    page.classList.add("show");
+    await new Promise(r => requestAnimationFrame(()=>requestAnimationFrame(r)));
+    try{
+      const F = window.Html5QrcodeSupportedFormats;
+      const formats = F ? [F.QR_CODE,F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.CODE_93,F.ITF,F.CODABAR,F.DATA_MATRIX,F.AZTEC,F.PDF_417].filter(Boolean) : undefined;
+      scanner = new window.Html5Qrcode("barcodeTurboReader", formats ? { formatsToSupport: formats, verbose:false } : { verbose:false });
+      const config = { fps:30, qrbox:(w,h)=>({ width:Math.floor(w * .82), height:Math.floor(h * .34) }), aspectRatio:1.7777778, disableFlip:false, experimentalFeatures:{ useBarCodeDetectorIfSupported:true }, videoConstraints:{ facingMode:{ ideal:"environment" }, width:{ ideal:1920 }, height:{ ideal:1080 }, advanced:[{ focusMode:"continuous" },{ exposureMode:"continuous" },{ whiteBalanceMode:"continuous" }] } };
+      const onScan = txt => { const c = String(txt || "").trim(); const t = Date.now(); if(!c) return; if(c === lastCode && t - lastAt < 1200) return; lastCode = c; lastAt = t; handleCode(c); };
+      await scanner.start({ facingMode:{ ideal:"environment" } }, config, onScan, ()=>{});
+      running = true;
+    }catch(err){
+      console.warn("turbo scanner failed, fallback", err);
+      try{
+        if(scanner){ try{ await scanner.clear(); }catch{} }
+        const reader = $("barcodeTurboReader"); if(reader) reader.innerHTML = "";
+        scanner = new window.Html5Qrcode("barcodeTurboReader", { verbose:false });
+        await scanner.start({ facingMode:"environment" }, { fps:18, qrbox:(w,h)=>({ width:Math.floor(w * .78), height:Math.floor(h * .30) }), disableFlip:false }, txt => { const c=String(txt||"").trim(); if(c) handleCode(c); }, ()=>{});
+        running = true;
+      }catch(e){ console.error(e); await stopTurboScanner(); toast("اسمح باستخدام الكاميرا وتأكد أن الرابط HTTPS"); }
+    }
+  }
+  window.openScanner = function(m, input){ return openTurboScanner(m || "sale", input || ""); };
+  window.openFloatingProductBarcodeScanner = function(input){ return openTurboScanner("product", input || "productBarcode"); };
+  window.stopScanner = stopTurboScanner;
+  window.stopFloatingScanner = stopTurboScanner;
+  document.addEventListener("click", function(e){
+    const sale = e.target.closest("#openScannerBtn");
+    const product = e.target.closest("#scanProductBarcodeBtn");
+    const close = e.target.closest("#floatingScannerCloseBtn,#stopScannerBtn,#barcodeTurboClose");
+    if(sale){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); openTurboScanner("sale", ""); return; }
+    if(product){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); openTurboScanner("product", "productBarcode"); return; }
+    if(close){ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); stopTurboScanner(); }
+  }, true);
+  document.addEventListener("visibilitychange", ()=>{ if(document.hidden && running) stopTurboScanner(); });
 })();
 </script>
 
