@@ -9587,6 +9587,255 @@
 })();
 </script>
 
+
+
+<!-- FATORA DIRECT PRINT + UNIT PRICE FINAL CORE - 2026-05-06 -->
+<style id="fee-direct-print-core-2026-05-06">
+  #feeDirectThermalArea,#feeDirectPrintArea{display:none!important;}
+  .fee-final-thermal-paper{width:76mm;max-width:76mm;background:#fff!important;color:#000!important;direction:rtl;font-family:'Cairo',Arial,sans-serif;padding:3mm 2mm;font-size:10.5px;line-height:1.55;box-sizing:border-box;filter:grayscale(1) contrast(1.25);}
+  .fee-final-thermal-paper *{color:#000!important;background:transparent!important;box-shadow:none!important;text-shadow:none!important;}
+  .fee-final-thermal-paper .logo{width:48px;height:48px;object-fit:contain;display:block;margin:0 auto 2mm;filter:grayscale(1) contrast(2.6) brightness(.86)!important;}
+  .fee-final-thermal-paper .center{text-align:center}.fee-final-thermal-paper .shop{font-weight:1000;font-size:15px;line-height:1.25}.fee-final-thermal-paper .meta{font-size:9.7px;line-height:1.7}.fee-final-thermal-paper .sep{border:0;border-top:1px dashed #000;margin:5px 0}.fee-final-thermal-paper table{width:100%;border-collapse:collapse;table-layout:fixed}.fee-final-thermal-paper th,.fee-final-thermal-paper td{font-size:9.6px;border-bottom:1px dotted #777;padding:3px 2px;text-align:right;vertical-align:top;word-break:break-word}.fee-final-thermal-paper th{font-weight:1000;border-bottom:1px solid #000}.fee-final-thermal-paper .row{display:flex;justify-content:space-between;gap:6px;padding:2px 0}.fee-final-thermal-paper .big{font-weight:1000;font-size:13.5px;border-top:1px solid #000;margin-top:3px;padding-top:4px}.fee-final-thermal-paper .foot{text-align:center;border-top:1px dashed #000;margin-top:6px;padding-top:5px;font-size:9.5px}.fee-final-thermal-paper .ltr{direction:ltr;unicode-bidi:embed;display:inline-block}
+  .fee-final-a4-paper{background:#fff;color:#0f172a;direction:rtl;font-family:'Cairo',Arial,sans-serif;width:100%;max-width:190mm;margin:0 auto;padding:8mm;box-sizing:border-box;}
+  .fee-final-a4-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;border:1px solid #dbe4ee;border-radius:16px;padding:12px 14px;margin-bottom:12px;background:#fff;}
+  .fee-final-a4-title{font-size:20px;font-weight:1000;color:#111827;line-height:1.4}.fee-final-a4-sub{font-size:12px;color:#475569;font-weight:800;line-height:1.8}.fee-final-a4-logo{width:56px;height:56px;object-fit:contain;filter:grayscale(1) contrast(1.35);}
+  .fee-final-info-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}.fee-final-info-box{border:1px solid #e2e8f0;border-radius:12px;padding:9px;background:#f8fafc}.fee-final-info-box small{display:block;color:#64748b;font-size:10px;font-weight:900}.fee-final-info-box b{display:block;color:#0f172a;font-size:13px;font-weight:1000;margin-top:3px}
+  .fee-final-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:auto}.fee-final-table th,.fee-final-table td{border:1px solid #d7dee8;padding:7px 6px;text-align:right;vertical-align:top}.fee-final-table th{background:#f1f5f9;color:#111827;font-weight:1000}.fee-final-table tfoot td{font-weight:1000;background:#f8fafc}
+  @media print{
+    body.fee-direct-thermal-printing, body.fee-direct-a4-printing{background:#fff!important;overflow:visible!important;}
+    body.fee-direct-thermal-printing > *:not(#feeDirectThermalArea){display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;}
+    body.fee-direct-thermal-printing #feeDirectThermalArea{display:block!important;visibility:visible!important;position:static!important;width:80mm!important;max-width:80mm!important;margin:0!important;padding:0!important;background:#fff!important;}
+    body.fee-direct-thermal-printing #feeDirectThermalArea *{visibility:visible!important;}
+    body.fee-direct-thermal-printing .fee-final-thermal-paper{width:76mm!important;max-width:76mm!important;margin:0!important;page-break-after:avoid!important;break-after:avoid!important;}
+    body.fee-direct-a4-printing > *:not(#feeDirectPrintArea){display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;}
+    body.fee-direct-a4-printing #feeDirectPrintArea{display:block!important;visibility:visible!important;position:static!important;width:100%!important;margin:0!important;padding:0!important;background:#fff!important;}
+    body.fee-direct-a4-printing #feeDirectPrintArea *{visibility:visible!important;}
+    body.fee-direct-a4-printing .fee-final-a4-paper{max-width:none!important;width:100%!important;margin:0!important;padding:0!important;}
+    @page feeThermalDirect{size:80mm auto;margin:0;}
+    @page feeA4Direct{size:A4;margin:10mm;}
+    body.fee-direct-thermal-printing #feeDirectThermalArea{page:feeThermalDirect;}
+    body.fee-direct-a4-printing #feeDirectPrintArea{page:feeA4Direct;}
+  }
+  @media(max-width:720px){.fee-final-info-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.fee-final-a4-head{display:block}.fee-final-table{font-size:10px}}
+</style>
+<script id="fee-direct-print-core-2026-05-06-script">
+(function(){
+  'use strict';
+  if(window.__feeDirectPrintCore20260506) return;
+  window.__feeDirectPrintCore20260506 = true;
+  const $ = id => document.getElementById(id);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const num = v => { const x = parseFloat(v); return Number.isFinite(x) ? x : 0; };
+  const arr = k => { try{ if(!state.data[k] || !Array.isArray(state.data[k])) state.data[k] = []; return state.data[k]; }catch(e){ return []; } };
+  const toast = (m,t='success') => { try{ (window.showToast || showToast)(m,t); }catch(e){ console.log(m); } };
+  const fmt = d => { try{ return (typeof formatDate === 'function' ? formatDate(d) : new Date(d).toLocaleString('ar-EG')); }catch(e){ return String(d || ''); } };
+  const money = v => { try{ return (typeof formatCurrency === 'function' ? formatCurrency(num(v)) : num(v).toLocaleString('en-US') + ' ' + (state?.data?.settings?.currency || 'شيكل')); }catch(e){ return String(v || 0); } };
+  const sanitizeFile = v => String(v || 'file').replace(/[\\/:*?"<>|]+/g,'_').slice(0,70);
+
+  function invoiceById(id){ return arr('invoices').find(i => i.id === id); }
+  function customerById(id){ return arr('customers').find(c => c.id === id); }
+  function settings(){ return state?.data?.settings || {}; }
+  function totals(inv){
+    try{ return calculateInvoiceTotals(inv); }catch(e){
+      const subtotal = num(inv?.subtotalBase ?? inv?.subtotal ?? inv?.total);
+      const discount = num(inv?.discountBase ?? inv?.discount);
+      const total = Math.max(0, num(inv?.totalBase ?? inv?.total ?? subtotal - discount));
+      const paid = num(inv?.paidBase ?? inv?.paidAmount ?? inv?.paid);
+      return {subtotal, discount, total, paid, remaining:Math.max(0,total-paid)};
+    }
+  }
+  function invoiceItems(inv){ return Array.isArray(inv?.items) ? inv.items : Array.isArray(inv?.lines) ? inv.lines : []; }
+  function logoImg(cls='logo'){
+    const s=settings();
+    return s.logo ? `<img crossorigin="anonymous" class="${cls}" src="${esc(s.logo)}" alt="logo">` : '';
+  }
+  function unitText(it){ return it.unitLabel || it.unit || (it.unitKey === 'carton' ? 'كرتونة' : 'قطعة'); }
+
+  function normalizeCartonProductFinal(p){
+    if(!p) return p;
+    const inferred = p.unitType || (String(p.unit || '').includes('كرت') ? 'carton' : String(p.unit || '').includes('كيل') ? 'kg' : String(p.unit || '').includes('لتر') ? 'liter' : 'piece');
+    p.unitType = inferred;
+    if(inferred === 'carton'){
+      const pieces = Math.max(1, Math.round(num(p.piecesPerCarton || p.cartonSize || 1)) || 1);
+      const cartonSale = num(p.salePriceCarton ?? p.cartonSalePrice ?? p.saleCartonPrice ?? p.salePrice ?? p.price);
+      const cartonCost = num(p.costPriceCarton ?? p.cartonCostPrice ?? p.costCartonPrice ?? p.costPrice ?? p.cost);
+      p.piecesPerCarton = pieces;
+      p.unit = 'كرتونة';
+      p.salePriceCarton = cartonSale;
+      p.salePrice = cartonSale;
+      p.salePricePiece = +(cartonSale / pieces).toFixed(4);
+      p.costPriceCarton = cartonCost;
+      p.costPrice = cartonCost;
+      p.costPricePiece = +(cartonCost / pieces).toFixed(4);
+    }
+    return p;
+  }
+  function normalizeProductsFinal(){ arr('products').forEach(normalizeCartonProductFinal); }
+  window.feeNormalizeCartonPricesFinal = normalizeProductsFinal;
+
+  const oldAddProductToCartPro = window.addProductToCartPro;
+  if(typeof oldAddProductToCartPro === 'function'){
+    window.addProductToCartPro = function(productId){
+      normalizeProductsFinal();
+      const p = arr('products').find(x => x.id === productId);
+      if(p) normalizeCartonProductFinal(p);
+      return oldAddProductToCartPro.apply(this, arguments);
+    };
+  }
+  const oldSetCartUnitPro = window.setCartUnitPro;
+  if(typeof oldSetCartUnitPro === 'function'){
+    window.setCartUnitPro = function(i, unitKey){
+      normalizeProductsFinal();
+      return oldSetCartUnitPro.apply(this, arguments);
+    };
+  }
+  const oldSaveProductFinal = window.saveProductPro || window.saveProduct;
+  if(typeof oldSaveProductFinal === 'function'){
+    window.saveProductPro = window.saveProduct = function(){
+      const r = oldSaveProductFinal.apply(this, arguments);
+      setTimeout(()=>{ try{ normalizeProductsFinal(); if(typeof saveAppState==='function') saveAppState(); if(typeof render==='function') render(); }catch(e){} },80);
+      return r;
+    };
+    try{ saveProductPro = window.saveProductPro; saveProduct = window.saveProduct; }catch(e){}
+  }
+
+  function thermalInvoiceHtml(invoiceId){
+    normalizeProductsFinal();
+    const inv = invoiceById(invoiceId);
+    if(!inv) return `<div class="fee-final-thermal-paper">الفاتورة غير موجودة</div>`;
+    const c = customerById(inv.customerId) || {};
+    const s = settings();
+    const t = totals(inv);
+    const rows = invoiceItems(inv).map((it,idx)=>{
+      const qty = num(it.qty ?? it.quantity ?? 1);
+      const price = num(it.priceBase ?? it.price ?? it.unitPrice ?? 0);
+      const lineTotal = num(it.totalBase ?? it.total ?? qty * price);
+      return `<tr><td style="width:37%">${idx+1}. ${esc(it.name || it.productName || it.itemName || 'صنف')}</td><td style="width:16%">${esc(unitText(it))}</td><td style="width:12%">${qty}</td><td style="width:17%">${money(price)}</td><td style="width:18%"><b>${money(lineTotal)}</b></td></tr>`;
+    }).join('') || `<tr><td colspan="5">لا توجد أصناف</td></tr>`;
+    return `<div class="fee-final-thermal-paper">
+      <div class="center">${logoImg('logo')}<div class="shop">${esc(s.shopName || s.companyName || 'اسم الشركة')}</div><div class="meta">${s.shopPhone?esc(s.shopPhone)+'<br>':''}${s.shopAddress?esc(s.shopAddress)+'<br>':''}فاتورة: <span class="ltr">${esc(inv.invoiceNumber || inv.number || inv.id)}</span><br>${esc(fmt(inv.date))}<br>العميل: ${esc(c.name || inv.customerName || 'زبون كاش')}${c.phone || inv.customerPhone ? `<br>الجوال: <span class="ltr">${esc(c.phone || inv.customerPhone)}</span>` : ''}</div></div>
+      <hr class="sep"><table><thead><tr><th>الصنف</th><th>وحدة</th><th>ك</th><th>سعر</th><th>مجموع</th></tr></thead><tbody>${rows}</tbody></table>
+      <hr class="sep"><div class="row"><span>المجموع</span><b>${money(t.subtotal)}</b></div>${t.discount?`<div class="row"><span>الخصم</span><b>${money(t.discount)}</b></div>`:''}<div class="row big"><span>الإجمالي</span><span>${money(t.total)}</span></div><div class="row"><span>الواصل</span><b>${money(t.paid)}</b></div><div class="row"><span>المتبقي</span><b>${money(t.remaining)}</b></div>${inv.note?`<div class="meta">ملاحظة: ${esc(inv.note)}</div>`:''}<div class="foot">${esc(s.footerNote || 'شكراً لتعاملكم معنا')}</div>
+    </div>`;
+  }
+  window.buildThermalInvoiceHTML = thermalInvoiceHtml;
+  window.feeV5ThermalInvoiceHtml = thermalInvoiceHtml;
+  window.buildInvoiceHTML = thermalInvoiceHtml;
+
+  function ensureArea(id){ let area=$(id); if(!area){ area=document.createElement('div'); area.id=id; document.body.appendChild(area); } return area; }
+  function directPrint(html, mode){
+    const isThermal = mode === 'thermal';
+    const cls = isThermal ? 'fee-direct-thermal-printing' : 'fee-direct-a4-printing';
+    const area = ensureArea(isThermal ? 'feeDirectThermalArea' : 'feeDirectPrintArea');
+    area.innerHTML = html;
+    document.body.classList.add(cls);
+    const clean = () => { document.body.classList.remove(cls); area.innerHTML=''; window.removeEventListener('afterprint', clean); };
+    window.addEventListener('afterprint', clean, {once:true});
+    setTimeout(()=>{ try{ window.focus(); window.print(); }catch(e){ clean(); throw e; } setTimeout(clean,1800); },120);
+  }
+  window.printInvoice = function(invoiceId){ directPrint(thermalInvoiceHtml(invoiceId), 'thermal'); };
+
+  function customerRows(customerId){
+    const c = customerById(customerId); if(!c) return {customer:null, rows:[], balance:0};
+    try{ if(typeof rebuildCustomerBalances === 'function') rebuildCustomerBalances(); }catch(e){}
+    const rows=[];
+    arr('invoices').filter(i=>i.customerId===customerId).forEach(inv=>{ const t=totals(inv); rows.push({date:inv.date,type:'فاتورة',ref:inv.invoiceNumber || inv.id, debit:t.total, credit:t.paid, note:inv.note||''}); });
+    (c.manualDebts||[]).forEach(d=>rows.push({date:d.date,type:'دين مباشر',ref:d.note||'-',debit:num(d.amount),credit:0,note:d.note||''}));
+    (c.payments||[]).forEach(p=>rows.push({date:p.date,type:'دفعة',ref:p.note||'-',debit:0,credit:num(p.amount),note:p.note||''}));
+    rows.sort((a,b)=>new Date(a.date||0)-new Date(b.date||0));
+    let running=0;
+    rows.forEach(r=>{ running += num(r.debit) - num(r.credit); r.balance = running; });
+    return {customer:c, rows, balance:running};
+  }
+  function customerTableHtml(customerId){
+    const data = customerRows(customerId); const c=data.customer; if(!c) return '';
+    const s = settings();
+    const rows = data.rows.map(r=>`<tr><td>${esc(fmt(r.date))}</td><td>${esc(r.type)}</td><td>${esc(r.ref || '-')}</td><td>${r.debit?money(r.debit):'-'}</td><td>${r.credit?money(r.credit):'-'}</td><td><b>${money(r.balance)}</b></td></tr>`).join('') || `<tr><td colspan="6" style="text-align:center;color:#64748b;padding:18px">لا توجد حركات</td></tr>`;
+    const totalDebit = data.rows.reduce((a,r)=>a+num(r.debit),0);
+    const totalCredit = data.rows.reduce((a,r)=>a+num(r.credit),0);
+    return `<div class="fee-final-a4-paper">
+      <div class="fee-final-a4-head"><div style="display:flex;gap:12px;align-items:center">${s.logo?`<img class="fee-final-a4-logo" crossorigin="anonymous" src="${esc(s.logo)}">`:''}<div><div class="fee-final-a4-title">${esc(s.shopName || s.companyName || 'اسم الشركة')}</div><div class="fee-final-a4-sub">كشف حساب عميل مفصل<br>${esc(s.shopPhone || '')} ${s.shopAddress ? ' · '+esc(s.shopAddress) : ''}</div></div></div><div class="fee-final-a4-sub">تاريخ الطباعة<br><b>${esc(fmt(new Date().toISOString()))}</b></div></div>
+      <div class="fee-final-info-grid"><div class="fee-final-info-box"><small>اسم العميل</small><b>${esc(c.name || '-')}</b></div><div class="fee-final-info-box"><small>الجوال</small><b>${esc(c.phone || '-')}</b></div><div class="fee-final-info-box"><small>العنوان</small><b>${esc(c.address || '-')}</b></div><div class="fee-final-info-box"><small>الرصيد الحالي</small><b>${money(c.balance ?? data.balance)}</b></div></div>
+      <table class="fee-final-table"><thead><tr><th>التاريخ</th><th>النوع</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="3">الإجماليات</td><td>${money(totalDebit)}</td><td>${money(totalCredit)}</td><td>${money(c.balance ?? data.balance)}</td></tr></tfoot></table>
+    </div>`;
+  }
+  window.buildCustomerStatementHTML = customerTableHtml;
+  window.printCustomerStatement = function(customerId){ const html=customerTableHtml(customerId); if(html) directPrint(html, 'a4'); };
+  window.printCustomerCard = window.printCustomerStatement;
+
+  function downloadBlob(blob, name){
+    try{ if(typeof robustDownloadBlob === 'function') return robustDownloadBlob(blob,name); }catch(e){}
+    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
+  }
+  window.downloadCustomerPDF = function(customerId){
+    const data=customerRows(customerId); const c=data.customer; if(!c) return;
+    try{
+      const jsPDF = window.jspdf?.jsPDF || window.jsPDF; if(!jsPDF) throw new Error('jspdf');
+      const pdf = new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+      const rtl = txt => { try{ return pdf.processArabic ? pdf.processArabic(String(txt ?? '')) : String(txt ?? ''); }catch(e){ return String(txt ?? ''); } };
+      pdf.setFontSize(14); pdf.text(rtl(`كشف حساب: ${c.name || ''}`), 200, 14, {align:'right'});
+      pdf.setFontSize(10); pdf.text(rtl(`${settings().shopName || settings().companyName || ''} - ${fmt(new Date().toISOString())}`), 200, 21, {align:'right'});
+      const body=data.rows.map(r=>[rtl(fmt(r.date)), rtl(r.type), rtl(r.ref||'-'), money(r.debit||0), money(r.credit||0), money(r.balance||0)]);
+      pdf.autoTable({head:[[rtl('التاريخ'),rtl('النوع'),rtl('البيان'),rtl('مدين'),rtl('دائن'),rtl('الرصيد')]],body,styles:{fontSize:8,halign:'right'},headStyles:{halign:'right'},startY:28,theme:'grid'});
+      pdf.save(`customer_${sanitizeFile(c.name || c.id)}.pdf`);
+      toast('تم تنزيل كشف العميل PDF','success');
+    }catch(e){ console.error(e); const html=customerTableHtml(customerId); const blob=new Blob(['<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>كشف حساب</title></head><body>'+html+'</body></html>'],{type:'text/html;charset=utf-8'}); downloadBlob(blob,`customer_${sanitizeFile(c.name || c.id)}.html`); toast('تم تنزيل كشف العميل كملف جدول HTML للطباعة PDF','warning'); }
+  };
+  window.downloadCustomerImage = function(customerId){
+    const data=customerRows(customerId); const c=data.customer; if(!c) return;
+    const rowH=34, width=1200, top=170, height=Math.max(420, top + rowH*(data.rows.length+2) + 40);
+    const cols=[160,150,300,160,160,170]; const heads=['التاريخ','النوع','البيان','مدين','دائن','الرصيد'];
+    let x=width-30; const colXs=[]; cols.forEach(w=>{ colXs.push({x:x-w,w}); x-=w; });
+    const text=(v,xx,yy,size=22,weight='700')=>`<text x="${xx}" y="${yy}" font-size="${size}" font-weight="${weight}" text-anchor="end" direction="rtl" unicode-bidi="bidi-override" font-family="Cairo,Arial">${esc(v)}</text>`;
+    let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#fff"/><rect x="30" y="28" width="1140" height="92" rx="18" fill="#f8fafc" stroke="#dbe4ee"/>${text(settings().shopName||settings().companyName||'اسم الشركة',1140,62,28,'900')}${text('كشف حساب العميل: '+(c.name||''),1140,98,22,'800')}${text('الرصيد الحالي: '+money(c.balance ?? data.balance),420,80,22,'900')}`;
+    let y=top;
+    svg += `<rect x="30" y="${y-28}" width="1140" height="34" fill="#f1f5f9" stroke="#d7dee8"/>`;
+    heads.forEach((h,i)=>{ const cpos=colXs[i]; svg += text(h,cpos.x+cpos.w-10,y-5,18,'900'); });
+    data.rows.forEach((r,idx)=>{ y += rowH; svg += `<rect x="30" y="${y-28}" width="1140" height="34" fill="${idx%2?'#ffffff':'#fbfdff'}" stroke="#e5e7eb"/>`; [fmt(r.date),r.type,r.ref||'-',r.debit?money(r.debit):'-',r.credit?money(r.credit):'-',money(r.balance)].forEach((v,i)=>{ const cpos=colXs[i]; svg += text(String(v).slice(0,34),cpos.x+cpos.w-10,y-6,16,'700'); }); });
+    svg += `</svg>`;
+    downloadBlob(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}),`customer_${sanitizeFile(c.name || c.id)}.svg`);
+    toast('تم تنزيل كشف العميل كصورة جدول SVG','success');
+  };
+
+  window.printHtml = function(html){ directPrint(`<div class="fee-final-a4-paper">${html || ''}</div>`, 'a4'); };
+  window.safePrintFromCanvas = function(rendererFn){
+    try{
+      const id = state?.selectedCustomerId;
+      if(id && customerById(id)) return window.printCustomerStatement(id);
+      const invId = state?.selectedInvoiceId;
+      if(invId && invoiceById(invId)) return window.printInvoice(invId);
+    }catch(e){}
+    toast('تم إلغاء طباعة السكرين شوت. استخدم طباعة الجدول أو الفاتورة الحرارية.','warning');
+  };
+
+  function patchButtons(){
+    normalizeProductsFinal();
+    if(state?.currentScreen === 'invoiceDetail'){
+      const id = state.selectedInvoiceId;
+      $$('button,a').forEach(btn=>{
+        const txt = String(btn.textContent || '').trim();
+        if(txt.includes('طباعة')) btn.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); window.printInvoice(id); };
+        if(txt === 'PDF' || txt.includes('PDF')) btn.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); window.printInvoice(id); toast('اختر حفظ PDF من نافذة الطباعة الحرارية','warning'); };
+      });
+    }
+    if(state?.currentScreen === 'customerDetail'){
+      const cid = state.selectedCustomerId; if(!cid) return;
+      const printBtns = $$('button').filter(b=>String(b.textContent||'').includes('طباعة'));
+      printBtns.forEach(b=>{ b.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); window.printCustomerStatement(cid); }; });
+      const host = printBtns[0]?.parentElement;
+      if(host && !host.querySelector('[data-fee-final-customer-export="1"]')){
+        host.insertAdjacentHTML('beforeend', `<button data-fee-final-customer-export="1" onclick="downloadCustomerPDF('${esc(cid)}')" class="fatora-chip red"><i class="fas fa-file-pdf"></i> PDF</button><button data-fee-final-customer-export="1" onclick="downloadCustomerImage('${esc(cid)}')" class="fatora-chip green"><i class="fas fa-image"></i> صورة</button><button data-fee-final-customer-export="1" onclick="downloadCustomerExcel('${esc(cid)}')" class="fatora-chip teal"><i class="fas fa-file-excel"></i> Excel</button>`);
+      }
+    }
+  }
+  const prevRender = window.render;
+  window.render = function(){ const r = prevRender && prevRender.apply(this, arguments); setTimeout(patchButtons, 80); return r; };
+  try{ render = window.render; }catch(e){}
+  setTimeout(()=>{ try{ normalizeProductsFinal(); patchButtons(); }catch(e){} },500);
+})();
+</script>
+
 <script id="fee-pwa-install-script">
 (function(){
   'use strict';
