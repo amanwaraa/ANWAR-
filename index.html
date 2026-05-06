@@ -595,6 +595,12 @@
   body.fee-booting::before{content:"";position:fixed;inset:0;background:#f6fbfa;z-index:999999;}
   body.fee-booting::after{content:"جاري تجهيز الواجهة";position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000000;background:#fff;color:#0f766e;border:1px solid #d7efeb;border-radius:22px;padding:14px 22px;font-family:Cairo,Arial,sans-serif;font-weight:900;box-shadow:0 20px 60px rgba(15,23,42,.12);}
 </style>
+
+<style id="fee-v5-early-no-flash">
+  body.fee-v5-booting #app-container{opacity:0!important;transition:none!important;}
+  body.fee-v5-booting .glass-header,body.fee-v5-booting .bottom-nav{opacity:0!important;}
+</style>
+
 </head>
 <body class="fee-booting">
 
@@ -4205,7 +4211,7 @@
     const html = `
       <html dir="rtl" lang="ar">
       <head><meta charset="utf-8"></head>
-      <body>
+      <body class="fee-v5-booting">
         <h2>${escapeHtml(state.data.settings.shopName || state.data.settings.companyName || "")}</h2>
         <p>رقم الفاتورة: ${escapeHtml(invoice.invoiceNumber || "")}</p>
         <p>العميل: ${escapeHtml(customer?.name || "")}</p>
@@ -4232,7 +4238,314 @@
         <p>ملاحظات: ${escapeHtml(invoice.note || state.data.settings.footerNote || "")}</p>
       
 
-      </body>
+      
+<style id="fee-v5-final-fixes-style">
+  /* v5: إخفاء شريط المزامنة التلقائي عند التنقل، ولا يظهر إلا لو تم تفعيله يدوياً */
+  #top-sync-progress:not(.fee-manual-sync){display:none!important;opacity:0!important;pointer-events:none!important;}
+  body.fee-v5-booting #app-container{opacity:0!important;}
+  .fee-v5-unit-preview{grid-column:1/-1;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;border-radius:18px;padding:11px 13px;font-size:12px;font-weight:900;line-height:1.9;}
+  .fee-v5-sale-note{display:block;margin-top:4px;color:#64748b;font-size:11px;font-weight:800;line-height:1.7}
+  .fee-v5-download-frame{position:fixed;left:-200vw;top:-200vh;width:1px;height:1px;border:0;opacity:0;pointer-events:none;}
+  .fee-v5-thermal{width:76mm;max-width:76mm;margin:0;background:#fff!important;color:#000!important;font-family:'Cairo',Arial,sans-serif;direction:rtl;padding:3.5mm 2mm;font-size:10.8px;line-height:1.55;filter:grayscale(1) contrast(1.35);}
+  .fee-v5-thermal *{color:#000!important;background:transparent!important;box-shadow:none!important;text-shadow:none!important;filter:grayscale(1) contrast(1.15);}
+  .fee-v5-thermal .logo{width:52px;height:52px;object-fit:contain;display:block;margin:0 auto 2mm;filter:grayscale(1) contrast(2.4) brightness(.85)!important;}
+  .fee-v5-thermal .center{text-align:center}.fee-v5-thermal .shop{font-weight:1000;font-size:16px;line-height:1.2}.fee-v5-thermal .meta{font-size:10px;line-height:1.7}.fee-v5-thermal .sep{border:0;border-top:1px dashed #000;margin:5px 0}.fee-v5-thermal table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:4px}.fee-v5-thermal th,.fee-v5-thermal td{border-bottom:1px dotted #777;padding:3px 2px;text-align:right;vertical-align:top;font-size:10px;word-break:break-word}.fee-v5-thermal th{border-bottom:1px solid #000;font-weight:1000}.fee-v5-thermal .sum{margin-top:5px;border-top:1px dashed #000;padding-top:4px}.fee-v5-thermal .row{display:flex;justify-content:space-between;gap:8px;padding:2px 0}.fee-v5-thermal .big{font-size:14px;font-weight:1000;border-top:1px solid #000;margin-top:3px;padding-top:4px}.fee-v5-thermal .foot{text-align:center;border-top:1px dashed #000;margin-top:6px;padding-top:5px;font-size:10px}.fee-v5-thermal .ltr{direction:ltr;unicode-bidi:embed}.fee-v5-thermal .tiny{font-size:9px}
+  #feeV5PrintOnly{display:none!important;}
+  @media print{
+    @page{size:80mm auto;margin:0!important;}
+    html,body{width:80mm!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important;}
+    body.fee-v5-printing > *:not(#feeV5PrintOnly){display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;}
+    body.fee-v5-printing #feeV5PrintOnly{display:block!important;visibility:visible!important;width:80mm!important;max-width:80mm!important;margin:0!important;padding:0!important;background:#fff!important;}
+    body.fee-v5-printing #feeV5PrintOnly *{visibility:visible!important;}
+    body.fee-v5-printing #feeV5PrintOnly img{display:block!important;width:80mm!important;max-width:80mm!important;margin:0!important;padding:0!important;filter:grayscale(1) contrast(1.35)!important;}
+  }
+</style>
+<script id="fee-v5-final-fixes-script">
+(function(){
+  'use strict';
+  if(window.__feeV5FinalFixesApplied) return; window.__feeV5FinalFixesApplied = true;
+  const $ = id => document.getElementById(id);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  const esc = v => String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
+  const num = v => { const x = parseFloat(v); return isFinite(x) ? x : 0; };
+  const arr = k => { try{ if(!state.data[k]) state.data[k]=[]; return state.data[k]; }catch(e){ return []; } };
+  const nowISO = () => new Date().toISOString();
+  const toast = (m,t='success') => { try{ (window.showToast||showToast)(m,t); }catch(e){ console.log(m); } };
+  const uid = p => (p||'id')+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+  function fmt(d){ try{ return (typeof formatDate==='function'?formatDate(d):new Date(d).toLocaleString('ar-EG')); }catch(e){ return String(d||''); } }
+  function money(v){ try{ return (typeof formatCurrency==='function'?formatCurrency(num(v)):num(v).toLocaleString('en-US')+' '+(state.data.settings.currency||'')); }catch(e){ return String(v); } }
+  function baseCurCode(){ try{ if(typeof getBaseCurrency==='function') return getBaseCurrency().code; }catch(e){} return state?.data?.settings?.currencyCode || 'ILS'; }
+  function unitLabel(t){ return t==='carton'?'كرتونة':t==='kg'?'كيلو':t==='liter'?'لتر':'قطعة'; }
+  function piecesValue(){ return Math.max(1, Math.round(num($('prod-pieces')?.value)||1)); }
+  function currentProduct(id){ return arr('products').find(p=>p.id===id) || {}; }
+  function normalizeOneProduct(p){
+    if(!p) return p;
+    const unitType = p.unitType || (String(p.unit||'').includes('كرت')?'carton':String(p.unit||'').includes('كيل')?'kg':String(p.unit||'').includes('لتر')?'liter':'piece');
+    p.unitType = unitType; p.unit = unitLabel(unitType);
+    p.piecesPerCarton = Math.max(1, num(p.piecesPerCarton || p.cartonSize || 1) || 1);
+    if(unitType==='carton'){
+      const pcs = p.piecesPerCarton;
+      const saleCarton = num(p.salePriceCarton ?? p.saleCartonPrice ?? p.cartonSalePrice ?? p.salePrice ?? p.price);
+      const costCarton = num(p.costPriceCarton ?? p.costCartonPrice ?? p.cartonCostPrice ?? p.costPrice ?? p.cost);
+      p.salePriceCarton = saleCarton;
+      p.salePrice = saleCarton;            // السعر الأساسي للكرتونة، والكاشير يقسم عند اختيار قطعة
+      p.salePricePiece = +(saleCarton / pcs).toFixed(4);
+      p.costPriceCarton = costCarton;
+      p.costPrice = costCarton;            // سعر الجملة للكرتونة
+      p.costPricePiece = +(costCarton / pcs).toFixed(4);
+    }else{
+      p.salePrice = num(p.salePrice ?? p.price);
+      p.costPrice = num(p.costPrice ?? p.cost);
+      delete p.salePriceCarton; delete p.salePricePiece; delete p.costPriceCarton; delete p.costPricePiece;
+    }
+    p.stock = num(p.stock ?? p.stockBase ?? 0);
+    p.lowStock = num(p.lowStock ?? 0);
+    p.updatedAt = p.updatedAt || nowISO();
+    return p;
+  }
+  function normalizeAllProducts(){ arr('products').forEach(normalizeOneProduct); }
+
+  function persistV5(type='save', payload={}){
+    try{ normalizeAllProducts(); }catch(e){}
+    try{ if(typeof window.fatoraRebuildAccountsAndBalances==='function') window.fatoraRebuildAccountsAndBalances(false); }catch(e){}
+    try{ if(typeof window.feeFinalRebuildAccountsV3==='function') window.feeFinalRebuildAccountsV3(false); }catch(e){}
+    try{ if(typeof rebuildCustomerBalances==='function') rebuildCustomerBalances(); }catch(e){}
+    try{ if(typeof enqueueSyncOperation==='function') enqueueSyncOperation({type, payload}); }catch(e){}
+    try{ if(typeof saveAppState==='function') saveAppState(); }catch(e){}
+    clearTimeout(window.__feeV5CloudTimer);
+    window.__feeV5CloudTimer = setTimeout(async()=>{ try{ if(!isLocalOnlyMode() && navigator.onLine && typeof pushFullStateToCloud==='function') await pushFullStateToCloud(); }catch(e){ console.warn(e); } }, 450);
+  }
+
+  // لا تظهر شريط المزامنة كلما دخلت قسم
+  const oldShowTopSync = window.showTopSync;
+  window.showTopSync = function(label, percent){
+    const bar=$('top-sync-progress');
+    if(!window.__feeV5AllowSyncBar){ if(bar) bar.classList.remove('show','fee-manual-sync'); return; }
+    if(bar) bar.classList.add('fee-manual-sync');
+    return oldShowTopSync && oldShowTopSync.apply(this, arguments);
+  };
+  const oldManualSync = window.manualSync;
+  if(typeof oldManualSync==='function') window.manualSync = async function(){ window.__feeV5AllowSyncBar=true; try{ return await oldManualSync.apply(this,arguments); } finally{ setTimeout(()=>{ window.__feeV5AllowSyncBar=false; const bar=$('top-sync-progress'); if(bar) bar.classList.remove('fee-manual-sync','show'); },900); } };
+
+  // مودال إضافة/تعديل صنف منسق وصريح مثل الكود المرفوع: قطعة أو كرتونة، مع سعر كرتونة وسعر قطعة محسوب
+  window.feeV5UpdateProductUnit = function(){
+    const type = $('prod-unit-type')?.value || 'piece';
+    const cartonBox = $('prod-carton-box');
+    const costLabel = $('prod-cost')?.closest('div')?.querySelector('label');
+    const saleLabel = $('prod-sale')?.closest('div')?.querySelector('label');
+    const help = $('prod-stock-help');
+    const preview = $('fee-v5-unit-preview');
+    if(cartonBox) cartonBox.style.display = type==='carton' ? 'block' : 'none';
+    if(costLabel) costLabel.textContent = type==='carton' ? 'سعر الشراء / الجملة للكرتونة' : 'سعر الجملة للوحدة';
+    if(saleLabel) saleLabel.textContent = type==='carton' ? 'سعر البيع للكرتونة' : 'سعر البيع للوحدة';
+    if(help) help.textContent = type==='carton' ? 'اكتب عدد الكراتين، وسيتم تخزين المخزون داخلياً كقطع.' : (type==='piece'?'اكتب عدد القطع.':'يمكن إدخال كسور مثل 0.250');
+    if(preview){
+      if(type!=='carton'){ preview.style.display='none'; preview.innerHTML=''; }
+      else{
+        const pcs = piecesValue(); const cost = num($('prod-cost')?.value); const sale = num($('prod-sale')?.value);
+        preview.style.display='block';
+        preview.innerHTML = `الكرتونة = <b>${pcs}</b> قطعة<br>سعر شراء القطعة بعد القسمة: <b>${money(cost/pcs)}</b><br>سعر بيع القطعة بعد القسمة: <b>${money(sale/pcs)}</b><br><span class="fee-v5-sale-note">في الكاشير: إذا اخترت قطعة يحسب سعر القطعة، وإذا اخترت كرتونة يحسب سعر الكرتونة كاملة.</span>`;
+      }
+    }
+  };
+
+  function productStockInputValue(p){
+    if(!p || !p.id) return 0;
+    normalizeOneProduct(p);
+    return p.unitType==='carton' ? +(num(p.stock)/Math.max(1,num(p.piecesPerCarton)||1)).toFixed(3) : num(p.stock);
+  }
+  window.showProductModalPro = window.showProductModal = function(id=''){
+    normalizeAllProducts();
+    const p = normalizeOneProduct({...currentProduct(id)});
+    const unit = p.unitType || 'piece';
+    const costValue = unit==='carton' ? num(p.costPriceCarton ?? p.costPrice) : num(p.costPrice);
+    const saleValue = unit==='carton' ? num(p.salePriceCarton ?? p.salePrice) : num(p.salePrice);
+    const body = `<div class="fee-two-grid">
+      <input id="prod-id" type="hidden" value="${esc(id)}">
+      <div><label class="block text-sm font-bold mb-2">اسم الصنف</label><input id="prod-name" class="input" value="${esc(p.name||'')}"></div>
+      <div><label class="block text-sm font-bold mb-2">التصنيف</label><input id="prod-category" class="input" value="${esc(p.category||'عام')}"></div>
+      <div><label class="block text-sm font-bold mb-2">الكود</label><input id="prod-code" class="input" value="${esc(p.code||'')}"></div>
+      <div><label class="block text-sm font-bold mb-2">الباركود</label><div class="grid grid-cols-[1fr_46px] gap-2"><input id="prod-barcode" class="input" value="${esc(p.barcode||'')}"><button type="button" onclick="openFeeScanner&&openFeeScanner('prod-barcode','input')" class="btn rounded-2xl bg-slate-900 text-white"><i class="fas fa-camera"></i></button></div></div>
+      <div><label class="block text-sm font-bold mb-2">نوع البيع</label><select id="prod-unit-type" class="select" onchange="feeV5UpdateProductUnit()"><option value="piece" ${unit==='piece'?'selected':''}>قطعة</option><option value="carton" ${unit==='carton'?'selected':''}>كرتونة</option><option value="kg" ${unit==='kg'?'selected':''}>كيلو</option><option value="liter" ${unit==='liter'?'selected':''}>لتر</option></select></div>
+      <div id="prod-carton-box"><label class="block text-sm font-bold mb-2">الكرتونة تحتوي على كم قطعة</label><input id="prod-pieces" class="input" type="number" step="1" min="1" value="${esc(p.piecesPerCarton||1)}" oninput="feeV5UpdateProductUnit()"></div>
+      <div><label class="block text-sm font-bold mb-2">المخزون المدخل</label><input id="prod-stock" class="input" type="number" step="0.001" value="${esc(productStockInputValue(p))}"><div id="prod-stock-help" class="fee-input-help"></div></div>
+      <div><label class="block text-sm font-bold mb-2">حد البضاعة الناقصة</label><input id="prod-low" class="input" type="number" step="0.001" value="${esc(p.lowStock??0)}"></div>
+      <div><label class="block text-sm font-bold mb-2">سعر الجملة للوحدة</label><input id="prod-cost" class="input" type="number" step="0.01" value="${esc(costValue)}" oninput="feeV5UpdateProductUnit()"></div>
+      <div><label class="block text-sm font-bold mb-2">سعر البيع للوحدة</label><input id="prod-sale" class="input" type="number" step="0.01" value="${esc(saleValue)}" oninput="feeV5UpdateProductUnit()"></div>
+      <div id="fee-v5-unit-preview" class="fee-v5-unit-preview"></div>
+    </div>`;
+    const footer = `<div class="flex gap-2"><button onclick="closeModal()" class="btn flex-1 py-3 rounded-2xl bg-slate-100 font-bold">إلغاء</button><button onclick="saveProductPro()" class="btn flex-1 py-3 rounded-2xl bg-blue-600 text-white font-extrabold">حفظ</button></div>`;
+    try{ openModal({title:id?'تعديل صنف':'إضافة صنف',maxWidth:'820px',body,footer}); }catch(e){ console.error(e); }
+    setTimeout(window.feeV5UpdateProductUnit, 30);
+  };
+  try{ showProductModalPro=window.showProductModalPro; showProductModal=window.showProductModal; }catch(e){}
+  window.toggleProductUnitFields = window.feeV5UpdateProductUnit;
+  try{ toggleProductUnitFields=window.feeV5UpdateProductUnit; }catch(e){}
+
+  window.saveProductPro = window.saveProduct = function(){
+    const id = $('prod-id')?.value || '';
+    const name = ($('prod-name')?.value || '').trim();
+    if(!name){ toast('أدخل اسم الصنف','error'); return; }
+    const unitType = $('prod-unit-type')?.value || 'piece';
+    const pcs = piecesValue();
+    const entered = num($('prod-stock')?.value);
+    const addedStock = unitType==='carton' ? entered * pcs : entered;
+    const code = ($('prod-code')?.value||'').trim();
+    const barcode = ($('prod-barcode')?.value||'').trim();
+    let products = arr('products');
+    let idx = id ? products.findIndex(p=>p.id===id) : products.findIndex(p=>(barcode && p.barcode===barcode) || (code && p.code===code));
+    const existing = idx>=0 ? normalizeOneProduct(products[idx]) : null;
+    const isAddToExistingStock = !!existing && !id;
+    const costInput = num($('prod-cost')?.value);
+    const saleInput = num($('prod-sale')?.value);
+    const costPerPieceNew = unitType==='carton' ? costInput/pcs : costInput;
+    const salePerPieceNew = unitType==='carton' ? saleInput/pcs : saleInput;
+    const payload = {
+      id: id || existing?.id || uid('prod'), name,
+      category: ($('prod-category')?.value||'عام').trim() || 'عام',
+      code, barcode, unitType, unit: unitLabel(unitType), piecesPerCarton: pcs,
+      stock: addedStock, lowStock: num($('prod-low')?.value),
+      costPrice: unitType==='carton' ? costInput : costPerPieceNew,
+      salePrice: unitType==='carton' ? saleInput : salePerPieceNew,
+      costPriceCarton: unitType==='carton' ? costInput : undefined,
+      salePriceCarton: unitType==='carton' ? saleInput : undefined,
+      costPricePiece: unitType==='carton' ? +costPerPieceNew.toFixed(4) : undefined,
+      salePricePiece: unitType==='carton' ? +salePerPieceNew.toFixed(4) : undefined,
+      costCurrency: existing?.costCurrency || baseCurCode(), saleCurrency: existing?.saleCurrency || baseCurCode(), updatedAt: nowISO()
+    };
+    if(isAddToExistingStock){
+      const oldStock = num(existing.stock);
+      const oldPieceCost = existing.unitType==='carton' ? num(existing.costPriceCarton ?? existing.costPrice)/Math.max(1,num(existing.piecesPerCarton)||1) : num(existing.costPrice);
+      const newStock = oldStock + addedStock;
+      const avgPieceCost = newStock>0 ? ((oldStock*oldPieceCost) + (addedStock*costPerPieceNew)) / newStock : costPerPieceNew;
+      payload.stock = newStock;
+      payload.costPrice = unitType==='carton' ? +(avgPieceCost*pcs).toFixed(4) : +avgPieceCost.toFixed(4);
+      payload.costPriceCarton = unitType==='carton' ? +(avgPieceCost*pcs).toFixed(4) : undefined;
+      payload.costPricePiece = unitType==='carton' ? +avgPieceCost.toFixed(4) : undefined;
+      payload.lastCostFormula = `متوسط الجملة: (${oldStock} × ${oldPieceCost.toFixed(3)}) + (${addedStock} × ${costPerPieceNew.toFixed(3)}) ÷ ${newStock} = ${avgPieceCost.toFixed(3)}`;
+      products[idx] = normalizeOneProduct({...existing, ...payload});
+    }else if(idx>=0){
+      products[idx] = normalizeOneProduct({...existing, ...payload});
+    }else{
+      products.push(normalizeOneProduct({...payload, createdAt:nowISO()}));
+    }
+    try{ closeModal(); }catch(e){}
+    persistV5(idx>=0 ? 'edit_product' : 'add_product', {productId:payload.id});
+    try{ if(typeof refreshShortages==='function') refreshShortages(false); }catch(e){}
+    try{ render(); }catch(e){}
+    toast(isAddToExistingStock && payload.lastCostFormula ? 'تم تحديث المخزون ومتوسط الجملة' : 'تم حفظ الصنف','success');
+  };
+  try{ saveProductPro=window.saveProductPro; saveProduct=window.saveProduct; }catch(e){}
+
+  // إصلاح أسعار الكرتونة في الكاشير حتى لو الدوال القديمة محلية: المنتج نفسه يخزن سعر الكرتونة في salePrice، والقطعة salePrice/pieces.
+  const oldSetCartUnitPro = window.setCartUnitPro;
+  if(typeof oldSetCartUnitPro==='function') window.setCartUnitPro = function(i,unitKey){ normalizeAllProducts(); return oldSetCartUnitPro.apply(this, arguments); };
+  const oldAddToCart = window.addProductToCartPro;
+  if(typeof oldAddToCart==='function') window.addProductToCartPro = function(productId){ normalizeAllProducts(); return oldAddToCart.apply(this, arguments); };
+
+  // مشتريات/إضافة مخزون: متوسط سعر الجملة حسب مجموع (الكمية × السعر) ÷ إجمالي الكميات
+  const oldSavePurchase = window.savePurchasePro;
+  if(typeof oldSavePurchase==='function') window.savePurchasePro = function(){
+    const pid = $('pur-product-id')?.value || $('pur-product')?.value || '';
+    const p = arr('products').find(x=>x.id===pid);
+    const oldStock = p ? num(p.stock) : 0;
+    const oldPieceCost = p ? (p.unitType==='carton' ? num(p.costPriceCarton ?? p.costPrice)/Math.max(1,num(p.piecesPerCarton)||1) : num(p.costPrice)) : 0;
+    const r = oldSavePurchase.apply(this, arguments);
+    setTimeout(()=>{
+      try{
+        const prod = arr('products').find(x=>x.id===pid); if(!prod) return;
+        normalizeOneProduct(prod);
+        const added = Math.max(0, num(prod.stock)-oldStock);
+        const pur = arr('purchases').slice().reverse().find(x=>x.productId===pid);
+        const amount = num(pur?.amount ?? pur?.price ?? $('pur-amount')?.value);
+        if(added>0 && amount>0){
+          const newPieceCost = amount/added;
+          const finalStock = num(prod.stock);
+          const avg = finalStock>0 ? ((oldStock*oldPieceCost)+(added*newPieceCost))/finalStock : newPieceCost;
+          if(prod.unitType==='carton'){
+            const pcs=Math.max(1,num(prod.piecesPerCarton)||1);
+            prod.costPricePiece=+avg.toFixed(4); prod.costPriceCarton=+(avg*pcs).toFixed(4); prod.costPrice=prod.costPriceCarton;
+          }else prod.costPrice=+avg.toFixed(4);
+          prod.lastCostFormula=`متوسط الجملة: (${oldStock} × ${oldPieceCost.toFixed(3)}) + (${added} × ${newPieceCost.toFixed(3)}) ÷ ${finalStock} = ${avg.toFixed(3)}`;
+          persistV5('purchase_avg_cost',{productId:pid});
+        }
+      }catch(e){ console.warn(e); }
+    },120);
+    return r;
+  };
+  try{ savePurchasePro=window.savePurchasePro; }catch(e){}
+
+  function invoiceById(id){ return arr('invoices').find(i=>i.id===id); }
+  function customerById(id){ return arr('customers').find(c=>c.id===id); }
+  function totals(inv){ try{ return (typeof calculateInvoiceTotals==='function'?calculateInvoiceTotals(inv):{subtotal:num(inv?.subtotalBase??inv?.subtotal),discount:num(inv?.discountBase??inv?.discount),total:num(inv?.total??inv?.subtotalBase??inv?.subtotal),paid:num(inv?.paidBase??inv?.paidAmount),remaining:Math.max(0,num(inv?.total??inv?.subtotalBase??inv?.subtotal)-num(inv?.paidBase??inv?.paidAmount))}); }catch(e){ const total=num(inv?.total??inv?.subtotal); const paid=num(inv?.paidAmount); return {subtotal:total,discount:0,total,paid,remaining:Math.max(0,total-paid)}; } }
+  function invoiceItems(inv){ return Array.isArray(inv?.items) ? inv.items : Array.isArray(inv?.lines) ? inv.lines : []; }
+  function shopLogo(){ const s=state?.data?.settings||{}; return s.logo ? `<img class="logo" crossorigin="anonymous" src="${esc(s.logo)}">` : ''; }
+  function thermalInvoiceHtml(id){
+    const inv = invoiceById(id); if(!inv) return '<div class="fee-v5-thermal">الفاتورة غير موجودة</div>';
+    const c = customerById(inv.customerId)||{}; const t=totals(inv); const s=state.data.settings||{};
+    const rows = invoiceItems(inv).map(it=>{
+      const name=it.name||it.itemName||it.productName||'صنف'; const qty=num(it.qty??it.quantity??1); const price=num(it.price??it.unitPrice??0); const total=num(it.total??(qty*price)); const unit=it.unitLabel||it.unit||it.unitKey||'قطعة';
+      return `<tr><td style="width:38%">${esc(name)}</td><td style="width:16%">${esc(unit)}</td><td style="width:13%">${qty}</td><td style="width:16%">${money(price)}</td><td style="width:17%">${money(total)}</td></tr>`;
+    }).join('') || '<tr><td colspan="5">لا توجد أصناف</td></tr>';
+    return `<div class="fee-v5-thermal"><div class="center">${shopLogo()}<div class="shop">${esc(s.shopName||s.companyName||'')}</div><div class="meta">فاتورة: <span class="ltr">${esc(inv.invoiceNumber||inv.number||inv.id)}</span><br>${esc(fmt(inv.date))}<br>العميل: ${esc(c.name||inv.customerName||'زبون كاش')}${c.phone||inv.customerPhone?`<br>الجوال: <span class="ltr">${esc(c.phone||inv.customerPhone)}</span>`:''}</div></div><hr class="sep"><table><thead><tr><th>الصنف</th><th>وحدة</th><th>كمية</th><th>سعر</th><th>مجموع</th></tr></thead><tbody>${rows}</tbody></table><div class="sum"><div class="row"><b>الإجمالي الفرعي</b><b>${money(t.subtotal)}</b></div><div class="row"><b>الخصم</b><b>${money(t.discount)}</b></div><div class="row big"><span>الإجمالي</span><span>${money(t.total)}</span></div><div class="row"><b>الواصل</b><b>${money(t.paid)}</b></div><div class="row"><b>المتبقي</b><b>${money(t.remaining)}</b></div></div>${inv.note?`<div class="tiny">ملاحظة: ${esc(inv.note)}</div>`:''}<div class="foot">${esc(s.footerNote||'شكراً لتعاملكم معنا')}</div></div>`;
+  }
+  window.feeV5ThermalInvoiceHtml = thermalInvoiceHtml;
+
+  async function htmlToPngBlob(html){
+    const host=document.createElement('div'); host.style.cssText='position:fixed;left:-10000px;top:0;width:80mm;background:#fff;z-index:-1;'; host.innerHTML=html; document.body.appendChild(host);
+    try{ if(document.fonts && document.fonts.ready) await Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,300))]); }catch(e){}
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    try{
+      if(!window.html2canvas) throw new Error('html2canvas_not_ready');
+      const canvas=await html2canvas(host.firstElementChild||host,{scale:2.2,backgroundColor:'#ffffff',useCORS:true,allowTaint:false,logging:false});
+      return await new Promise(resolve=>canvas.toBlob(b=>resolve(b),'image/png',0.95));
+    }finally{ host.remove(); }
+  }
+  function openAndDownloadBlob(blob, filename){
+    const url=URL.createObjectURL(blob);
+    try{ window.open(url,'_blank','noopener'); }catch(e){}
+    const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); setTimeout(()=>{ a.click(); a.remove(); },60);
+    setTimeout(()=>URL.revokeObjectURL(url),8000);
+  }
+  async function invoicePngBlob(id){ return await htmlToPngBlob(thermalInvoiceHtml(id)); }
+  window.printInvoice = async function(invoiceId){
+    try{
+      const blob = await invoicePngBlob(invoiceId); const url=URL.createObjectURL(blob);
+      let area=$('feeV5PrintOnly'); if(!area){ area=document.createElement('div'); area.id='feeV5PrintOnly'; document.body.appendChild(area); }
+      area.innerHTML=`<img src="${url}" alt="thermal invoice">`;
+      document.body.classList.add('fee-v5-printing');
+      const clean=()=>{ document.body.classList.remove('fee-v5-printing'); area.innerHTML=''; URL.revokeObjectURL(url); window.removeEventListener('afterprint',clean); };
+      window.addEventListener('afterprint', clean, {once:true});
+      setTimeout(()=>{ try{ window.focus(); window.print(); }catch(e){ clean(); throw e; } setTimeout(clean,1800); },220);
+    }catch(e){ console.error(e); toast('تعذر الطباعة الحرارية','error'); }
+  };
+  window.downloadInvoiceImageV5 = async function(invoiceId){ try{ const b=await invoicePngBlob(invoiceId); openAndDownloadBlob(b,`invoice-${(invoiceById(invoiceId)?.invoiceNumber||invoiceId)}.png`); toast('تم فتح رابط الصورة وتنزيلها','success'); }catch(e){ console.error(e); toast('تعذر تنزيل الصورة','error'); } };
+  window.downloadInvoicePdfV5 = async function(invoiceId){
+    try{ const b=await invoicePngBlob(invoiceId); const img=URL.createObjectURL(b); const im=new Image(); im.src=img; await new Promise((res,rej)=>{im.onload=res; im.onerror=rej;}); const jsPDF = window.jspdf?.jsPDF || window.jsPDF; if(!jsPDF) throw new Error('jspdf'); const h=im.naturalHeight*80/im.naturalWidth; const pdf=new jsPDF({orientation:'p',unit:'mm',format:[80,Math.max(110,h)]}); pdf.addImage(img,'PNG',0,0,80,h); const blob=pdf.output('blob'); URL.revokeObjectURL(img); openAndDownloadBlob(blob,`invoice-${(invoiceById(invoiceId)?.invoiceNumber||invoiceId)}.pdf`); toast('تم فتح رابط PDF وتنزيله','success'); }catch(e){ console.error(e); toast('تعذر تنزيل PDF','error'); }
+  };
+  const oldDownloadElementImage = window.downloadElementImage;
+  window.downloadElementImage = function(element, filename){ const id=state?.selectedInvoiceId || document.querySelector('[data-invoice-id]')?.getAttribute('data-invoice-id'); if(id && invoiceById(id)) return window.downloadInvoiceImageV5(id); return oldDownloadElementImage ? oldDownloadElementImage.apply(this,arguments) : null; };
+  const oldDownloadElementPdf = window.downloadElementPdf;
+  window.downloadElementPdf = function(element, filename){ const id=state?.selectedInvoiceId || document.querySelector('[data-invoice-id]')?.getAttribute('data-invoice-id'); if(id && invoiceById(id)) return window.downloadInvoicePdfV5(id); return oldDownloadElementPdf ? oldDownloadElementPdf.apply(this,arguments) : null; };
+  const oldPrintHtml = window.printHtml;
+  window.printHtml = function(html){ const id=state?.selectedInvoiceId; if(id && invoiceById(id)) return window.printInvoice(id); return oldPrintHtml ? oldPrintHtml.apply(this,arguments) : window.print(); };
+
+  // بعد عرض تفاصيل الفاتورة اربط الأزرار القديمة بالطباعة/التنزيل الحراري، بدون سكرين لعناصر النظام
+  function patchInvoiceDetailButtons(){
+    const id=state?.selectedInvoiceId; if(!id || !invoiceById(id)) return;
+    const bind=(needle,fn)=>$$('button,a').filter(b=>String(b.textContent||'').includes(needle)).forEach(b=>{ if(!b.__feeV5Bound){ b.__feeV5Bound=true; b.onclick=(ev)=>{ev.preventDefault();ev.stopPropagation();fn(id);}; } });
+    bind('طباعة', window.printInvoice); bind('صورة', window.downloadInvoiceImageV5); bind('PDF', window.downloadInvoicePdfV5);
+  }
+
+  const prevRender = window.render;
+  window.render=function(){ const r=prevRender&&prevRender.apply(this,arguments); setTimeout(()=>{ try{ normalizeAllProducts(); patchInvoiceDetailButtons(); }catch(e){} document.body.classList.remove('fee-v5-booting'); },60); return r; };
+  try{ render=window.render; }catch(e){}
+  setTimeout(()=>{ try{ normalizeAllProducts(); patchInvoiceDetailButtons(); }catch(e){} document.body.classList.remove('fee-v5-booting'); },700);
+  window.addEventListener('load',()=>setTimeout(()=>document.body.classList.remove('fee-v5-booting'),1000));
+})();
+</script>
+
+</body>
       </html>
     `;
 
