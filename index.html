@@ -8609,9 +8609,418 @@
   const oldSaveSettings=window.saveSettings; window.saveSettings=function(){ const r=oldSaveSettings&&oldSaveSettings.apply(this,arguments); setTimeout(()=>{ try{ const c=baseCur(); state.data.settings.currency=c.name||c.symbol||state.data.settings.currency; saveAppState(); if(!isLocalOnlyMode()&&navigator.onLine) syncQueueToCloud(); }catch(e){} applyFinalTheme(); },120); return r; };
   window.setBaseCurrencyFinal=function(id){ arr('currencies').forEach(c=>c.isBase=(c.id===id)); const c=baseCur(); state.data.settings.currency=c.name||c.symbol||c.code; saveAppState(); render(); toast('تم تعيين العملة الأساسية','success'); };
   const oldRender=window.render; window.render=function(){ applyFinalTheme(); const el=$('app-container'); if(el && state.currentScreen==='inventory'){ rebuildAccountsFinal(false); renderInventoryFinal(el); return; } if(el && state.currentScreen==='invoices'){ rebuildAccountsFinal(false); renderInvoicesFinal(el); return; } if(el && state.currentScreen==='accounts'){ renderAccountsFinal(el); return; } const r=oldRender&&oldRender.apply(this,arguments); setTimeout(()=>{ applyFinalTheme(); if(state.currentScreen==='cashier'){ renderCashierProductsFinal($('fee-cashier-search')?.value||''); } $$('[onclick*="fatoraOpenInvoiceShare"],[onclick*="fatoraOpenReportsPreview"],[onclick*="fatoraOpenCustomerPreview"],#fatora-share-invoice-btn,#fatora-report-preview-btn,#fatora-customer-preview-btn').forEach(x=>x.remove()); },30); return r; };
-  setTimeout(()=>{try{applyFinalTheme(); rebuildAccountsFinal(true); render();}catch(e){console.warn(e);}},220);
+  setTimeout(()=>{try{applyFinalTheme(); if(window.feeFinalRebuildAccountsV3) window.feeFinalRebuildAccountsV3(true); else rebuildAccountsFinal(false); render();}catch(e){console.warn(e);}},220);
 })();
 </script>
 
+
+
+<style id="fee-accounting-customer-carton-v3-style">
+  .fee-account-ledger-card .fee-balance-positive{color:#15803d!important;}
+  .fee-account-ledger-card .fee-balance-negative{color:#dc2626!important;}
+  .fee-account-ledger-card .fee-balance-zero{color:#0f172a!important;}
+  .fee-product-carton-note{font-size:12px;font-weight:800;color:#0f766e;background:#ecfdf5;border:1px solid #bbf7d0;border-radius:16px;padding:10px 12px;line-height:1.8}
+  .fee-hide-piece-price-final{display:none!important;}
+</style>
+<script id="fee-accounting-customer-carton-v3-script">
+(function(){
+  'use strict';
+  if(window.__feeAccountingCustomerCartonV3) return;
+  window.__feeAccountingCustomerCartonV3 = true;
+
+  const $ = id => document.getElementById(id);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  const n = v => { const x = parseFloat(v); return Number.isFinite(x) ? x : 0; };
+  const arr = k => { if(!state.data[k] || !Array.isArray(state.data[k])) state.data[k] = []; return state.data[k]; };
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const uid2 = p => (typeof uid === 'function' ? uid(p) : (p + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,8)));
+  const now = () => new Date().toISOString();
+  const toast = (m,t='success') => { try{ showToast(m,t); }catch(e){ console.log(m); } };
+  const money = v => { try{ return formatCurrency(Number(v||0)); }catch(e){ return Number(v||0).toLocaleString('en-US') + ' ' + (state.data.settings?.currency || 'شيكل'); } };
+  const fmt = v => { try{ return formatDate(v); }catch(e){ return v ? new Date(v).toLocaleString('ar-EG') : ''; } };
+
+  function normalizeId(id){
+    if(id === 'cash' || id === 'كاش' || id === 'الصندوق') return '__cash__';
+    return id || '';
+  }
+
+  function ensureCashAccountV3(){
+    let a = arr('paymentAccounts').find(x => x.id === '__cash__' || x.isCashDefault || String(x.type||'').toLowerCase() === 'cash');
+    if(!a){
+      a = {id:'__cash__', name:'كاش / الصندوق', type:'cash', number:'', openingBalance:0, balance:0, movements:[], isCashDefault:true, createdAt:now()};
+      arr('paymentAccounts').unshift(a);
+    }
+    if(!a.id) a.id='__cash__';
+    if(String(a.type||'').toLowerCase()==='cash') a.isCashDefault = true;
+    if(!Array.isArray(a.movements)) a.movements = [];
+    return a;
+  }
+
+  function baseCurrencyCode(){
+    const list = arr('currencies');
+    const c = list.find(x=>x.isBase) || list[0];
+    return c?.code || 'ILS';
+  }
+  function currencyRate(code){
+    const list = arr('currencies');
+    const c = list.find(x=>x.code===code) || list.find(x=>x.isBase) || list[0];
+    return n(c?.rateToBase) || 1;
+  }
+  function toBaseV3(amount, code){ return n(amount) * currencyRate(code || baseCurrencyCode()); }
+
+  function movementSign(m){
+    const t = String(m?.type || m?.direction || '').toLowerCase();
+    if(['deposit','in','income','incoming','وارد','إيداع'].includes(t)) return 1;
+    if(['withdraw','out','expense','outgoing','صادر','سحب'].includes(t)) return -1;
+    return n(m?.amount) < 0 ? -1 : 1;
+  }
+  function movement(accountId, kind, amount, label, refId, date, source){
+    accountId = normalizeId(accountId);
+    const value = Math.abs(n(amount));
+    if(!accountId || !value) return null;
+    return {id:['v3',source||'src',String(refId||uid2('ref')).replace(/[^a-zA-Z0-9_\-]/g,'_'),accountId,kind].join('_'), accountId, type:kind==='in'?'deposit':'withdraw', amount:value, currency:baseCurrencyCode(), label:label||'', refId:refId||'', date:date||now(), auto:true, source:source||''};
+  }
+  function totals(inv){
+    try{ return calculateInvoiceTotals(inv); }catch(e){
+      const subtotal = n(inv?.subtotalBase ?? inv?.subtotal);
+      const discount = n(inv?.discountBase ?? inv?.discount);
+      const total = Math.max(0, subtotal - discount);
+      const paid = n(inv?.paidBase ?? inv?.paidAmount ?? inv?.paid);
+      return {subtotal, discount, total, paid, remaining:Math.max(0,total-paid)};
+    }
+  }
+  function invoiceCompleted(inv){
+    const t = totals(inv);
+    const s = String(inv?.status || '').toLowerCase();
+    return s === 'completed' || s === 'paid' || s === 'مكتملة' || (t.remaining <= 0 && t.total > 0 && t.paid > 0);
+  }
+  function isAutoLabel(label){
+    return /(فاتورة|بيع|دفعة عميل|مصروف|مشتريات|أجر|راتب|دفعة تاجر|مورد)/.test(String(label||''));
+  }
+  function manualMoveKey(m){ return [normalizeId(m.accountId), movementSign(m)>0?'deposit':'withdraw', Math.abs(n(m.amount)).toFixed(4), String(m.date||'').slice(0,19), String(m.label||'')].join('|'); }
+
+  function collectManualMovements(){
+    const collected = [];
+    const push = m => {
+      if(!m) return;
+      const accountId = normalizeId(m.accountId);
+      const amount = Math.abs(n(m.amount));
+      if(!accountId || !amount) return;
+      const manual = m.manual || m.isManual || m.source === 'manual' || (!m.auto && (!m.refId || String(m.refId).startsWith('manual')) && !isAutoLabel(m.label));
+      if(!manual) return;
+      collected.push({
+        id:m.id || ('manual_' + Math.random().toString(36).slice(2)),
+        accountId,
+        type: movementSign(m)>0 ? 'deposit' : 'withdraw',
+        amount,
+        currency:m.currency || baseCurrencyCode(),
+        label:m.label || 'حركة يدوية',
+        refId:m.refId || 'manual',
+        date:m.date || now(),
+        manual:true,
+        source:'manual'
+      });
+    };
+    arr('accountManualMovements').forEach(push);
+    arr('accountMovements').forEach(push);
+    arr('paymentAccounts').forEach(a => (Array.isArray(a.movements)?a.movements:[]).forEach(m => push({...m, accountId:a.id})));
+    const map = new Map();
+    collected.forEach(m => map.set(m.id || manualMoveKey(m), m));
+    state.data.accountManualMovements = Array.from(map.values()).sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
+    return state.data.accountManualMovements;
+  }
+
+  function accountHasSource(id, manualMoves){
+    id = normalizeId(id);
+    if(manualMoves.some(m=>normalizeId(m.accountId)===id)) return true;
+    const hasInv = arr('invoices').some(inv => normalizeId(inv.accountId || inv.paymentAccountId || inv.bankAccountId || '') === id && invoiceCompleted(inv) && totals(inv).paid > 0);
+    const hasPay = arr('customers').some(c => (c.payments||[]).some(p => normalizeId(p.accountId || p.paymentAccountId || '') === id && n(p.amount) > 0));
+    const hasOut = ['expenses','wages','purchases','supplierPayments'].some(k => arr(k).some(x => normalizeId(x.accountId || x.paymentAccountId || '') === id && n(x.amount ?? x.paidAmount ?? x.paid ?? x.price) > 0));
+    return hasInv || hasPay || hasOut;
+  }
+
+  function stableOpening(a, manualMoves){
+    if(a.id === '__cash__' || a.isCashDefault) {
+      a.openingBalance = n(a.openingBalance || 0);
+      return a.openingBalance;
+    }
+    if(a.openingBalanceV3 !== undefined && a.openingBalanceV3 !== null && a.openingBalanceV3 !== '') return n(a.openingBalanceV3);
+    if(a.openingBalance !== undefined && a.openingBalance !== null && a.openingBalance !== '') {
+      a.openingBalanceV3 = n(a.openingBalance);
+      return a.openingBalanceV3;
+    }
+    if(!accountHasSource(a.id, manualMoves) && a.balance !== undefined && a.balance !== null && a.balance !== '') a.openingBalanceV3 = n(a.balance);
+    else a.openingBalanceV3 = 0;
+    a.openingBalance = a.openingBalanceV3;
+    return a.openingBalanceV3;
+  }
+
+  function rebuildCustomerBalancesV3(){
+    const map = {};
+    arr('customers').forEach(c => { map[c.id] = 0; });
+    arr('invoices').forEach(inv => {
+      const cid = inv.customerId || '';
+      if(!cid) return;
+      map[cid] = (map[cid] || 0) + totals(inv).remaining;
+    });
+    arr('customers').forEach(c => {
+      const manualDebt = (c.manualDebts||[]).reduce((s,d)=>s+n(d.amount),0);
+      const payments = (c.payments||[]).reduce((s,p)=>s+n(p.amount),0);
+      c.balance = Number(((map[c.id] || 0) + manualDebt - payments).toFixed(4));
+    });
+  }
+  window.rebuildCustomerBalances = rebuildCustomerBalancesV3;
+  try{ rebuildCustomerBalances = rebuildCustomerBalancesV3; }catch(e){}
+
+  function rebuildAccountsV3(save=false){
+    ensureCashAccountV3();
+    rebuildCustomerBalancesV3();
+    const manual = collectManualMovements();
+    const accounts = arr('paymentAccounts');
+    accounts.forEach(a => { a.id = normalizeId(a.id) || uid2('acc'); a.openingBalance = stableOpening(a, manual); a.balance = n(a.openingBalance); a.movements = []; });
+
+    const moves = [];
+    manual.forEach(m => moves.push({...m, amount:Math.abs(n(m.amount)), type:movementSign(m)>0?'deposit':'withdraw'}));
+
+    arr('invoices').forEach(inv => {
+      const t = totals(inv);
+      const acc = normalizeId(inv.accountId || inv.paymentAccountId || inv.bankAccountId || '');
+      if(acc && t.paid > 0 && invoiceCompleted(inv)) moves.push(movement(acc,'in',t.paid,'وارد فاتورة ' + (inv.invoiceNumber || inv.id), inv.id, inv.date, 'invoice'));
+    });
+    arr('customers').forEach(c => (c.payments||[]).forEach(p => {
+      const acc = normalizeId(p.accountId || p.paymentAccountId || '');
+      if(acc && n(p.amount) > 0) moves.push(movement(acc,'in',toBaseV3(p.amount,p.currency), 'دفعة عميل: ' + (c.name || ''), p.id || (c.id + '_' + p.date), p.date, 'customer_payment'));
+    }));
+    arr('expenses').forEach(e => { const acc=normalizeId(e.accountId||e.paymentAccountId||''); if(acc && n(e.amount)>0) moves.push(movement(acc,'out',toBaseV3(e.amount,e.currency),'مصروف: '+(e.category||e.name||''),e.id,e.date,'expense')); });
+    arr('wages').forEach(w => { const acc=normalizeId(w.accountId||w.paymentAccountId||''); if(acc && n(w.amount)>0) moves.push(movement(acc,'out',toBaseV3(w.amount,w.currency),'أجر عامل: '+(w.workerName||w.employeeName||w.category||''),w.id,w.date,'wage')); });
+    arr('purchases').forEach(p => { const acc=normalizeId(p.accountId||p.paymentAccountId||''); const paid=n(p.paidAmount ?? p.paid ?? p.amount ?? p.price); if(acc && paid>0) moves.push(movement(acc,'out',toBaseV3(paid,p.currency),'مشتريات: '+(p.productName||p.supplierName||''),p.id,p.date,'purchase')); });
+    arr('supplierPayments').forEach(sp => { const acc=normalizeId(sp.accountId||sp.paymentAccountId||''); if(acc && n(sp.amount)>0) moves.push(movement(acc,'out',toBaseV3(sp.amount,sp.currency),'دفعة تاجر: '+(sp.supplierName||sp.name||''),sp.id,sp.date,'supplier_payment')); });
+
+    const unique = new Map();
+    moves.filter(Boolean).forEach(m => unique.set(m.id || [m.source,m.accountId,m.refId,m.type,Math.abs(n(m.amount))].join('|'), m));
+    const final = Array.from(unique.values()).sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
+    final.forEach(m => {
+      const a = accounts.find(x => normalizeId(x.id) === normalizeId(m.accountId));
+      if(!a) return;
+      const value = Math.abs(n(m.amount));
+      a.balance = Number((n(a.balance) + (movementSign(m)>0 ? value : -value)).toFixed(4));
+      a.movements.push({...m, amount:value});
+    });
+    state.data.accountMovements = final;
+    if(save){
+      try{ saveAppState(); }catch(e){}
+      try{ enqueueSyncOperation({type:'accounting_rebuild_v3', payload:{at:Date.now()}}); updatePendingSyncBadge(); }catch(e){}
+      try{ if(!isLocalOnlyMode() && navigator.onLine) setTimeout(()=>syncQueueToCloud(),120); }catch(e){}
+    }
+    return true;
+  }
+  window.feeFinalRebuildAccountsV3 = rebuildAccountsV3;
+  window.fatoraRebuildAccountsAndBalances = rebuildAccountsV3;
+
+  function addAccountMovementV3(accountId, type, amount, label, refId=''){
+    accountId = normalizeId(accountId);
+    const value = Math.abs(n(amount));
+    if(!accountId || !value) return;
+    // movements that belong to invoices / expenses / purchases are rebuilt from their real records, so do not duplicate them here
+    if(refId && isAutoLabel(label)) { rebuildAccountsV3(true); return; }
+    const m = {id:uid2('manual_mov'), accountId, type:(type==='deposit'||type==='in')?'deposit':'withdraw', amount:value, label:label||'حركة يدوية', refId:'manual_'+Date.now(), date:now(), manual:true, source:'manual'};
+    arr('accountManualMovements').unshift(m);
+    rebuildAccountsV3(true);
+  }
+  window.addAccountMovement = addAccountMovementV3;
+  window.addAccountMovementPro = addAccountMovementV3;
+  try{ addAccountMovement = addAccountMovementV3; }catch(e){}
+
+  function accountOptions(selected='__cash__'){
+    ensureCashAccountV3();
+    selected = normalizeId(selected || '__cash__');
+    return arr('paymentAccounts').map(a => `<option value="${esc(normalizeId(a.id))}" ${normalizeId(a.id)===selected?'selected':''}>${esc(a.name||'حساب')} - ${money(a.balance||0)}</option>`).join('');
+  }
+  window.feeV3AccountOptions = accountOptions;
+
+  const oldSaveAccount = window.saveAccountPro || window.saveAccount;
+  window.saveAccountPro = window.saveAccount = function(){
+    const id = $('acc-id')?.value || '';
+    const name = $('acc-name')?.value?.trim();
+    if(!name){ toast('أدخل اسم الحساب','error'); return; }
+    const balance = n($('acc-balance')?.value);
+    const payload = {id:id||uid2('acc'), name, type:$('acc-type')?.value||'cash', number:$('acc-number')?.value?.trim()||'', openingBalance:balance, openingBalanceV3:balance, balance, updatedAt:now()};
+    const i = arr('paymentAccounts').findIndex(a=>a.id===id);
+    if(i>=0) arr('paymentAccounts')[i] = {...arr('paymentAccounts')[i], ...payload, movements:Array.isArray(arr('paymentAccounts')[i].movements)?arr('paymentAccounts')[i].movements:[]};
+    else arr('paymentAccounts').push({...payload, movements:[], createdAt:now()});
+    try{ closeModal(); }catch(e){}
+    rebuildAccountsV3(true);
+    try{ render(); }catch(e){}
+    toast('تم حفظ الحساب وإعادة حساب رصيده','success');
+  };
+  window.saveAccountMovement = function(){
+    const id=$('mov-account')?.value; const type=$('mov-type')?.value||'deposit'; const amount=n($('mov-amount')?.value); if(amount<=0){toast('أدخل المبلغ','error');return;}
+    addAccountMovementV3(id,type,amount,$('mov-label')?.value?.trim()||'حركة يدوية');
+    try{ closeModal(); render(); }catch(e){}
+  };
+
+  function getCustomer(id){ return arr('customers').find(c=>c.id===id); }
+  window.showPaymentModal = function(customerId=''){
+    const customerOptions = arr('customers').map(c=>`<option value="${esc(c.id)}" ${customerId===c.id?'selected':''}>${esc(c.name)}${c.phone?' - '+esc(c.phone):''}</option>`).join('');
+    openModal({title:'إضافة دفعة عميل',maxWidth:'680px',body:`<div class="space-y-4"><div><label class="block text-sm font-bold text-slate-700 mb-2">العميل</label><select id="payment-customer-id" class="select"><option value="">اختر العميل</option>${customerOptions}</select></div><div class="grid sm:grid-cols-2 gap-3"><div><label class="block text-sm font-bold text-slate-700 mb-2">المبلغ</label><input id="payment-amount" type="number" class="input" value="0" step="0.01"></div><div><label class="block text-sm font-bold text-slate-700 mb-2">دخلت على حساب</label><select id="payment-account-id" class="select">${accountOptions('__cash__')}</select></div></div><div><label class="block text-sm font-bold text-slate-700 mb-2">ملاحظة</label><textarea id="payment-note" class="textarea" placeholder="دفعة كاش / تحويل بنك / ملاحظة"></textarea></div></div>`,footer:`<div class="flex gap-3"><button onclick="closeModal()" class="btn flex-1 py-3 rounded-2xl bg-slate-100 font-bold">إلغاء</button><button onclick="savePayment()" class="btn flex-1 py-3 rounded-2xl bg-green-600 text-white font-extrabold">حفظ الدفعة</button></div>`});
+  };
+  window.savePayment = function(){
+    const customerId=$('payment-customer-id')?.value; const amount=n($('payment-amount')?.value); const customer=getCustomer(customerId); const accountId=normalizeId($('payment-account-id')?.value||'__cash__');
+    if(!customer){toast('اختر العميل أولاً','error');return;} if(amount<=0){toast('أدخل مبلغاً صحيحاً','error');return;}
+    customer.payments = customer.payments || [];
+    customer.payments.push({id:uid2('payment'), amount, note:$('payment-note')?.value?.trim()||'', accountId, paymentAccountId:accountId, paymentMethod:accountId==='__cash__'?'cash':'account', date:now(), createdBy:state.session?.userId||'owner'});
+    try{ enqueueSyncOperation({type:'add_payment_v3',payload:{customerId,amount,accountId}}); }catch(e){}
+    try{ closeModal(); }catch(e){}
+    rebuildAccountsV3(true);
+    try{ render(); }catch(e){}
+    toast('تمت إضافة الدفعة وربطها بالحساب','success');
+  };
+  window.showManualDebtModal = function(customerId=''){
+    const customerOptions = arr('customers').map(c=>`<option value="${esc(c.id)}" ${customerId===c.id?'selected':''}>${esc(c.name)}${c.phone?' - '+esc(c.phone):''}</option>`).join('');
+    openModal({title:'إضافة دين مباشر',maxWidth:'620px',body:`<div class="space-y-4"><div><label class="block text-sm font-bold text-slate-700 mb-2">العميل</label><select id="manual-debt-customer-id" class="select"><option value="">اختر العميل</option>${customerOptions}</select></div><div><label class="block text-sm font-bold text-slate-700 mb-2">المبلغ</label><input id="manual-debt-amount" type="number" class="input" value="0" step="0.01"></div><div><label class="block text-sm font-bold text-slate-700 mb-2">ملاحظة</label><textarea id="manual-debt-note" class="textarea"></textarea></div></div>`,footer:`<div class="flex gap-3"><button onclick="closeModal()" class="btn flex-1 py-3 rounded-2xl bg-slate-100 font-bold">إلغاء</button><button onclick="saveManualDebt()" class="btn flex-1 py-3 rounded-2xl bg-red-600 text-white font-extrabold">حفظ الدين</button></div>`});
+  };
+  window.saveManualDebt = function(){
+    if(window.feeCheckDailyLimit && !window.feeCheckDailyLimit('manualDebts','الدين اليدوي')) return;
+    const customerId=$('manual-debt-customer-id')?.value; const amount=n($('manual-debt-amount')?.value); const customer=getCustomer(customerId);
+    if(!customer){toast('اختر العميل أولاً','error');return;} if(amount<=0){toast('أدخل مبلغاً صحيحاً','error');return;}
+    customer.manualDebts = customer.manualDebts || [];
+    customer.manualDebts.push({id:uid2('debt'), amount, note:$('manual-debt-note')?.value?.trim()||'', date:now(), createdBy:state.session?.userId||'owner'});
+    try{ enqueueSyncOperation({type:'add_manual_debt_v3',payload:{customerId,amount}}); }catch(e){}
+    try{ closeModal(); }catch(e){}
+    rebuildAccountsV3(true);
+    try{ render(); }catch(e){}
+    toast('تمت إضافة الدين وإعادة حساب العميل','success');
+  };
+  try{ savePayment = window.savePayment; showPaymentModal = window.showPaymentModal; saveManualDebt = window.saveManualDebt; showManualDebtModal = window.showManualDebtModal; }catch(e){}
+
+  function readSelectedPaymentAccount(){
+    const ids = ['cashier-simple-account','cashier-pay-account','fee-cashier-account','invoice-complete-account','payment-account-id'];
+    for(const id of ids){ const v = normalizeId($(id)?.value || ''); if(v) return v; }
+    return '__cash__';
+  }
+  function markInvoiceAccount(inv, acc){
+    if(!inv) return;
+    acc = normalizeId(acc || readSelectedPaymentAccount());
+    if(acc){ inv.accountId = acc; inv.paymentAccountId = acc; inv.paymentMethod = acc==='__cash__'?'cash':'account'; }
+  }
+  const oldCreateCashier = window.createCashierInvoicePro;
+  if(typeof oldCreateCashier === 'function'){
+    window.createCashierInvoicePro = function(opts={}){
+      const res = oldCreateCashier.apply(this, arguments);
+      if(res){ markInvoiceAccount(res, opts.accountId || readSelectedPaymentAccount()); rebuildAccountsV3(true); }
+      return res;
+    };
+    try{ createCashierInvoicePro = window.createCashierInvoicePro; }catch(e){}
+  }
+  const oldCompleteCashier = window.completeCashierSale;
+  if(typeof oldCompleteCashier === 'function'){
+    window.completeCashierSale = function(){ const r = oldCompleteCashier.apply(this, arguments); setTimeout(()=>{ const inv=arr('invoices')[arr('invoices').length-1]; if(inv) markInvoiceAccount(inv, readSelectedPaymentAccount()); rebuildAccountsV3(true); try{render();}catch(e){} },60); return r; };
+    try{ completeCashierSale = window.completeCashierSale; }catch(e){}
+  }
+  const oldSaveStatus = window.saveInvoiceStatusChange;
+  window.saveInvoiceStatusChange = function(invoiceId){
+    const inv = arr('invoices').find(i=>i.id===invoiceId); if(!inv) return;
+    const st = $('invoice-status-change')?.value || 'pending';
+    if(st === 'completed'){
+      const t = totals(inv); inv.status='completed'; inv.paidAmount = t.total; inv.paidBase = t.total; markInvoiceAccount(inv, normalizeId($('invoice-complete-account')?.value||'__cash__'));
+    } else { inv.status = st; inv.accountId=''; inv.paymentAccountId=''; }
+    inv.updatedAt = now();
+    try{ closeModal(); }catch(e){}
+    rebuildAccountsV3(true);
+    try{ render(); }catch(e){}
+    toast('تم تحديث الفاتورة والحسابات بشكل صحيح','success');
+  };
+
+  function productPieces(p){ return Math.max(1, n(p?.piecesPerCarton)||1); }
+  function normalizeCartonProduct(p){
+    if(!p || p.unitType !== 'carton') return;
+    const pieces = productPieces(p);
+    const carton = n(p.salePriceCarton ?? p.salePrice);
+    p.salePriceCarton = carton;
+    p.salePrice = carton;
+    p.salePricePiece = +(carton / pieces).toFixed(4);
+  }
+  arr('products').forEach(normalizeCartonProduct);
+
+  const oldShowProductModal = window.showProductModalPro || window.showProductModal;
+  if(typeof oldShowProductModal === 'function'){
+    window.showProductModalPro = window.showProductModal = function(id=''){
+      const r = oldShowProductModal.apply(this, arguments);
+      setTimeout(()=>{
+        const unit = $('prod-unit-type')?.value;
+        const pieces = Math.max(1, n($('prod-pieces')?.value)||1);
+        const sale = $('prod-sale');
+        const salePiece = $('prod-sale-piece');
+        const saleCarton = $('prod-sale-carton');
+        if(sale && unit === 'carton'){
+          const parent = sale.closest('div');
+          const label = parent?.querySelector('label'); if(label) label.textContent = 'سعر البيع كرتونة';
+          const p = arr('products').find(x=>x.id===id)||{};
+          sale.value = n(p.salePriceCarton ?? p.salePrice ?? sale.value);
+          if(parent && !parent.querySelector('.fee-product-carton-note')) parent.insertAdjacentHTML('beforeend', `<div class="fee-product-carton-note mt-2">أدخل سعر بيع الكرتونة فقط. عند البيع بالقطعة سيتم تقسيم سعر الكرتونة على عدد القطع تلقائياً.</div>`);
+        }
+        if(salePiece){ const d=salePiece.closest('div'); if(d) d.classList.add('fee-hide-piece-price-final'); salePiece.value = (n(saleCarton?.value || sale?.value) / pieces).toFixed(4); }
+        if(saleCarton){ const d=saleCarton.closest('div'); if(d) d.classList.add('fee-hide-piece-price-final'); saleCarton.value = n(sale?.value || saleCarton.value); }
+      },30);
+      return r;
+    };
+    try{ showProductModalPro = window.showProductModalPro; showProductModal = window.showProductModal; }catch(e){}
+  }
+  const oldToggle = window.toggleProductUnitFields;
+  window.toggleProductUnitFields = function(){
+    try{ oldToggle && oldToggle.apply(this, arguments); }catch(e){}
+    const unit = $('prod-unit-type')?.value;
+    const sale = $('prod-sale');
+    const label = sale?.closest('div')?.querySelector('label');
+    if(label) label.textContent = unit==='carton' ? 'سعر البيع كرتونة' : 'سعر البيع';
+  };
+  const oldSaveProduct = window.saveProductPro || window.saveProduct;
+  if(typeof oldSaveProduct === 'function'){
+    window.saveProductPro = window.saveProduct = function(){
+      const unit = $('prod-unit-type')?.value;
+      if(unit === 'carton'){
+        const pieces = Math.max(1, n($('prod-pieces')?.value)||1);
+        const cartonPrice = n($('prod-sale')?.value || $('prod-sale-carton')?.value);
+        let piece = $('prod-sale-piece');
+        if(!piece){ piece=document.createElement('input'); piece.type='hidden'; piece.id='prod-sale-piece'; document.body.appendChild(piece); }
+        piece.value = (cartonPrice / pieces).toFixed(4);
+        let carton = $('prod-sale-carton');
+        if(!carton){ carton=document.createElement('input'); carton.type='hidden'; carton.id='prod-sale-carton'; document.body.appendChild(carton); }
+        carton.value = cartonPrice;
+      }
+      const r = oldSaveProduct.apply(this, arguments);
+      setTimeout(()=>{ arr('products').forEach(normalizeCartonProduct); rebuildAccountsV3(true); try{saveAppState(); render();}catch(e){} },80);
+      return r;
+    };
+    try{ saveProductPro = window.saveProductPro; saveProduct = window.saveProduct; }catch(e){}
+  }
+
+  function renderAccountsV3(el, accountId=''){
+    rebuildAccountsV3(false);
+    const accounts = arr('paymentAccounts');
+    const moves = arr('accountMovements');
+    const incoming = moves.filter(m=>movementSign(m)>0).reduce((s,m)=>s+Math.abs(n(m.amount)),0);
+    const outgoing = moves.filter(m=>movementSign(m)<0).reduce((s,m)=>s+Math.abs(n(m.amount)),0);
+    const selected = accounts.find(a=>normalizeId(a.id)===normalizeId(accountId));
+    const balClass = v => n(v)>0?'fee-balance-positive':n(v)<0?'fee-balance-negative':'fee-balance-zero';
+    el.innerHTML = `<div class="space-y-5"><div class="flex justify-between items-center gap-3 flex-wrap"><div><h2 class="text-2xl font-black">حسابات الدفع والتحويل</h2><p class="text-sm text-slate-500 font-bold">الوارد موجب، والصادر سالب، والحساب لا يتضاعف عند التنقل.</p></div><button onclick="showAccountModalPro&&showAccountModalPro()" class="fatora-chip dark"><i class="fas fa-plus"></i> حساب</button></div><div class="grid grid-cols-3 gap-3"><div class="fatora-stat-card"><small>الوارد</small><b style="color:#15803d">${money(incoming)}</b></div><div class="fatora-stat-card"><small>الصادر</small><b style="color:#dc2626">${money(outgoing)}</b></div><div class="fatora-stat-card"><small>الحركات</small><b>${moves.length}</b></div></div><div class="grid sm:grid-cols-2 gap-3">${accounts.map(a=>`<button class="fee-account-ledger-card text-right" onclick="feeOpenAccountLedger('${esc(a.id)}')"><div class="flex justify-between gap-2"><div><div class="font-black">${esc(a.name)}</div><div class="text-xs text-slate-500 font-bold mt-1">${esc(a.type||'')} ${a.number?'- '+esc(a.number):''}</div></div><div class="font-black text-xl ${balClass(a.balance)}">${money(a.balance)}</div></div></button>`).join('') || '<div class="fee-card p-5 text-center text-slate-400">لا توجد حسابات</div>'}</div>${selected?`<div class="section-card p-4"><h3 class="font-black mb-3">سجل ${esc(selected.name)}</h3>${moves.filter(m=>normalizeId(m.accountId)===normalizeId(selected.id)).map(m=>`<div class="fee-ledger-row"><div class="fee-ledger-icon ${movementSign(m)>0?'in':'out'}"><i class="fas ${movementSign(m)>0?'fa-arrow-down':'fa-arrow-up'}"></i></div><div><div class="font-black">${esc(m.label||'حركة')}</div><div class="text-xs text-slate-500 font-bold">${esc(fmt(m.date))}</div></div><div class="font-black ${movementSign(m)>0?'text-green-700':'text-red-600'}">${movementSign(m)>0?'+':'-'} ${money(Math.abs(n(m.amount)))}</div></div>`).join('') || '<div class="text-center text-slate-400 py-8">لا توجد حركات لهذا الحساب</div>'}</div>`:''}</div>`;
+  }
+  window.feeOpenAccountLedger = function(id){ const el=$('app-container'); if(el) renderAccountsV3(el,id); };
+
+  const prevRender = window.render;
+  window.render = function(){
+    const r = prevRender && prevRender.apply(this, arguments);
+    setTimeout(()=>{
+      try{ rebuildAccountsV3(false); }catch(e){}
+      const el = $('app-container');
+      if(el && state.currentScreen === 'accounts') renderAccountsV3(el);
+      arr('products').forEach(normalizeCartonProduct);
+    },20);
+    return r;
+  };
+
+  setTimeout(()=>{ try{ rebuildAccountsV3(true); if(state.currentScreen==='accounts' && $('app-container')) renderAccountsV3($('app-container')); }catch(e){ console.warn(e); } },320);
+})();
+</script>
 </body>
 </html>
