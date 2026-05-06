@@ -518,284 +518,132 @@
       .invoice-meta { min-width:100%; }
       .color-swatch{ width:54px; height:54px; }
     }
-
-    /* app-like UI redesign overrides */
-    :root{
-      --primary:#2b5fd9;
-      --primary-2:#3a6ce3;
-      --primary-3:#5a87f2;
-      --danger:#d93a3a;
-      --success:#169b59;
-      --warning:#d28a1b;
-      --dark:#1e293b;
-      --muted:#667085;
-      --bg:#e9eef5;
-      --card:#ffffff;
-      --border:#d7e0ec;
-      --shadow:0 16px 40px rgba(15,23,42,.10);
-      --shadow-soft:0 10px 26px rgba(15,23,42,.08);
-      --shadow-press:0 4px 12px rgba(15,23,42,.08);
-    }
-
-    html, body {
-      background:
-        radial-gradient(circle at top right, rgba(74,108,247,.10), transparent 32%),
-        radial-gradient(circle at bottom left, rgba(15,23,42,.06), transparent 28%),
-        linear-gradient(180deg,#edf2f8 0%,#e7edf5 100%);
-    }
-
-    body {
-      padding-bottom: 104px;
-      color: var(--dark);
-    }
-
-    #appRoot{
-      min-height:100vh;
-    }
-
-    @media(min-width:960px){
-      #appRoot{
-        max-width: 1480px;
-        margin: 0 auto;
-        padding-inline: 10px;
-      }
-    }
-
-    .glass-header{
-      background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(245,248,252,.98));
-      border:1px solid var(--border);
-      border-bottom:1px solid var(--border);
-      box-shadow: 0 14px 34px rgba(15,23,42,.08);
-      backdrop-filter: blur(14px);
-      min-height: 68px;
-    }
-
-    @media(min-width:960px){
-      .glass-header{
-        width: min(1280px, calc(100% - 24px));
-        margin: 12px auto 0;
-        border-radius: 24px;
-      }
-    }
-
-    .bottom-nav{
-      background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(247,249,252,.98));
-      backdrop-filter: blur(14px);
-      border:1px solid var(--border);
-      box-shadow: 0 18px 40px rgba(15,23,42,.12);
-      border-radius: 24px;
-      width: min(860px, calc(100% - 18px));
-      left: 50%;
-      right: auto;
-      transform: translateX(-50%);
-      bottom: 10px;
-      padding: 8px;
-      gap: 6px;
-      z-index: 60;
-    }
-
-    .bottom-nav .nav-btn{
-      border-radius: 18px;
-      min-width: 0;
-      transition: .18s ease;
-      padding: 9px 6px;
-    }
-
-    .bottom-nav .nav-btn span{
-      font-weight: 900;
-      letter-spacing: -.1px;
-    }
-
-    .bottom-nav .nav-btn.text-blue-600{
-      background: linear-gradient(180deg,#edf4ff,#e7f0ff);
-      box-shadow: inset 0 0 0 1px #d8e5ff, 0 8px 18px rgba(43,95,217,.12);
-    }
-
-    .bottom-nav .nav-btn.text-blue-600 i,
-    .bottom-nav .nav-btn.text-blue-600 span{
-      color: var(--primary) !important;
-    }
-
-    .bottom-nav .nav-btn.text-gray-500 i,
-    .bottom-nav .nav-btn.text-gray-500 span{
-      color:#6b7280 !important;
-    }
-
-    .fancy-card,
-    .section-card,
-    .shortage-home-card,
-    .modal-panel,
-    .invoice-header,
-    .invoice-meta,
-    .rights-box,
-    .top-sync-progress,
-    .suggestions-box,
-    .color-palette-wrap{
-      background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.98));
-      border:1px solid var(--border);
-      box-shadow: var(--shadow-soft);
-    }
-
-    .fancy-card{
-      border-radius: 26px;
-    }
-
-    .section-card{
-      border-radius: 30px;
-      box-shadow: 0 14px 34px rgba(15,23,42,.08);
-    }
-
-    #app-container{
-      max-width: 1280px;
-      margin: 0 auto;
-      padding-top: 18px !important;
-      padding-bottom: 128px !important;
-    }
-
-    .btn,
-    .login-tab-btn,
-    .fab-main,
-    button[class*="rounded-2xl"],
-    button[class*="rounded-3xl"]{
-      border: 1px solid rgba(15,23,42,.06);
-      box-shadow: 0 8px 18px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.35);
-    }
-
-    .btn{
-      border-radius: 16px;
-      font-weight: 900;
-      letter-spacing: -.1px;
-    }
-
-    .btn:hover,
-    .login-tab-btn:hover,
-    .fab-main:hover{
-      transform: translateY(-2px);
-      box-shadow: 0 14px 26px rgba(15,23,42,.12);
-    }
-
-    .btn:active,
-    .login-tab-btn:active,
-    .fab-main:active{
-      transform: translateY(0) scale(.985);
-      box-shadow: var(--shadow-press);
-    }
-
-    .input,
-    .select,
-    .textarea{
-      background: linear-gradient(180deg,#ffffff,#f8fafc);
-      border:1px solid #d6deea;
-      border-radius: 18px;
-      box-shadow: inset 0 1px 2px rgba(255,255,255,.9), inset 0 -1px 0 rgba(148,163,184,.06);
-    }
-
-    .input:focus,
-    .select:focus,
-    .textarea:focus{
-      border-color: rgba(43,95,217,.55);
-      box-shadow: 0 0 0 4px rgba(43,95,217,.12), inset 0 1px 2px rgba(255,255,255,.9);
-    }
-
-    .modal-backdrop{
-      background: rgba(15,23,42,.42);
-      backdrop-filter: blur(8px);
-      align-items: center;
-      justify-content: center;
-    }
-
-    .modal-panel{
-      border-radius: 28px;
-      box-shadow: 0 24px 70px rgba(15,23,42,.18);
-    }
-
-    .table-modern th{
-      background: linear-gradient(180deg,#f7f9fc,#eef3f8);
-      border-bottom:1px solid var(--border);
-    }
-
-    .table-modern td{
-      border-bottom:1px solid #edf1f6;
-    }
-
-    .invoice-paper{
-      background: #fff;
-      border:1px solid #e3e8f1;
-      border-radius: 24px;
-      box-shadow: 0 10px 24px rgba(15,23,42,.06);
-    }
-
-    .invoice-header{
-      border-radius: 24px;
-    }
-
-    .fab-main{
-      width: 58px;
-      height: 58px;
-      border-radius: 20px;
-      bottom: 92px;
-      left: 18px;
-      background: linear-gradient(180deg,var(--primary),var(--primary-2));
-      box-shadow: 0 18px 34px rgba(43,95,217,.28);
-    }
-
-    .toast{
-      border:1px solid rgba(255,255,255,.10);
-      border-radius: 20px;
-    }
-
-    .glass-header .w-14.h-14,
-    .glass-header .w-16.h-16{
-      border-radius: 18px;
-      box-shadow: 0 8px 18px rgba(15,23,42,.08);
-      background: linear-gradient(180deg,#ffffff,#f7f9fc);
-    }
-
-    #header-shop-name{
-      font-size: 18px !important;
-      letter-spacing: -.2px;
-    }
-
-    .badge{
-      border:1px solid rgba(15,23,42,.05);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.45);
-    }
-
-    .sync-progress,
-    .sync-progress-fill{
-      border-radius: 999px;
-    }
-
-    @media(max-width:768px){
-      .glass-header{
-        min-height: 62px;
-        padding: 10px 12px !important;
-      }
-      #header-shop-name{
-        font-size: 16px !important;
-      }
-      .bottom-nav{
-        width: calc(100% - 14px);
-        border-radius: 22px;
-        padding: 7px;
-      }
-      .bottom-nav .nav-btn{
-        padding: 8px 4px;
-      }
-      .bottom-nav .nav-btn i{font-size:20px !important;}
-      .bottom-nav .nav-btn span{font-size:10px !important;}
-      .fancy-card,
-      .section-card,
-      .modal-panel{
-        border-radius: 22px;
-      }
-      #app-container{
-        padding-top: 14px !important;
-        padding-bottom: 118px !important;
-      }
-    }
-
   </style>
+
+
+<style id="fee-program-fatora-style-final-safe">
+  :root{
+    --primary:#178b82!important;
+    --primary-2:#21a79b!important;
+    --primary-3:#6bd1c8!important;
+    --bg:#eef5f6!important;
+    --dark:#263238!important;
+    --muted:#71808a!important;
+    --border:#dfe9eb!important;
+    --shadow-soft:0 8px 22px rgba(15,23,42,.065)!important;
+    --shadow:0 14px 34px rgba(15,23,42,.09)!important;
+  }
+  html,body{
+    background:linear-gradient(180deg,#edf5f6 0%,#f8fbfb 48%,#eef5f6 100%)!important;
+    color:var(--dark)!important;
+  }
+  body{overscroll-behavior-y:none;}
+  .glass-header{
+    background:#f8fbfb!important;
+    border-bottom:1px solid #dfe9eb!important;
+    box-shadow:0 7px 18px rgba(15,23,42,.055)!important;
+    min-height:58px!important;
+    padding:8px 12px!important;
+  }
+  .glass-header button{
+    border-radius:15px!important;
+    transition:.16s ease!important;
+  }
+  .glass-header button:active{transform:scale(.96)!important;}
+  #header-shop-name{font-weight:950!important;color:#263238!important;letter-spacing:-.2px!important;}
+  #feeConnectionChip{
+    display:inline-flex!important;
+    align-items:center!important;
+    gap:6px!important;
+    background:#eef9f7!important;
+    border:1px solid #d5eeeb!important;
+    border-radius:999px!important;
+    padding:6px 8px!important;
+    font-size:11px!important;
+    font-weight:900!important;
+    color:#147a72!important;
+    white-space:nowrap!important;
+    line-height:1!important;
+  }
+  #feeConnectionChip .online-dot,#feeConnectionChip .offline-dot{
+    width:8px!important;height:8px!important;min-width:8px!important;border-radius:999px!important;
+    box-shadow:0 0 0 5px rgba(22,163,74,.12)!important;
+  }
+  #feeConnectionChip .offline-dot{box-shadow:0 0 0 5px rgba(220,38,38,.12)!important;}
+  header.glass-header #connectionDot, header.glass-header #connectionText{display:none!important;}
+  header.glass-header .min-w-0:has(#header-shop-name){
+    display:flex!important;align-items:center!important;gap:7px!important;min-width:0!important;flex-wrap:nowrap!important;
+  }
+  .bottom-nav{
+    background:#fff!important;
+    border:1px solid #dfe9eb!important;
+    box-shadow:0 -6px 20px rgba(15,23,42,.075)!important;
+    border-radius:22px!important;
+    width:min(860px,calc(100% - 14px))!important;
+    left:50%!important;right:auto!important;transform:translateX(-50%)!important;
+    bottom:8px!important;height:70px!important;padding:7px!important;
+    gap:5px!important;overflow:hidden!important;
+  }
+  .bottom-nav .nav-btn{
+    border-radius:18px!important;min-width:62px!important;transition:.16s ease!important;color:#6b7280!important;
+  }
+  .bottom-nav .nav-btn.text-blue-600,.bottom-nav .nav-btn.fee-bottom-active{
+    background:#e9f7f6!important;color:var(--primary)!important;box-shadow:inset 0 0 0 1px #d5eeeb,0 6px 14px rgba(23,139,130,.12)!important;
+  }
+  .bottom-nav .nav-btn.text-blue-600 i,.bottom-nav .nav-btn.text-blue-600 span,.bottom-nav .nav-btn.fee-bottom-active i,.bottom-nav .nav-btn.fee-bottom-active span{color:var(--primary)!important;}
+  .bottom-nav .nav-btn:active{transform:scale(.96)!important;}
+  .fancy-card,.section-card,.fee-card,.shortage-home-card,.modal-panel,.invoice-meta,.invoice-header,.suggestions-box,.top-sync-progress{
+    background:#fff!important;border:1px solid #e1eaec!important;border-radius:24px!important;box-shadow:0 8px 20px rgba(15,23,42,.065)!important;
+  }
+  .fee-app-hero{
+    background:linear-gradient(135deg,#1e9f94 0%,#168a82 52%,#0f575d 100%)!important;
+    color:#fff!important;border-radius:30px!important;padding:24px!important;box-shadow:0 18px 40px rgba(22,138,130,.22)!important;overflow:hidden!important;position:relative!important;
+  }
+  .fee-app-hero:before{content:"";position:absolute;inset:auto -80px -100px auto;width:260px;height:260px;background:rgba(255,255,255,.11);border-radius:999px;}
+  .fee-app-hero:after{content:"";position:absolute;inset:-80px auto auto -80px;width:220px;height:220px;background:rgba(255,255,255,.08);border-radius:999px;}
+  .fee-app-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px;position:relative;z-index:1;}
+  .fee-app-stat{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:14px;min-height:92px;display:flex;flex-direction:column;justify-content:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.12);}
+  .fee-app-stat .k{font-size:12px;opacity:.82;font-weight:800;}
+  .fee-app-stat .v{font-size:22px;font-weight:950;margin-top:5px;line-height:1.15;}
+  .fee-app-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px;}
+  .fee-tool-card{background:#fff;border:1px solid #e1eaec;border-radius:24px;padding:16px;text-align:right;box-shadow:0 8px 20px rgba(15,23,42,.06);min-height:112px;display:flex;align-items:center;gap:13px;transition:.18s ease;}
+  .fee-tool-card:active{transform:scale(.985)}
+  .fee-tool-icon{width:56px;height:56px;border-radius:20px;background:#e9f7f6;color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:23px;flex-shrink:0;}
+  .fee-record-card{background:#fff;border:1px solid #e1eaec;border-radius:20px;padding:13px;box-shadow:0 7px 16px rgba(15,23,42,.055);display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-bottom:9px;}
+  .fee-record-card .record-title{font-weight:900;color:#25313b;}
+  .fee-record-card .record-sub{font-size:12px;color:#71808a;margin-top:4px;line-height:1.7;}
+  .fee-record-card .record-amount{font-weight:950;color:var(--primary);direction:ltr;text-align:left;}
+  .btn,button[class*="bg-blue"],button[class*="bg-indigo"],button[class*="bg-green"],button[class*="bg-slate"],button[class*="rounded-2xl"],button[class*="rounded-3xl"]{
+    border-radius:17px!important;box-shadow:0 7px 16px rgba(15,23,42,.08)!important;font-weight:900!important;
+  }
+  .input,.select,.textarea{border-radius:18px!important;border:1px solid #dce7ea!important;background:#fff!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.9)!important;}
+  .input:focus,.select:focus,.textarea:focus{border-color:#75c9c2!important;box-shadow:0 0 0 4px rgba(23,139,130,.12)!important;}
+  .modal-backdrop{align-items:center!important;justify-content:center!important;background:rgba(13,35,42,.42)!important;backdrop-filter:blur(8px)!important;}
+  .modal-panel{max-width:min(920px,calc(100vw - 24px))!important;}
+  #feePreviewLinkBtn,.fee-preview-ready-chip a{
+    background:linear-gradient(135deg,var(--primary),var(--primary-2))!important;color:#fff!important;
+  }
+  #feePreviewLinkBtn{margin-bottom:12px!important;display:inline-flex!important;align-items:center!important;gap:8px!important;padding:12px 16px!important;border:0!important;}
+  #fee-public-preview{min-height:100vh;background:#f7fafb;padding:16px;font-family:Cairo,Arial,sans-serif;direction:rtl;color:#25313b;}
+  #fee-public-preview .public-card{max-width:980px;margin:0 auto;background:#fff;border:1px solid #e1eaec;border-radius:26px;box-shadow:0 12px 30px rgba(15,23,42,.08);padding:14px;overflow:auto;}
+  .fee-preview-ready-chip{position:fixed;left:12px;bottom:88px;z-index:2147483000;background:#fff;border:1px solid #dfe9eb;border-radius:20px;padding:12px;box-shadow:0 18px 45px rgba(15,23,42,.15);font-family:Cairo,Arial,sans-serif;direction:rtl;display:flex;gap:8px;align-items:center;}
+  .fee-preview-ready-chip a,.fee-preview-ready-chip button{border:0;text-decoration:none;border-radius:14px;padding:10px 12px;font-weight:900;}
+  .fee-preview-ready-chip button{background:#f1f5f9;color:#263238;}
+  @media(max-width:720px){
+    #app-container{padding-left:10px!important;padding-right:10px!important;padding-bottom:112px!important;}
+    header.glass-header{min-height:56px!important;padding:8px 10px!important;}
+    header.glass-header h1,#header-shop-name{font-size:16px!important;max-width:118px!important;}
+    header.glass-header .w-14.h-14{width:42px!important;height:42px!important;}
+    #feeConnectionChip{font-size:10px!important;padding:5px 6px!important;}
+    .fee-app-hero{border-radius:28px!important;padding:20px!important;}
+    .fee-app-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+    .fee-app-stat .v{font-size:20px;}
+    .fee-app-tools{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+    .fee-tool-card{padding:13px;min-height:104px;flex-direction:column;align-items:flex-start;}
+    .fee-tool-icon{width:48px;height:48px;border-radius:17px;font-size:20px;}
+    .bottom-nav{width:calc(100% - 12px)!important;height:68px!important;border-radius:23px!important;}
+  }
+</style>
 </head>
 <body>
 
@@ -4431,776 +4279,7 @@
         <p>المدفوع: ${escapeHtml(formatCurrency(totals.paid))}</p>
         <p>الديون: ${escapeHtml(formatCurrency(totals.remaining))}</p>
         <p>ملاحظات: ${escapeHtml(invoice.note || state.data.settings.footerNote || "")}</p>
-      
-
-<!-- fee restore download page + status beside name 2026-05-05 -->
-<style id="fee-download-page-status-next-to-name-fix">
-  /* الحالة بجانب اسم المحل وليس تحت الاسم أو بجانب المزامنة */
-  #feeConnectionChipFinal,
-  #feeConnectionChipName{
-    display:inline-flex!important;
-    align-items:center!important;
-    justify-content:center!important;
-    gap:5px!important;
-    height:28px!important;
-    padding:0 8px!important;
-    border-radius:999px!important;
-    background:#f8fafc!important;
-    border:1px solid #e2e8f0!important;
-    color:#334155!important;
-    font-size:10.5px!important;
-    font-weight:900!important;
-    line-height:1!important;
-    white-space:nowrap!important;
-    box-shadow:0 6px 14px rgba(15,23,42,.04)!important;
-    flex:0 0 auto!important;
-  }
-  #feeConnectionChipFinal .dot,
-  #feeConnectionChipName .dot{
-    width:8px!important;
-    height:8px!important;
-    min-width:8px!important;
-    border-radius:999px!important;
-    display:inline-block!important;
-    background:#22c55e!important;
-    box-shadow:0 0 0 4px rgba(34,197,94,.14)!important;
-  }
-  #feeConnectionChipFinal.offline .dot,
-  #feeConnectionChipName.offline .dot{
-    background:#ef4444!important;
-    box-shadow:0 0 0 4px rgba(239,68,68,.14)!important;
-  }
-  header.glass-header #connectionDot,
-  header.glass-header #connectionText{display:none!important;}
-  header.glass-header .min-w-0:has(#header-shop-name){
-    display:flex!important;
-    align-items:center!important;
-    gap:6px!important;
-    min-width:0!important;
-    flex-wrap:nowrap!important;
-  }
-  #header-shop-name{max-width:128px!important;}
-  @media(max-width:430px){
-    #header-shop-name{max-width:88px!important;font-size:15px!important;}
-    #feeConnectionChipFinal,#feeConnectionChipName{font-size:10px!important;height:26px!important;padding:0 6px!important;}
-  }
-</style>
-<script id="fee-download-page-status-next-to-name-fix-script">
-(function(){
-  'use strict';
-
-  const $ = (id) => document.getElementById(id);
-  const safe = (v) => String(v ?? '').replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]; });
-  const num = (v) => { const x = parseFloat(v); return Number.isFinite(x) ? x : 0; };
-  const stamp = () => new Date().toISOString().replace(/[-:.TZ]/g,'').slice(0,14) + '_' + Math.random().toString(36).slice(2,7);
-  const fileName = (name) => {
-    const raw = String(name || 'download.bin').replace(/[\\/:*?"<>|]+/g,'_').trim() || 'download.bin';
-    const dot = raw.lastIndexOf('.');
-    return dot > 0 ? raw.slice(0,dot) + '_' + stamp() + raw.slice(dot) : raw + '_' + stamp();
-  };
-  const stateObj = () => { try { return window.state || state; } catch(e){ return window.state || {}; } };
-  const arr = (k) => { const st = stateObj(); if(!st.data) st.data = {}; if(!Array.isArray(st.data[k])) st.data[k] = []; return st.data[k]; };
-  const baseCurrency = () => arr('currencies').find(c => c && c.isBase) || {code:'ILS', name:'شيكل', symbol:'₪', rateToBase:1};
-  const currencyBy = (code) => arr('currencies').find(c => c && c.code === code) || baseCurrency();
-  const money = (v, code) => `${Number(v||0).toLocaleString('en-US')} ${(currencyBy(code || baseCurrency().code).symbol || code || '₪')}`;
-  const baseMoney = (v) => money(v, baseCurrency().code);
-  const fmtDate = (v) => { try { return typeof formatDate === 'function' ? formatDate(v) : new Date(v).toLocaleString('ar-EG'); } catch(e){ return v || ''; } };
-  const toast = (msg, type='success') => { try { showToast(msg, type); } catch(e){ console.log(msg); } };
-
-  function currentSettings(){ const st = stateObj(); return (st && st.data && st.data.settings) || {}; }
-  function getInv(id){ try{ if(typeof getInvoiceById === 'function') return getInvoiceById(id); }catch(e){} return arr('invoices').find(i => i.id === id || i.invoiceNumber === id); }
-  function getCust(id){ try{ if(typeof getCustomerById === 'function') return getCustomerById(id); }catch(e){} return arr('customers').find(c => c.id === id); }
-  function totals(inv){ try{ if(typeof calculateInvoiceTotals === 'function') return calculateInvoiceTotals(inv); }catch(e){} const subtotal = num(inv?.subtotal || inv?.total); const discount = num(inv?.discount); const total = Math.max(0, subtotal - discount); const paid = num(inv?.paidAmount || inv?.paid); return {subtotal, discount, total, paid, remaining:Math.max(0,total-paid)}; }
-
-  function moveStatusBesideName(){
-    const header = document.querySelector('header.glass-header');
-    if(!header) return;
-    const oldDot = $('connectionDot');
-    const oldText = $('connectionText');
-    if(oldDot) oldDot.style.display = 'none';
-    if(oldText) oldText.style.display = 'none';
-
-    const title = $('header-shop-name');
-    if(!title || !title.parentElement) return;
-    const actions = header.querySelector('div.flex.items-center.gap-2') || header.lastElementChild;
-    let chip = $('feeConnectionChipFinal') || $('feeConnectionChipName');
-    if(!chip){ chip = document.createElement('span'); }
-    chip.id = 'feeConnectionChipName';
-    chip.className = navigator.onLine ? '' : 'offline';
-    let label = (oldText && oldText.textContent && oldText.textContent.trim()) || (navigator.onLine ? 'متصل' : 'غير متصل');
-    if(!navigator.onLine && (label === 'متصل' || label === 'أونلاين')) label = 'غير متصل';
-    chip.innerHTML = '<span class="dot"></span><span>' + safe(label) + '</span>';
-    if(chip.parentElement !== title.parentElement || title.nextElementSibling !== chip){
-      title.insertAdjacentElement('afterend', chip);
-    }
-    if(actions){
-      Array.from(actions.querySelectorAll('#feeConnectionChipFinal,#feeConnectionChipName')).forEach(el => {
-        if(el !== chip) el.remove();
-      });
-    }
-  }
-
-  function openDownloadPage(title){
-    let w = null;
-    try { w = window.open('', '_blank'); } catch(e){ w = null; }
-    if(w && w.document){
-      try{
-        w.document.open();
-        w.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+safe(title||'تحميل الملف')+'</title><style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f6fb;font-family:Arial,sans-serif;color:#0f172a}.box{width:min(420px,calc(100vw - 30px));background:#fff;border:1px solid #e5e7eb;border-radius:26px;padding:24px;text-align:center;box-shadow:0 20px 55px rgba(15,23,42,.15)}.spin{width:44px;height:44px;border-radius:50%;border:4px solid #dbeafe;border-top-color:#2563eb;animation:s 1s linear infinite;margin:0 auto 16px}@keyframes s{to{transform:rotate(360deg)}}.muted{color:#64748b;line-height:1.8;font-size:14px}</style></head><body><div class="box"><div class="spin"></div><h2>جاري تجهيز الملف</h2><p class="muted">اترك هذه الصفحة مفتوحة، سيظهر زر التنزيل هنا فوراً.</p></div>
-
-<!-- fee FINAL TRUE download + status beside shop name fix 2026-05-05 -->
-<style id="fee-final-true-download-status-style">
-  /* أخفي كل شرائح الاتصال القديمة أو التي كانت بجانب المزامنة */
-  #feeConnectionChip,
-  #feeConnectionChipFinal{
-    display:none!important;
-    visibility:hidden!important;
-    width:0!important;
-    height:0!important;
-    overflow:hidden!important;
-    padding:0!important;
-    margin:0!important;
-  }
-
-  header.glass-header .fee-shop-title-inline-final{
-    display:flex!important;
-    align-items:center!important;
-    gap:7px!important;
-    flex-wrap:nowrap!important;
-    min-width:0!important;
-    line-height:1!important;
-  }
-  #feeStatusBesideNameFinal{
-    display:inline-flex!important;
-    align-items:center!important;
-    justify-content:center!important;
-    gap:5px!important;
-    height:24px!important;
-    padding:0 7px!important;
-    border-radius:999px!important;
-    background:#f8fafc!important;
-    border:1px solid #e2e8f0!important;
-    color:#475569!important;
-    font-size:10.5px!important;
-    font-weight:900!important;
-    white-space:nowrap!important;
-    flex-shrink:0!important;
-    max-width:72px!important;
-  }
-  #feeStatusBesideNameFinal .fee-dot{
-    width:9px!important;
-    height:9px!important;
-    min-width:9px!important;
-    border-radius:999px!important;
-    background:#22c55e!important;
-    box-shadow:0 0 0 4px rgba(34,197,94,.13)!important;
-  }
-  #feeStatusBesideNameFinal.offline .fee-dot{
-    background:#ef4444!important;
-    box-shadow:0 0 0 4px rgba(239,68,68,.12)!important;
-  }
-  header.glass-header .fee-old-status-line-final{
-    display:none!important;
-    visibility:hidden!important;
-    height:0!important;
-    overflow:hidden!important;
-    margin:0!important;
-  }
-
-  .fee-download-fallback-panel-final{
-    position:fixed!important;
-    left:12px!important;
-    right:12px!important;
-    bottom:94px!important;
-    z-index:2147483605!important;
-    background:#ffffff!important;
-    color:#0f172a!important;
-    border:1px solid #dbeafe!important;
-    border-radius:22px!important;
-    padding:14px!important;
-    box-shadow:0 20px 55px rgba(15,23,42,.22)!important;
-    text-align:center!important;
-    font-family:Arial,'Cairo',sans-serif!important;
-  }
-  .fee-download-fallback-panel-final a,
-  .fee-download-fallback-panel-final button{
-    display:inline-flex!important;
-    align-items:center!important;
-    justify-content:center!important;
-    gap:8px!important;
-    border:0!important;
-    border-radius:14px!important;
-    padding:11px 16px!important;
-    margin:6px!important;
-    font-weight:900!important;
-    text-decoration:none!important;
-  }
-  .fee-download-fallback-panel-final a{background:#2563eb!important;color:#fff!important;}
-  .fee-download-fallback-panel-final button{background:#f1f5f9!important;color:#0f172a!important;}
-</style>
-<script id="fee-final-true-download-status-script">
-(function(){
-  'use strict';
-
-  const $ = (id) => document.getElementById(id);
-  let serial = 0;
-  window.__feeFinalDownloadUrls = window.__feeFinalDownloadUrls || [];
-
-  function escText(v){
-    return String(v == null ? '' : v)
-      .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
-      .replaceAll('"','&quot;').replaceAll("'",'&#039;');
-  }
-  function safeFileName(name){
-    const raw = String(name || 'download.bin').replace(/[\\/:*?"<>|]+/g,'_').trim() || 'download.bin';
-    const dot = raw.lastIndexOf('.');
-    const stamp = new Date().toISOString().replace(/[-:.TZ]/g,'').slice(0,14) + '_' + (++serial);
-    return dot > 0 ? raw.slice(0,dot) + '_' + stamp + raw.slice(dot) : raw + '_' + stamp;
-  }
-  function toast(msg,type){
-    try{ if(typeof showToast === 'function') showToast(msg, type || 'success'); }
-    catch(e){ try{ console.log(msg); }catch(_){} }
-  }
-
-  function openDownloadTicket(title){
-    let w = null;
-    try{
-      w = window.open('about:blank', '_blank');
-      if(w){
-        w.document.open();
-        w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escText(title || 'تجهيز الملف')}</title><style>body{margin:0;min-height:100vh;background:#f3f6fb;color:#0f172a;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}.box{width:min(430px,calc(100vw - 30px));background:#fff;border:1px solid #e5e7eb;border-radius:28px;padding:26px;box-shadow:0 20px 60px rgba(15,23,42,.16)}.spin{width:44px;height:44px;border-radius:999px;border:4px solid #dbeafe;border-top-color:#2563eb;animation:s 1s linear infinite;margin:0 auto 16px}@keyframes s{to{transform:rotate(360deg)}}.muted{color:#64748b;line-height:1.9;font-size:14px}</style></head><body><div class="box"><div class="spin"></div><h2>جاري تجهيز الملف</h2><p class="muted">لا تغلق هذه الصفحة. سيظهر زر التنزيل هنا خلال لحظات.</p></div>
-<style id="fee-program-ui-final-overrides">
-  body, html {
-    background:
-      radial-gradient(circle at top right, rgba(74,108,247,.10), transparent 32%),
-      radial-gradient(circle at bottom left, rgba(15,23,42,.06), transparent 28%),
-      linear-gradient(180deg,#edf2f8 0%,#e7edf5 100%) !important;
-  }
-  #appRoot {
-    max-width: 1480px !important;
-    margin: 0 auto !important;
-  }
-  header.glass-header{
-    background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(244,247,251,.98)) !important;
-    border: 1px solid #d7e0ec !important;
-    box-shadow: 0 14px 34px rgba(15,23,42,.08) !important;
-    min-height: 66px !important;
-  }
-  @media(min-width:960px){
-    header.glass-header{
-      width:min(1280px, calc(100% - 24px)) !important;
-      margin:12px auto 0 !important;
-      border-radius:24px !important;
-      top:12px !important;
-    }
-  }
-  #app-container{
-    max-width:1280px !important;
-    margin:0 auto !important;
-    padding-top:18px !important;
-    padding-bottom:128px !important;
-  }
-  .fancy-card, .section-card, .fee-card, .modal-panel, .top-sync-progress, .invoice-paper, .invoice-header, .invoice-meta, .suggestions-box{
-    background: linear-gradient(180deg, rgba(255,255,255,.985), rgba(248,250,252,.985)) !important;
-    border:1px solid #d7e0ec !important;
-    box-shadow: 0 12px 30px rgba(15,23,42,.09) !important;
-    border-radius:24px !important;
-  }
-  .btn, .fab-main, .login-tab-btn, .auth-main-btn, button[class*="rounded-2xl"], button[class*="rounded-3xl"]{
-    box-shadow: 0 8px 18px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.35) !important;
-    border:1px solid rgba(15,23,42,.06) !important;
-  }
-  .btn{
-    border-radius:16px !important;
-    font-weight:900 !important;
-  }
-  .input, .select, .textarea{
-    background: linear-gradient(180deg,#ffffff,#f8fafc) !important;
-    border:1px solid #d6deea !important;
-    border-radius:18px !important;
-    box-shadow: inset 0 1px 2px rgba(255,255,255,.9), inset 0 -1px 0 rgba(148,163,184,.06) !important;
-  }
-  .input:focus, .select:focus, .textarea:focus{
-    border-color: rgba(43,95,217,.55) !important;
-    box-shadow: 0 0 0 4px rgba(43,95,217,.12), inset 0 1px 2px rgba(255,255,255,.9) !important;
-  }
-  .bottom-nav{
-    background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(246,249,252,.98)) !important;
-    border:1px solid #d7e0ec !important;
-    box-shadow: 0 18px 40px rgba(15,23,42,.12) !important;
-    width:min(860px, calc(100% - 18px)) !important;
-    left:50% !important;
-    right:auto !important;
-    transform:translateX(-50%) !important;
-    border-radius:24px !important;
-    bottom:10px !important;
-    padding:8px !important;
-  }
-  .bottom-nav .nav-btn{
-    border-radius:18px !important;
-    min-width:66px !important;
-    transition:.18s ease !important;
-  }
-  .bottom-nav .nav-btn.fee-bottom-active,
-  .bottom-nav .nav-btn.text-blue-600{
-    background: linear-gradient(180deg,#edf4ff,#e7f0ff) !important;
-    box-shadow: inset 0 0 0 1px #d8e5ff, 0 8px 18px rgba(43,95,217,.12) !important;
-    color: var(--primary) !important;
-  }
-  .bottom-nav .nav-btn.fee-bottom-active i,
-  .bottom-nav .nav-btn.fee-bottom-active span,
-  .bottom-nav .nav-btn.text-blue-600 i,
-  .bottom-nav .nav-btn.text-blue-600 span{
-    color: var(--primary) !important;
-  }
-  .fab-main{
-    width:58px !important;
-    height:58px !important;
-    border-radius:20px !important;
-    background: linear-gradient(180deg,var(--primary),var(--primary-2)) !important;
-    box-shadow: 0 18px 34px rgba(43,95,217,.28) !important;
-  }
-  .toast{
-    border-radius:20px !important;
-    border:1px solid rgba(255,255,255,.10) !important;
-  }
-  @media(max-width:768px){
-    header.glass-header{
-      min-height:62px !important;
-      padding:10px 12px !important;
-      border-radius:0 !important;
-      width:100% !important;
-      margin:0 !important;
-      top:0 !important;
-    }
-    .bottom-nav{
-      width:calc(100% - 14px) !important;
-      border-radius:22px !important;
-    }
-    #app-container{padding-top:14px !important; padding-bottom:118px !important;}
-  }
-</style>
-
-</body></html>`);
-        w.document.close();
-        try{ w.focus(); }catch(e){}
-      }
-    }catch(e){ w = null; }
-    return w;
-  }
-
-  function showFallbackPanel(url, filename){
-    let box = $('feeFinalDownloadFallbackPanel');
-    if(!box){
-      box = document.createElement('div');
-      box.id = 'feeFinalDownloadFallbackPanel';
-      box.className = 'fee-download-fallback-panel-final no-print';
-      document.body.appendChild(box);
-    }
-    box.innerHTML = `<div style="font-weight:1000;font-size:15px;margin-bottom:5px">الملف جاهز للتنزيل</div><div style="color:#64748b;font-size:12px;margin-bottom:8px">اضغط الزر الأزرق إذا لم يبدأ التحميل تلقائياً.</div><a href="${escText(url)}" download="${escText(filename)}">تنزيل الملف</a><a href="${escText(url)}" target="_blank" style="background:#0f172a!important">فتح الملف</a><button type="button" onclick="this.parentElement.remove()">إغلاق</button>`;
-    try{
-      const a = box.querySelector('a[download]');
-      setTimeout(()=>{ try{ a && a.click(); }catch(e){} }, 60);
-    }catch(e){}
-  }
-
-  function writeReadyPage(ticket, url, filename, title){
-    const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escText(title || 'تحميل الملف')}</title><style>body{margin:0;min-height:100vh;background:#f3f6fb;color:#0f172a;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}.box{width:min(440px,calc(100vw - 30px));background:#fff;border:1px solid #e5e7eb;border-radius:30px;padding:26px;box-shadow:0 20px 60px rgba(15,23,42,.18)}.ok{width:54px;height:54px;border-radius:999px;background:#dcfce7;color:#16a34a;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;margin:0 auto 12px}a,button{display:inline-flex;align-items:center;justify-content:center;margin:7px;background:#2563eb;color:#fff;text-decoration:none;border:0;padding:14px 20px;border-radius:16px;font-weight:900;font-size:16px}.open{background:#0f172a}.close{background:#f1f5f9;color:#0f172a}.muted{color:#64748b;font-size:14px;line-height:1.9}</style></head><body><div class="box"><div class="ok">✓</div><h2>الملف جاهز</h2><p class="muted">إذا لم يبدأ التنزيل تلقائياً اضغط زر تنزيل الملف. هذه الصفحة ستعمل كل مرة بدون تحديث الموقع.</p><a id="dl" href="${escText(url)}" download="${escText(filename)}">تنزيل الملف</a><a class="open" href="${escText(url)}" target="_self">فتح الملف</a><br><button class="close" onclick="window.close()">إغلاق</button></div><script>(function(){function go(){var a=document.getElementById('dl');try{a.click()}catch(e){} } setTimeout(go,180); setTimeout(go,900);})();<\/script></body></html>`;
-    try{
-      if(ticket && !ticket.closed){
-        ticket.document.open();
-        ticket.document.write(html);
-        ticket.document.close();
-        try{ ticket.focus(); }catch(e){}
-        return true;
-      }
-    }catch(e){ console.warn(e); }
-    return false;
-  }
-
-  function deliverBlobFinal(blob, filename, ticket, title){
-    try{
-      if(!(blob instanceof Blob) || blob.size === 0){
-        toast('الملف فارغ ولم يتم تنزيله', 'error');
-        try{ ticket && !ticket.closed && ticket.close(); }catch(e){}
-        return false;
-      }
-      const safeName = safeFileName(filename);
-      let fileBlob = blob;
-      try{ fileBlob = new File([blob], safeName, {type: blob.type || 'application/octet-stream'}); }catch(e){}
-      const url = URL.createObjectURL(fileBlob);
-      window.__feeFinalDownloadUrls.push(url); // لا نلغي الرابط حتى لا يختفي التنزيل في الجوال
-      const wrote = writeReadyPage(ticket, url, safeName, title || 'تحميل الملف');
-      if(!wrote) showFallbackPanel(url, safeName);
-      return true;
-    }catch(err){
-      console.error(err);
-      toast('تعذر تجهيز التنزيل', 'error');
-      try{ ticket && !ticket.closed && ticket.close(); }catch(e){}
-      return false;
-    }
-  }
-  window.feeDeliverBlobFinal = deliverBlobFinal;
-
-  function canvasToBlobFinal(canvas, type='image/png', quality=.92){
-    return new Promise((resolve, reject) => {
-      try{
-        if(canvas.toBlob) canvas.toBlob(b => b ? resolve(b) : reject(new Error('empty canvas blob')), type, quality);
-        else {
-          const data = canvas.toDataURL(type, quality);
-          const bin = atob(data.split(',')[1]);
-          const arr = new Uint8Array(bin.length);
-          for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
-          resolve(new Blob([arr], {type}));
-        }
-      }catch(e){ reject(e); }
-    });
-  }
-  function bwCanvasFinal(canvas){
-    try{
-      const out = document.createElement('canvas');
-      out.width = canvas.width; out.height = canvas.height;
-      const ctx = out.getContext('2d', {willReadFrequently:true});
-      ctx.drawImage(canvas,0,0);
-      const img = ctx.getImageData(0,0,out.width,out.height);
-      for(let i=0;i<img.data.length;i+=4){
-        const g = img.data[i]*0.299 + img.data[i+1]*0.587 + img.data[i+2]*0.114;
-        const v = g > 170 ? 255 : 0;
-        img.data[i]=img.data[i+1]=img.data[i+2]=v;
-      }
-      ctx.putImageData(img,0,0);
-      return out;
-    }catch(e){ return canvas; }
-  }
-  async function htmlToCanvasFinal(html, scale=2, bw=false){
-    const root = $('capture-root') || (()=>{ const d=document.createElement('div'); d.id='capture-root'; d.style.cssText='position:fixed;left:-99999px;top:0;width:1150px;background:#fff'; document.body.appendChild(d); return d; })();
-    root.innerHTML = html;
-    const el = root.firstElementChild;
-    if(!el) throw new Error('لا يوجد محتوى للتصدير');
-    await Promise.all(Array.from(el.querySelectorAll('img')).map(img => new Promise(res => {
-      try{ img.crossOrigin = 'anonymous'; }catch(e){}
-      if(img.complete) return res();
-      img.onload = img.onerror = () => res();
-      setTimeout(res, 1600);
-    })));
-    const canvas = await html2canvas(el, {scale, backgroundColor:'#ffffff', useCORS:true, allowTaint:false, logging:false, removeContainer:true});
-    root.innerHTML = '';
-    return bw ? bwCanvasFinal(canvas) : canvas;
-  }
-  async function pdfCanvasFinal(canvas, filename, ticket, title, thermal=false){
-    const { jsPDF } = window.jspdf || {};
-    if(!jsPDF) throw new Error('jsPDF غير جاهز');
-    const img = canvas.toDataURL('image/png');
-    let pdf;
-    if(thermal){
-      const width = 80;
-      const height = Math.max(120, canvas.height * width / canvas.width);
-      pdf = new jsPDF('p','mm',[width, height + 6]);
-      pdf.addImage(img,'PNG',0,0,width,height);
-    }else{
-      pdf = new jsPDF('p','mm','a4');
-      const pageW = 190, pageH = 277;
-      const imgH = canvas.height * pageW / canvas.width;
-      let left = imgH, pos = 10;
-      pdf.addImage(img,'PNG',10,pos,pageW,imgH);
-      left -= pageH;
-      while(left > 0){ pos = left - imgH + 10; pdf.addPage(); pdf.addImage(img,'PNG',10,pos,pageW,imgH); left -= pageH; }
-    }
-    return deliverBlobFinal(pdf.output('blob'), filename, ticket, title || 'PDF');
-  }
-
-  function fmtMoney(v){ try{ return typeof formatCurrency === 'function' ? formatCurrency(v) : String(Number(v||0).toLocaleString('en-US')) + ' شيكل'; }catch(e){ return String(v||0); } }
-  function fmtDate(v){ try{ return typeof formatDate === 'function' ? formatDate(v) : new Date(v).toLocaleString('ar-EG'); }catch(e){ return String(v||''); } }
-  function getInv(id){ try{ return typeof getInvoiceById === 'function' ? getInvoiceById(id) : (state.data.invoices||[]).find(x=>x.id===id); }catch(e){ return null; } }
-  function getCust(id){ try{ return typeof getCustomerById === 'function' ? getCustomerById(id) : (state.data.customers||[]).find(x=>x.id===id); }catch(e){ return null; } }
-  function invTotals(inv){ try{ return typeof calculateInvoiceTotals === 'function' ? calculateInvoiceTotals(inv) : {total:Number(inv.total||0),paid:Number(inv.paidAmount||0),remaining:Math.max(0,Number(inv.total||0)-Number(inv.paidAmount||0)),subtotal:Number(inv.subtotal||0),discount:Number(inv.discount||0)}; }catch(e){ return {total:0,paid:0,remaining:0,subtotal:0,discount:0}; } }
-  function invoiceHTMLFinal(id){
-    try{ if(typeof window.buildInvoiceHTML === 'function') return window.buildInvoiceHTML(id); }catch(e){}
-    try{ if(typeof buildInvoiceHTML === 'function') return buildInvoiceHTML(id); }catch(e){}
-    const inv = getInv(id); if(!inv) return '<div>الفاتورة غير موجودة</div>';
-    const c = getCust(inv.customerId) || {};
-    const t = invTotals(inv);
-    const rows = (inv.items||[]).map(it=>`<tr><td>${escText(it.name||it.productName||'-')}</td><td>${it.qty||it.quantity||0}</td><td>${fmtMoney(it.priceBase??it.price??0)}</td><td>${fmtMoney(it.totalBase??it.total??0)}</td></tr>`).join('');
-    return `<div class="invoice-paper"><h2>فاتورة ${escText(inv.invoiceNumber||'')}</h2><p>العميل: ${escText(c.name||'زبون كاش')}</p><table style="width:100%;border-collapse:collapse"><tbody>${rows}</tbody></table><h3>الإجمالي: ${fmtMoney(t.total)}</h3><p>الواصل: ${fmtMoney(t.paid)} - المتبقي: ${fmtMoney(t.remaining)}</p></div>`;
-  }
-  function customerHTMLFinal(customerId){
-    try{ if(typeof buildCustomerStatementHTML === 'function') return buildCustomerStatementHTML(customerId); }catch(e){}
-    const c = getCust(customerId) || {};
-    const invs = (state.data.invoices||[]).filter(i=>i.customerId===customerId);
-    let total=0, paid=0, rem=0;
-    const cards = invs.map(inv=>{ const t=invTotals(inv); total+=t.total; paid+=t.paid; rem+=t.remaining; return `<div style="border:1px solid #e5e7eb;border-radius:16px;padding:12px;margin:10px 0"><b>${escText(inv.invoiceNumber||inv.id)}</b> - ${fmtDate(inv.date)}<br>الإجمالي: ${fmtMoney(t.total)} | الواصل: ${fmtMoney(t.paid)} | المتبقي: ${fmtMoney(t.remaining)}</div>`; }).join('');
-    return `<div class="invoice-paper"><h2>كشف حساب ${escText(c.name||'')}</h2><p>الهاتف: ${escText(c.phone||'-')}</p><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"><div>إجمالي الفواتير<br><b>${fmtMoney(total)}</b></div><div>إجمالي الواصل<br><b>${fmtMoney(paid)}</b></div><div>الصافي المتبقي<br><b>${fmtMoney(rem)}</b></div></div>${cards || '<p>لا توجد فواتير</p>'}</div>`;
-  }
-  function reportHTMLFinal(){
-    const invoices = (state.data.invoices||[]);
-    let sales=0, paid=0, debts=0, cost=0;
-    invoices.forEach(inv=>{ const t=invTotals(inv); sales+=t.total; paid+=t.paid; debts+=t.remaining; (inv.items||[]).forEach(it=> cost += Number(it.costBase||0)); });
-    const expenses = (state.data.expenses||[]).reduce((a,e)=>a+Number(e.amount||0),0);
-    const purchases = (state.data.purchases||[]).reduce((a,p)=>a+Number(p.amount||p.total||p.price||0),0);
-    const wages = (state.data.workers||[]).reduce((a,w)=>a+Number(w.amount||w.salary||0),0);
-    const gross = sales-cost, net = gross-expenses-wages-purchases;
-    const s = state.data.settings || {};
-    const logo = s.logo ? `<img src="${escText(s.logo)}" style="width:70px;height:70px;object-fit:contain;background:#fff;border:1px solid #e5e7eb;border-radius:18px">` : '<div style="width:70px;height:70px;border:1px solid #e5e7eb;border-radius:18px;display:flex;align-items:center;justify-content:center">🏪</div>';
-    const rows = (state.data.customers||[]).map(c=>`<tr><td>${escText(c.name||'')}</td><td>${escText(c.phone||'')}</td><td>${fmtMoney(c.balance||0)}</td></tr>`).join('');
-    return `<div class="invoice-paper"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid #e5e7eb;padding-bottom:14px;margin-bottom:14px"><div style="display:flex;gap:12px;align-items:center">${logo}<div><h2 style="margin:0">${escText(s.shopName||s.companyName||'التقارير')}</h2><p style="margin:4px 0;color:#64748b">تقرير المبيعات والأرباح - ${fmtDate(new Date().toISOString())}</p></div></div></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px"><div>المبيعات<br><b>${fmtMoney(sales)}</b></div><div>الواصل<br><b>${fmtMoney(paid)}</b></div><div>ديون الزبائن<br><b>${fmtMoney(debts)}</b></div><div>تكلفة البضاعة<br><b>${fmtMoney(cost)}</b></div><div>المصاريف<br><b>${fmtMoney(expenses)}</b></div><div>أجور العمال<br><b>${fmtMoney(wages)}</b></div><div>المشتريات<br><b>${fmtMoney(purchases)}</b></div><div>إجمالي الربح<br><b>${fmtMoney(gross)}</b></div><div>صافي الربح<br><b>${fmtMoney(net)}</b></div></div><h3>ديون العملاء</h3><table style="width:100%;border-collapse:collapse"><thead><tr><th>العميل</th><th>الهاتف</th><th>الدين</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-  }
-
-  // التصدير النهائي: كل دالة تفتح صفحة التنزيل أولاً ثم تضع الملف فيها، وهذا يحل مشكلة أول تنزيل فقط.
-  window.downloadInvoiceImage = async function(invoiceId){ const ticket=openDownloadTicket('تجهيز صورة الفاتورة'); try{ let canvas; if(typeof window.renderInvoiceCanvas === 'function'){ const r=await window.renderInvoiceCanvas(invoiceId); canvas = r.canvas || r; try{ r.root && (r.root.innerHTML=''); }catch(e){} } else canvas = await htmlToCanvasFinal(invoiceHTMLFinal(invoiceId),3,true); canvas = bwCanvasFinal(canvas); const blob = await canvasToBlobFinal(canvas,'image/png'); deliverBlobFinal(blob, (getInv(invoiceId)?.invoiceNumber||'invoice')+'.png', ticket, 'صورة الفاتورة'); toast('تم تجهيز صورة الفاتورة','success'); }catch(e){ console.error(e); toast('تعذر تجهيز الصورة','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.downloadInvoicePDF = async function(invoiceId){ const ticket=openDownloadTicket('تجهيز PDF الفاتورة'); try{ let canvas; if(typeof window.renderInvoiceCanvas === 'function'){ const r=await window.renderInvoiceCanvas(invoiceId); canvas = r.canvas || r; try{ r.root && (r.root.innerHTML=''); }catch(e){} } else canvas = await htmlToCanvasFinal(invoiceHTMLFinal(invoiceId),3,true); canvas = bwCanvasFinal(canvas); await pdfCanvasFinal(canvas, (getInv(invoiceId)?.invoiceNumber||'invoice')+'.pdf', ticket, 'PDF الفاتورة', true); toast('تم تجهيز PDF','success'); }catch(e){ console.error(e); toast('تعذر تجهيز PDF','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.downloadInvoiceExcel = function(invoiceId){ const ticket=openDownloadTicket('تجهيز Excel الفاتورة'); try{ const inv=getInv(invoiceId); if(!inv) throw new Error('الفاتورة غير موجودة'); const c=getCust(inv.customerId)||{}; const t=invTotals(inv); const rows=[[state.data.settings.shopName||state.data.settings.companyName||''],['رقم الفاتورة',inv.invoiceNumber||''],['العميل',c.name||''],['التاريخ',fmtDate(inv.date)],[],['الصنف','الوحدة','الكمية','السعر','الإجمالي'],...(inv.items||[]).map(it=>[it.name||it.productName||'',it.unitLabel||it.unit||'',it.qty||it.quantity||0,it.priceBase??it.price??0,it.totalBase??it.total??0]),[],['الإجمالي',t.total],['الواصل',t.paid],['المتبقي',t.remaining]]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'فاتورة'); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); deliverBlobFinal(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),(inv.invoiceNumber||'invoice')+'.xlsx',ticket,'Excel الفاتورة'); toast('تم تجهيز Excel','success'); }catch(e){ console.error(e); toast('تعذر تجهيز Excel','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.downloadInvoiceWord = function(invoiceId){ const ticket=openDownloadTicket('تجهيز Word الفاتورة'); try{ const inv=getInv(invoiceId); if(!inv) throw new Error('الفاتورة غير موجودة'); const html='<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"></head><body>'+invoiceHTMLFinal(invoiceId)+'</body></html>'; deliverBlobFinal(new Blob(['\ufeff',html],{type:'application/msword;charset=utf-8'}),(inv.invoiceNumber||'invoice')+'.doc',ticket,'Word الفاتورة'); toast('تم تجهيز Word','success'); }catch(e){ console.error(e); toast('تعذر تجهيز Word','error'); try{ticket&&ticket.close();}catch(_){} } };
-
-  window.downloadCustomerImage = async function(customerId){ const ticket=openDownloadTicket('تجهيز صورة كشف العميل'); try{ const canvas=await htmlToCanvasFinal(customerHTMLFinal(customerId),2,false); deliverBlobFinal(await canvasToBlobFinal(canvas,'image/png'),'customer_statement.png',ticket,'صورة كشف العميل'); toast('تم تجهيز الصورة','success'); }catch(e){ console.error(e); toast('تعذر تجهيز الصورة','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.downloadCustomerPDF = async function(customerId){ const ticket=openDownloadTicket('تجهيز PDF كشف العميل'); try{ const canvas=await htmlToCanvasFinal(customerHTMLFinal(customerId),2,false); await pdfCanvasFinal(canvas,'customer_statement.pdf',ticket,'PDF كشف العميل',false); toast('تم تجهيز PDF','success'); }catch(e){ console.error(e); toast('تعذر تجهيز PDF','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.downloadCustomerExcel = function(customerId){ const ticket=openDownloadTicket('تجهيز Excel كشف العميل'); try{ const c=getCust(customerId)||{}; const rows=[['كشف حساب',c.name||''],['الهاتف',c.phone||''],[],['الفاتورة','التاريخ','الإجمالي','الواصل','المتبقي']]; (state.data.invoices||[]).filter(i=>i.customerId===customerId).forEach(inv=>{ const t=invTotals(inv); rows.push([inv.invoiceNumber||inv.id,fmtDate(inv.date),t.total,t.paid,t.remaining]); }); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'كشف العميل'); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); deliverBlobFinal(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'customer_statement.xlsx',ticket,'Excel كشف العميل'); toast('تم تجهيز Excel','success'); }catch(e){ console.error(e); toast('تعذر تجهيز Excel','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.downloadCustomerWord = function(customerId){ const ticket=openDownloadTicket('تجهيز Word كشف العميل'); try{ deliverBlobFinal(new Blob(['\ufeff','<!doctype html><html dir="rtl"><head><meta charset="utf-8"></head><body>'+customerHTMLFinal(customerId)+'</body></html>'],{type:'application/msword;charset=utf-8'}),'customer_statement.doc',ticket,'Word كشف العميل'); toast('تم تجهيز Word','success'); }catch(e){ console.error(e); toast('تعذر تجهيز Word','error'); try{ticket&&ticket.close();}catch(_){} } };
-
-  window.exportReportsImage = async function(){ const ticket=openDownloadTicket('تجهيز صورة التقرير'); try{ const canvas=await htmlToCanvasFinal(reportHTMLFinal(),2,false); deliverBlobFinal(await canvasToBlobFinal(canvas,'image/png'),'reports.png',ticket,'صورة التقرير'); toast('تم تجهيز صورة التقرير','success'); }catch(e){ console.error(e); toast('تعذر تجهيز صورة التقرير','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.exportReportsPDF = async function(){ const ticket=openDownloadTicket('تجهيز PDF التقرير'); try{ const canvas=await htmlToCanvasFinal(reportHTMLFinal(),2,false); await pdfCanvasFinal(canvas,'reports.pdf',ticket,'PDF التقرير',false); toast('تم تجهيز PDF','success'); }catch(e){ console.error(e); toast('تعذر تجهيز PDF','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.exportReportsExcel = function(){ const ticket=openDownloadTicket('تجهيز Excel التقرير'); try{ const invoices=(state.data.invoices||[]); const rows=[['رقم','التاريخ','العميل','الإجمالي','الواصل','المتبقي'],...invoices.map(inv=>{const t=invTotals(inv); const c=getCust(inv.customerId)||{}; return [inv.invoiceNumber||inv.id,fmtDate(inv.date),c.name||'',t.total,t.paid,t.remaining];})]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'الفواتير'); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['العميل','الهاتف','الدين'],...(state.data.customers||[]).map(c=>[c.name,c.phone||'',Number(c.balance||0)])]),'العملاء'); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); deliverBlobFinal(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'reports.xlsx',ticket,'Excel التقرير'); toast('تم تجهيز Excel','success'); }catch(e){ console.error(e); toast('تعذر تجهيز Excel','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.exportReportsWord = function(){ const ticket=openDownloadTicket('تجهيز Word التقرير'); try{ deliverBlobFinal(new Blob(['\ufeff','<!doctype html><html dir="rtl"><head><meta charset="utf-8"></head><body>'+reportHTMLFinal()+'</body></html>'],{type:'application/msword;charset=utf-8'}),'reports.doc',ticket,'Word التقرير'); toast('تم تجهيز Word','success'); }catch(e){ console.error(e); toast('تعذر تجهيز Word','error'); try{ticket&&ticket.close();}catch(_){} } };
-
-  window.downloadAllCustomerInvoicesPDF = async function(){ const ticket=openDownloadTicket('تجهيز كشف الديون PDF'); try{ const canvas=await htmlToCanvasFinal(reportHTMLFinal(),2,false); await pdfCanvasFinal(canvas,'all_customer_debts.pdf',ticket,'كشف الديون PDF',false); toast('تم تجهيز كشف الديون','success'); }catch(e){ console.error(e); toast('تعذر تجهيز كشف الديون','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.downloadAllCustomerInvoicesExcel = function(){ const ticket=openDownloadTicket('تجهيز كشف الديون Excel'); try{ const rows=[['الزبون','الهاتف','إجمالي الدين'],...(state.data.customers||[]).filter(c=>Number(c.balance||0)>0).map(c=>[c.name,c.phone||'',Number(c.balance||0)])]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'ديون الزبائن'); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); deliverBlobFinal(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'all_customer_debts.xlsx',ticket,'كشف الديون Excel'); toast('تم تجهيز Excel','success'); }catch(e){ console.error(e); toast('تعذر تجهيز Excel','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.exportInventoryExcelPro = window.exportInventoryExcel = function(){ const ticket=openDownloadTicket('تجهيز Excel الأصناف'); try{ const rows=[['الكود','الصنف','التصنيف','الباركود','نوع الوحدة','المخزون','قطع بالكرتونة','الجملة','البيع'],...(state.data.products||[]).map(p=>[p.code,p.name,p.category,p.barcode,p.unitType||p.unit,p.stock,p.piecesPerCarton||'',p.costPrice,p.salePrice])]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'الأصناف'); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); deliverBlobFinal(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'inventory.xlsx',ticket,'Excel الأصناف'); toast('تم تجهيز Excel','success'); }catch(e){ console.error(e); toast('تعذر تجهيز Excel','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.exportExpensesExcel = function(){ const ticket=openDownloadTicket('تجهيز Excel المصاريف'); try{ const rows=[['التاريخ','البند','المبلغ','الحساب','ملاحظات'],...(state.data.expenses||[]).map(e=>[fmtDate(e.date),e.category,e.amount,e.accountId||'',e.note||''])]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'المصاريف'); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); deliverBlobFinal(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'expenses.xlsx',ticket,'Excel المصاريف'); toast('تم تجهيز Excel','success'); }catch(e){ console.error(e); toast('تعذر تجهيز Excel','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.downloadFeeFullBackup = function(){ const ticket=openDownloadTicket('تجهيز النسخة الاحتياطية'); try{ if(state && state.data && state.data.meta) state.data.meta.lastBackupAt = new Date().toISOString(); try{ if(typeof saveAppState === 'function') saveAppState(); }catch(e){} const blob = new Blob([JSON.stringify({version:'fee-final-backup',exportedAt:new Date().toISOString(),data:state.data}, null, 2)], {type:'application/json;charset=utf-8'}); deliverBlobFinal(blob,'fee-backup.json',ticket,'النسخة الاحتياطية'); toast('تم تجهيز النسخة الاحتياطية','success'); }catch(e){ console.error(e); toast('تعذر تجهيز النسخة الاحتياطية','error'); try{ticket&&ticket.close();}catch(_){} } };
-
-  function moveStatusBesideNameFinal(){
-    const title = $('header-shop-name');
-    if(!title) return;
-    const parent = title.parentElement;
-    if(!parent) return;
-    parent.classList.add('fee-shop-title-inline-final');
-    Array.from(parent.children).forEach(ch=>{
-      if(ch !== title && ch.id !== 'feeStatusBesideNameFinal') ch.classList.add('fee-old-status-line-final');
-    });
-    let chip = $('feeStatusBesideNameFinal');
-    if(!chip){ chip = document.createElement('span'); chip.id = 'feeStatusBesideNameFinal'; }
-    const online = navigator.onLine;
-    const oldText = $('connectionText');
-    let txt = (oldText && oldText.textContent && oldText.textContent.trim()) || (online ? 'متصل' : 'غير متصل');
-    if(!online) txt = 'غير متصل';
-    chip.classList.toggle('offline', !online);
-    chip.innerHTML = `<span class="fee-dot"></span><span>${escText(txt)}</span>`;
-    if(chip.parentElement !== parent || title.nextElementSibling !== chip) title.insertAdjacentElement('afterend', chip);
-  }
-  const oldHeader = window.updateHeader;
-  if(typeof oldHeader === 'function' && !oldHeader.__feeStatusBesideNameFinal){
-    const wrapped = function(){ const r = oldHeader.apply(this, arguments); setTimeout(moveStatusBesideNameFinal, 0); return r; };
-    wrapped.__feeStatusBesideNameFinal = true;
-    window.updateHeader = wrapped;
-  }
-  const oldRender = window.render;
-  if(typeof oldRender === 'function' && !oldRender.__feeFinalDownloadStatusRender){
-    const wrappedRender = function(){ const r = oldRender.apply(this, arguments); setTimeout(moveStatusBesideNameFinal, 0); setTimeout(moveStatusBesideNameFinal, 80); return r; };
-    wrappedRender.__feeFinalDownloadStatusRender = true;
-    window.render = wrappedRender;
-  }
-  window.addEventListener('online', () => setTimeout(moveStatusBesideNameFinal, 40));
-  window.addEventListener('offline', () => setTimeout(moveStatusBesideNameFinal, 40));
-  window.addEventListener('DOMContentLoaded', () => setTimeout(moveStatusBesideNameFinal, 120));
-  setTimeout(moveStatusBesideNameFinal, 80);
-  setTimeout(moveStatusBesideNameFinal, 500);
-  setInterval(moveStatusBesideNameFinal, 1200);
-})();
-</script>
-
-</body></html>');
-        w.document.close();
-      }catch(e){ w = null; }
-    }
-    return w;
-  }
-
-  function showFallbackDownload(dataUrl, filename){
-    let box = $('fee-download-manual-box');
-    if(!box){
-      box = document.createElement('div');
-      box.id = 'fee-download-manual-box';
-      box.style.cssText = 'position:fixed;left:12px;right:12px;bottom:88px;z-index:2147483647;background:#fff;color:#0f172a;border:1px solid #e5e7eb;border-radius:20px;padding:14px;text-align:center;box-shadow:0 18px 55px rgba(15,23,42,.20);font-family:Arial,sans-serif';
-      document.body.appendChild(box);
-    }
-    box.innerHTML = '<div style="font-weight:900;margin-bottom:8px">الملف جاهز</div><a href="'+dataUrl+'" download="'+safe(filename)+'" style="display:inline-flex;background:#2563eb;color:#fff;text-decoration:none;padding:11px 16px;border-radius:14px;font-weight:900">اضغط لتنزيل الملف</a><button type="button" style="margin-right:8px;border:0;background:#f1f5f9;padding:11px 14px;border-radius:14px;font-weight:900" onclick="this.parentElement.remove()">إغلاق</button>';
-  }
-
-  function blobToDataURL(blob){
-    return new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result || ''));
-      r.onerror = reject;
-      r.readAsDataURL(blob);
-    });
-  }
-
-  async function deliverBlob(blob, filename, ticket, title){
-    if(!(blob instanceof Blob) || blob.size === 0){ toast('الملف فارغ، لم يتم تنزيله', 'error'); try{ ticket && !ticket.closed && ticket.close(); }catch(e){} return false; }
-    const safeName = fileName(filename);
-    const dataUrl = await blobToDataURL(blob);
-    const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تحميل الملف</title><style>body{margin:0;min-height:100vh;background:#f3f6fb;color:#0f172a;text-align:center;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center}.box{width:min(430px,calc(100vw - 30px));background:#fff;border:1px solid #e5e7eb;border-radius:28px;padding:26px;box-shadow:0 20px 60px rgba(15,23,42,.16)}a,button{display:inline-flex;align-items:center;justify-content:center;margin:8px;background:#2563eb;color:#fff;text-decoration:none;border:0;padding:14px 20px;border-radius:16px;font-weight:900;font-size:16px}.close{background:#f1f5f9;color:#0f172a}.muted{color:#64748b;font-size:14px;line-height:1.9}</style></head><body><div class="box"><h2>الملف جاهز</h2><p class="muted">إذا لم يبدأ التنزيل تلقائياً اضغط الزر الأزرق. هذه الصفحة تمنع مشكلة أن التنزيل يشتغل مرة واحدة فقط.</p><a id="dl" href="'+dataUrl+'" download="'+safe(safeName)+'">تنزيل الملف</a><br><button class="close" onclick="window.close()">إغلاق</button></div><script>(function(){function go(){var a=document.getElementById("dl");try{a.click()}catch(e){} setTimeout(function(){try{window.location.href=a.href}catch(e){}},500)} setTimeout(go,120);})();<' + '/script></body></html>';
-    if(ticket && !ticket.closed && ticket.document){
-      try{ ticket.document.open(); ticket.document.write(html); ticket.document.close(); }
-      catch(e){ showFallbackDownload(dataUrl, safeName); }
-    }else{
-      showFallbackDownload(dataUrl, safeName);
-      try{
-        const a = document.createElement('a');
-        a.href = dataUrl; a.download = safeName; a.style.display = 'none';
-        document.body.appendChild(a); a.click(); a.remove();
-      }catch(e){}
-    }
-    return true;
-  }
-
-  async function canvasFromHTML(html, scale){
-    let root = $('capture-root');
-    if(!root){
-      root = document.createElement('div');
-      root.id = 'capture-root';
-      root.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px;background:#fff;z-index:-1';
-      document.body.appendChild(root);
-    }
-    root.innerHTML = html;
-    const el = root.firstElementChild;
-    if(!el) throw new Error('لا يوجد محتوى للتصدير');
-    await Promise.all(Array.from(root.querySelectorAll('img')).map(img => new Promise(res => { try{ img.crossOrigin='anonymous'; }catch(e){} if(img.complete) res(); else { img.onload=res; img.onerror=res; setTimeout(res, 1200); } })));
-    const canvas = await html2canvas(el, {scale:scale||2, backgroundColor:'#ffffff', useCORS:true, allowTaint:false, logging:false, windowWidth:Math.max(900, el.scrollWidth || 900)});
-    root.innerHTML = '';
-    return canvas;
-  }
-
-  function canvasToBlob(canvas, type, quality){
-    return new Promise((resolve) => {
-      if(canvas.toBlob) canvas.toBlob(b => resolve(b), type || 'image/png', quality || .92);
-      else fetch(canvas.toDataURL(type || 'image/png', quality || .92)).then(r => r.blob()).then(resolve);
-    });
-  }
-
-  function thermalBW(canvas){
-    const out = document.createElement('canvas'); out.width = canvas.width; out.height = canvas.height;
-    const ctx = out.getContext('2d'); ctx.drawImage(canvas,0,0);
-    try{
-      const img = ctx.getImageData(0,0,out.width,out.height);
-      for(let i=0;i<img.data.length;i+=4){
-        const g = img.data[i]*.299 + img.data[i+1]*.587 + img.data[i+2]*.114;
-        const v = g > 170 ? 255 : 0;
-        img.data[i]=img.data[i+1]=img.data[i+2]=v;
-      }
-      ctx.putImageData(img,0,0);
-    }catch(e){}
-    return out;
-  }
-
-  function logoHTML(size){
-    const s = currentSettings();
-    if(s.logo) return '<img src="'+safe(s.logo)+'" crossorigin="anonymous" style="width:'+size+'px;height:'+size+'px;object-fit:contain;display:block;margin:0 auto 5px;filter:grayscale(1) contrast(1.3);background:#fff">';
-    return '<div style="width:'+size+'px;height:'+size+'px;border:1px solid #000;margin:0 auto 5px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px">LOGO</div>';
-  }
-
-  function invoiceThermalHTML(invoiceId){
-    const inv = getInv(invoiceId); if(!inv) throw new Error('الفاتورة غير موجودة');
-    const c = getCust(inv.customerId) || {};
-    const t = totals(inv);
-    const s = currentSettings();
-    const rows = (inv.items || []).map(it => {
-      const q = num(it.qty ?? it.quantity ?? 0);
-      const price = num(it.priceBase ?? it.price ?? 0);
-      const total = num(it.totalBase ?? it.total ?? (q*price));
-      return '<tr><td style="text-align:right">'+safe(it.name || it.productName || '')+'</td><td>'+safe(it.unitLabel || it.unit || '')+'</td><td>'+Number(q.toFixed(3))+'</td><td>'+baseMoney(price)+'</td><td>'+baseMoney(total)+'</td></tr>';
-    }).join('') || '<tr><td colspan="5">لا توجد أصناف</td></tr>';
-    return '<div style="width:302px;max-width:302px;background:#fff;color:#000;font-family:Cairo,Arial,sans-serif;padding:10px 8px;direction:rtl;filter:grayscale(1) contrast(1.18)">'+
-      logoHTML(58)+
-      '<h2 style="font-size:15px;text-align:center;margin:0 0 3px;font-weight:900;color:#000">'+safe(s.shopName || s.companyName || '')+'</h2>'+
-      '<div style="font-size:10px;text-align:center;line-height:1.7;border-bottom:1px dashed #000;padding-bottom:5px;margin-bottom:6px;color:#000">فاتورة: '+safe(inv.invoiceNumber || inv.id || '')+'<br>'+fmtDate(inv.date || new Date().toISOString())+'<br>'+(c.name ? 'العميل: '+safe(c.name)+'<br>' : '')+(c.phone ? 'الجوال: '+safe(c.phone) : '')+'</div>'+
-      '<table style="width:100%;border-collapse:collapse;font-size:10px;color:#000"><thead><tr><th style="border-bottom:1px solid #000;text-align:right">الصنف</th><th style="border-bottom:1px solid #000">وحدة</th><th style="border-bottom:1px solid #000">كمية</th><th style="border-bottom:1px solid #000">سعر</th><th style="border-bottom:1px solid #000">مجموع</th></tr></thead><tbody>'+rows+'</tbody></table>'+
-      '<div style="font-size:11px;margin-top:6px;border-top:1px dashed #000;padding-top:5px;color:#000"><div style="display:flex;justify-content:space-between"><b>الإجمالي</b><b>'+baseMoney(t.total)+'</b></div><div style="display:flex;justify-content:space-between"><b>الواصل</b><b>'+baseMoney(t.paid)+'</b></div><div style="display:flex;justify-content:space-between"><b>المتبقي</b><b>'+baseMoney(t.remaining)+'</b></div></div>'+
-      '<div style="text-align:center;font-size:10px;margin-top:8px;border-top:1px dashed #000;padding-top:5px">'+safe(s.footerNote || 'شكراً لتعاملكم معنا')+'</div></div>';
-  }
-
-  function reportData(){
-    let sales=0, paid=0, remaining=0, cost=0;
-    arr('invoices').forEach(inv => { const t=totals(inv); sales+=num(t.total); paid+=num(t.paid); remaining+=num(t.remaining); (inv.items||[]).forEach(it => { cost += num(it.costBase ?? it.cost ?? 0) * num(it.qty ?? it.quantity ?? 1); }); });
-    const expenses = arr('expenses').filter(e=>e.type !== 'wage').reduce((a,e)=>a+num(e.amount)*(num(currencyBy(e.currency).rateToBase)||1),0);
-    const wages = arr('wages').reduce((a,w)=>a+num(w.amount)*(num(currencyBy(w.currency).rateToBase)||1),0);
-    const purchases = arr('purchases').reduce((a,p)=>a+num(p.amount)*(num(currencyBy(p.currency).rateToBase)||1),0);
-    const gross = sales - cost;
-    const percentRules = arr('wageRules').filter(r=>r.mode === 'profit_percent').reduce((a,r)=>a+(gross*Math.max(0,num(r.percent))/100),0);
-    return {sales, paid, remaining, cost, expenses, wages, purchases, gross, percentRules, net:gross-expenses-wages-percentRules};
-  }
-
-  function reportsHTML(){
-    const d = reportData(); const s = currentSettings();
-    const cust = arr('customers').filter(c=>num(c.balance)>0).map(c=>'<tr><td>'+safe(c.name)+'</td><td>'+safe(c.phone||'')+'</td><td>'+baseMoney(c.balance)+'</td></tr>').join('');
-    const short = arr('products').filter(p=>num(p.stock)<=num(p.lowStock ?? p.minStock ?? 3)).map(p=>'<tr><td>'+safe(p.name)+'</td><td>'+num(p.stock)+'</td><td>'+num(p.lowStock ?? p.minStock ?? 3)+'</td></tr>').join('');
-    const stats = [['المبيعات',d.sales],['تكلفة البضاعة',d.cost],['إجمالي الربح',d.gross],['المصاريف',d.expenses],['أجور العمال',d.wages],['نسبة أرباح العمال',d.percentRules],['المشتريات',d.purchases],['صافي الربح',d.net]].map(x=>'<div style="border:1px solid #e5e7eb;border-radius:16px;padding:12px"><small style="color:#64748b;font-weight:800">'+x[0]+'</small><br><b style="font-size:18px">'+baseMoney(x[1])+'</b></div>').join('');
-    return '<div style="background:#fff;color:#0f172a;font-family:Cairo,Arial,sans-serif;padding:22px;direction:rtl;width:900px;max-width:900px">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #e5e7eb;padding-bottom:14px;margin-bottom:16px"><div>'+logoHTML(72)+'<h1 style="margin:0;font-size:24px">'+safe(s.shopName||s.companyName||'')+'</h1></div><div style="color:#64748b;font-size:12px;line-height:1.8">تقرير شامل<br>'+fmtDate(new Date().toISOString())+'</div></div>'+
-      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">'+stats+'</div><h3>ديون العملاء</h3><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th>العميل</th><th>الجوال</th><th>الدين</th></tr></thead><tbody>'+(cust||'<tr><td colspan="3">لا توجد بيانات</td></tr>')+'</tbody></table><h3>البضاعة الناقصة</h3><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th>الصنف</th><th>المخزون</th><th>حد النقص</th></tr></thead><tbody>'+(short||'<tr><td colspan="3">لا توجد بضاعة ناقصة</td></tr>')+'</tbody></table></div>';
-  }
-
-  function customerHTML(customerId){
-    const c = getCust(customerId) || {}; let total=0, paid=0, rem=0;
-    const invs = arr('invoices').filter(i=>i.customerId === customerId);
-    const blocks = invs.map(inv => { const t=totals(inv); total+=num(t.total); paid+=num(t.paid); rem+=num(t.remaining); const rows=(inv.items||[]).map(it=>'<tr><td>'+safe(it.name||it.productName||'')+'</td><td>'+num(it.qty||it.quantity)+'</td><td>'+baseMoney(it.priceBase??it.price??0)+'</td><td>'+baseMoney(it.totalBase??it.total??0)+'</td></tr>').join(''); return '<h3>فاتورة '+safe(inv.invoiceNumber||inv.id)+' - '+fmtDate(inv.date)+'</h3><table style="width:100%;border-collapse:collapse"><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>'+rows+'</tbody></table><p><b>الإجمالي:</b> '+baseMoney(t.total)+' - <b>الواصل:</b> '+baseMoney(t.paid)+' - <b>المتبقي:</b> '+baseMoney(t.remaining)+'</p>'; }).join('');
-    return '<div style="background:#fff;color:#0f172a;font-family:Cairo,Arial,sans-serif;padding:22px;direction:rtl;width:900px;max-width:900px">'+logoHTML(72)+'<h1>كشف حساب '+safe(c.name||'')+'</h1><p>'+safe(c.phone||'')+'</p>'+(blocks||'<p>لا توجد فواتير</p>')+'<hr><h2>الخلاصة</h2><p>إجمالي الفواتير: '+baseMoney(total)+' | الواصل: '+baseMoney(paid)+' | المتبقي: '+baseMoney(rem)+'</p></div>';
-  }
-
-  async function pdfFromCanvas(canvas, filename, ticket){
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('p','mm','a4');
-    const img = canvas.toDataURL('image/png');
-    const w = 190, h = canvas.height*w/canvas.width;
-    let left = h, pos = 10;
-    pdf.addImage(img,'PNG',10,pos,w,h);
-    left -= 277;
-    while(left>0){ pos = left - h + 10; pdf.addPage(); pdf.addImage(img,'PNG',10,pos,w,h); left -= 277; }
-    await deliverBlob(pdf.output('blob'), filename, ticket, 'PDF');
-  }
-
-  function workbookBlob(wb){
-    const out = XLSX.write(wb, {bookType:'xlsx', type:'array'});
-    return new Blob([out], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  }
-
-  window.downloadInvoiceImage = async function(invoiceId){ const ticket=openDownloadPage('صورة الفاتورة'); try{ const canvas=thermalBW(await canvasFromHTML(invoiceThermalHTML(invoiceId),3)); await deliverBlob(await canvasToBlob(canvas,'image/png'), (getInv(invoiceId)?.invoiceNumber||'invoice')+'.png', ticket); toast('تم تجهيز صورة الفاتورة','success'); }catch(e){ console.error(e); toast('تعذر تنزيل الصورة','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.downloadInvoicePDF = async function(invoiceId){ const ticket=openDownloadPage('PDF الفاتورة'); try{ const canvas=thermalBW(await canvasFromHTML(invoiceThermalHTML(invoiceId),3)); await pdfFromCanvas(canvas, (getInv(invoiceId)?.invoiceNumber||'invoice')+'.pdf', ticket); toast('تم تجهيز PDF','success'); }catch(e){ console.error(e); toast('تعذر تنزيل PDF','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.downloadInvoiceExcel = async function(invoiceId){ const ticket=openDownloadPage('Excel الفاتورة'); try{ const inv=getInv(invoiceId); if(!inv) throw new Error('الفاتورة غير موجودة'); const c=getCust(inv.customerId)||{}; const t=totals(inv); const rows=[[currentSettings().shopName||currentSettings().companyName||''],['رقم الفاتورة',inv.invoiceNumber||''],['العميل',c.name||''],['التاريخ',fmtDate(inv.date)],[],['الصنف','الوحدة','الكمية','السعر','الإجمالي'],...(inv.items||[]).map(it=>[it.name||it.productName||'',it.unitLabel||it.unit||'',it.qty||it.quantity||0,it.priceBase??it.price??0,it.totalBase??it.total??0]),[],['الإجمالي',t.total],['الواصل',t.paid],['المتبقي',t.remaining]]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'فاتورة'); await deliverBlob(workbookBlob(wb),(inv.invoiceNumber||'invoice')+'.xlsx',ticket); toast('تم تجهيز Excel','success'); }catch(e){ console.error(e); toast('تعذر تنزيل Excel','error'); try{ticket&&ticket.close();}catch(_){} } };
-  window.downloadInvoiceWord = async function(invoiceId){ const ticket=openDownloadPage('Word الفاتورة'); try{ const inv=getInv(invoiceId); if(!inv) throw new Error('الفاتورة غير موجودة'); const html='<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"></head><body>'+invoiceThermalHTML(invoiceId)+'</body></html>'; await deliverBlob(new Blob(['\ufeff',html],{type:'application/msword;charset=utf-8'}),(inv.invoiceNumber||'invoice')+'.doc',ticket); toast('تم تجهيز Word','success'); }catch(e){ console.error(e); toast('تعذر تنزيل Word','error'); try{ticket&&ticket.close();}catch(_){} } };
-
-  window.exportReportsImage = async function(){ const ticket=openDownloadPage('صورة التقرير'); try{ const canvas=await canvasFromHTML(reportsHTML(),2); await deliverBlob(await canvasToBlob(canvas,'image/png'),'reports.png',ticket); toast('تم تجهيز صورة التقرير','success'); }catch(e){console.error(e);toast('تعذر تنزيل التقرير','error');try{ticket&&ticket.close();}catch(_){}} };
-  window.exportReportsPDF = async function(){ const ticket=openDownloadPage('PDF التقرير'); try{ const canvas=await canvasFromHTML(reportsHTML(),2); await pdfFromCanvas(canvas,'reports.pdf',ticket); toast('تم تجهيز PDF','success'); }catch(e){console.error(e);toast('تعذر تنزيل PDF','error');try{ticket&&ticket.close();}catch(_){}} };
-  window.exportReportsExcel = async function(){ const ticket=openDownloadPage('Excel التقرير'); try{ const d=reportData(); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['البند','القيمة'],['المبيعات',d.sales],['تكلفة البضاعة',d.cost],['إجمالي الربح',d.gross],['المصاريف',d.expenses],['أجور العمال',d.wages],['نسبة أرباح العمال',d.percentRules],['المشتريات',d.purchases],['صافي الربح',d.net]]),'ملخص'); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['العميل','الهاتف','الدين'],...arr('customers').map(c=>[c.name,c.phone||'',num(c.balance)])]),'العملاء'); await deliverBlob(workbookBlob(wb),'reports.xlsx',ticket); toast('تم تجهيز Excel','success'); }catch(e){console.error(e);toast('تعذر تنزيل Excel','error');try{ticket&&ticket.close();}catch(_){}} };
-  window.exportReportsWord = async function(){ const ticket=openDownloadPage('Word التقرير'); try{ await deliverBlob(new Blob(['\ufeff','<!doctype html><html dir="rtl"><head><meta charset="utf-8"></head><body>'+reportsHTML()+'</body></html>'],{type:'application/msword;charset=utf-8'}),'reports.doc',ticket); toast('تم تجهيز Word','success'); }catch(e){console.error(e);toast('تعذر تنزيل Word','error');try{ticket&&ticket.close();}catch(_){}} };
-
-  window.downloadCustomerImage = async function(customerId){ const ticket=openDownloadPage('صورة كشف العميل'); try{ const canvas=await canvasFromHTML(customerHTML(customerId),2); await deliverBlob(await canvasToBlob(canvas,'image/png'),'customer.png',ticket); toast('تم تجهيز الصورة','success'); }catch(e){console.error(e);toast('تعذر تنزيل الصورة','error');try{ticket&&ticket.close();}catch(_){}} };
-  window.downloadCustomerPDF = async function(customerId){ const ticket=openDownloadPage('PDF كشف العميل'); try{ const canvas=await canvasFromHTML(customerHTML(customerId),2); await pdfFromCanvas(canvas,'customer.pdf',ticket); toast('تم تجهيز PDF','success'); }catch(e){console.error(e);toast('تعذر تنزيل PDF','error');try{ticket&&ticket.close();}catch(_){}} };
-  window.downloadCustomerExcel = async function(customerId){ const ticket=openDownloadPage('Excel كشف العميل'); try{ const c=getCust(customerId)||{}; const rows=[['كشف حساب',c.name||''],['الهاتف',c.phone||''],[],['الفاتورة','التاريخ','الإجمالي','الواصل','المتبقي']]; arr('invoices').filter(i=>i.customerId===customerId).forEach(inv=>{ const t=totals(inv); rows.push([inv.invoiceNumber||inv.id,fmtDate(inv.date),t.total,t.paid,t.remaining]); }); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'كشف العميل'); await deliverBlob(workbookBlob(wb),'customer.xlsx',ticket); toast('تم تجهيز Excel','success'); }catch(e){console.error(e);toast('تعذر تنزيل Excel','error');try{ticket&&ticket.close();}catch(_){}} };
-  window.downloadCustomerWord = async function(customerId){ const ticket=openDownloadPage('Word كشف العميل'); try{ await deliverBlob(new Blob(['\ufeff','<!doctype html><html dir="rtl"><head><meta charset="utf-8"></head><body>'+customerHTML(customerId)+'</body></html>'],{type:'application/msword;charset=utf-8'}),'customer.doc',ticket); toast('تم تجهيز Word','success'); }catch(e){console.error(e);toast('تعذر تنزيل Word','error');try{ticket&&ticket.close();}catch(_){}} };
-
-  window.downloadAllCustomerInvoicesPDF = async function(){ const ticket=openDownloadPage('PDF ديون الزبائن'); try{ const canvas=await canvasFromHTML(reportsHTML(),2); await pdfFromCanvas(canvas,'all_customer_debts.pdf',ticket); toast('تم تجهيز كشف الديون','success'); }catch(e){console.error(e);toast('تعذر تنزيل كشف الديون','error');try{ticket&&ticket.close();}catch(_){}} };
-  window.downloadAllCustomerInvoicesExcel = async function(){ const ticket=openDownloadPage('Excel ديون الزبائن'); try{ const rows=[['الزبون','الهاتف','إجمالي الدين'],...arr('customers').filter(c=>num(c.balance)>0).map(c=>[c.name,c.phone||'',num(c.balance)])]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'ديون الزبائن'); await deliverBlob(workbookBlob(wb),'all_customer_debts.xlsx',ticket); toast('تم تجهيز Excel','success'); }catch(e){console.error(e);toast('تعذر تنزيل Excel','error');try{ticket&&ticket.close();}catch(_){}} };
-  window.exportInventoryExcel = async function(){ const ticket=openDownloadPage('Excel الأصناف'); try{ const rows=[['الكود','الصنف','الباركود','الوحدة','المخزون','جملة','بيع'],...arr('products').map(p=>[p.code||p.id,p.name,p.barcode||'',p.unit||p.baseUnit||'',p.stock||0,p.costPrice||p.cost||0,p.sellPrice||p.price||0])]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'الأصناف'); await deliverBlob(workbookBlob(wb),'inventory.xlsx',ticket); toast('تم تجهيز Excel','success'); }catch(e){console.error(e);toast('تعذر تنزيل Excel','error');try{ticket&&ticket.close();}catch(_){}} };
-  window.exportExpensesExcel = async function(){ const ticket=openDownloadPage('Excel المصاريف'); try{ const rows=[['التاريخ','البند','المبلغ','الحساب','ملاحظات'],...arr('expenses').map(e=>[fmtDate(e.date),e.category,e.amount,e.accountId||'',e.note||''])]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'المصاريف'); await deliverBlob(workbookBlob(wb),'expenses.xlsx',ticket); toast('تم تجهيز Excel','success'); }catch(e){console.error(e);toast('تعذر تنزيل Excel','error');try{ticket&&ticket.close();}catch(_){}} };
-  window.downloadFeeFullBackup = async function(){ const ticket=openDownloadPage('نسخة احتياطية'); try{ const st=stateObj(); if(st.data && st.data.meta) st.data.meta.lastBackupAt = new Date().toISOString(); try{ if(typeof saveAppState === 'function') saveAppState(); }catch(e){} const payload = {version:'fee-full-fixed-downloads', exportedAt:new Date().toISOString(), data:st.data}; await deliverBlob(new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'}),'fee-backup.json',ticket); try{ if(typeof updateAlertsBadge==='function') updateAlertsBadge(); }catch(e){} toast('تم تجهيز النسخة الاحتياطية','success'); }catch(e){console.error(e);toast('تعذر تنزيل النسخة','error');try{ticket&&ticket.close();}catch(_){}} };
-
-  function hookRenderAndNav(){
-    const oldRender = window.render;
-    if(typeof oldRender === 'function' && !oldRender.__feeStatusNameDownloadPatched){
-      const wrapped = function(){ const res = oldRender.apply(this, arguments); setTimeout(moveStatusBesideName,0); setTimeout(moveStatusBesideName,80); return res; };
-      wrapped.__feeStatusNameDownloadPatched = true; window.render = wrapped;
-    }
-  }
-  hookRenderAndNav();
-  ['DOMContentLoaded','load','online','offline'].forEach(ev => window.addEventListener(ev, () => setTimeout(moveStatusBesideName, 50)));
-  document.addEventListener('click', () => setTimeout(moveStatusBesideName, 0), true);
-  setTimeout(moveStatusBesideName, 80);
-  setTimeout(moveStatusBesideName, 500);
-  setInterval(moveStatusBesideName, 350);
-})();
-</script>
-
-</body>
+      </body>
       </html>
     `;
 
@@ -8228,63 +7307,7 @@
   window.downloadCustomerImage = async function(customerId){ const ticket=prepareDownloadWindow('تجهيز كشف العميل'); try{ const canvas=await canvasFromHTML(customerHTML(customerId),2); const blob=await canvasBlob(canvas,'image/png'); downloadBlob(blob,'customer.png',ticket); toast('تم تجهيز صورة كشف العميل','success'); }catch(e){console.error(e);toast('تعذر تنزيل الصورة','error');try{ticket&&ticket.close();}catch{}} };
   window.downloadCustomerPDF = async function(customerId){ const ticket=prepareDownloadWindow('تجهيز PDF'); try{ const canvas=await canvasFromHTML(customerHTML(customerId),2); await pdfFromCanvas(canvas,'customer.pdf',ticket); toast('تم تجهيز PDF','success'); }catch(e){console.error(e);toast('تعذر تنزيل PDF','error');try{ticket&&ticket.close();}catch{}} };
   window.downloadCustomerExcel = function(customerId){ try{ const c=getCustomerById(customerId)||{}; const rows=[['كشف حساب',c.name||''],['الهاتف',c.phone||''],[],['الفاتورة','التاريخ','الإجمالي','الواصل','المتبقي']]; arr2('invoices').filter(i=>i.customerId===customerId).forEach(inv=>{ const t=calculateInvoiceTotals(inv); rows.push([inv.invoiceNumber||inv.id,fmtDate(inv.date),t.total,t.paid,t.remaining]); }); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'كشف العميل'); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); downloadBlob(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'customer.xlsx'); toast('تم تنزيل Excel','success'); }catch(e){console.error(e);toast('تعذر تنزيل Excel','error');} };
-  window.downloadCustomerWord = function(customerId){ try{ downloadBlob(new Blob(['\ufeff','<!doctype html><html dir="rtl"><head><meta charset="utf-8">
-
-<style id="fee-scanner-always-top-fix-2026-05-05">
-  /* كاميرا الباركود دائمًا فوق نافذة إضافة الصنف وأي نافذة أخرى */
-  #feeScannerPage.fee-scan-page{
-    position:fixed!important;
-    inset:0!important;
-    width:100vw!important;
-    height:100dvh!important;
-    max-width:100vw!important;
-    max-height:100dvh!important;
-    background:#000!important;
-    z-index:2147483600!important;
-    overflow:hidden!important;
-    isolation:isolate!important;
-    transform:none!important;
-    margin:0!important;
-    padding:0!important;
-  }
-  #feeScannerPage.fee-scan-page.show{
-    display:block!important;
-    visibility:visible!important;
-    opacity:1!important;
-    pointer-events:auto!important;
-  }
-  #feeScannerPage .fee-scan-reader,
-  #feeScannerPage #feeScanReader{
-    position:fixed!important;
-    inset:0!important;
-    width:100vw!important;
-    height:100dvh!important;
-    z-index:2147483601!important;
-    background:#000!important;
-  }
-  #feeScannerPage .fee-scan-reader video,
-  #feeScannerPage #feeScanReader video{
-    width:100vw!important;
-    height:100dvh!important;
-    object-fit:cover!important;
-    position:fixed!important;
-    inset:0!important;
-  }
-  #feeScannerPage .fee-scan-frame{z-index:2147483610!important;}
-  #feeScannerPage .fee-laser{z-index:2147483611!important;}
-  #feeScannerPage .fee-scan-toast{z-index:2147483612!important;}
-  #feeScannerPage .fee-scan-close{z-index:2147483613!important;}
-  body.fee-scanner-open{overflow:hidden!important;touch-action:none!important;}
-  body.fee-scanner-open #modal-root,
-  body.fee-scanner-open .modal-backdrop,
-  body.fee-scanner-open #feeSideMenu,
-  body.fee-scanner-open #feeSideBackdrop,
-  body.fee-scanner-open .bottom-nav,
-  body.fee-scanner-open header{pointer-events:none!important;}
-  body.fee-scanner-open #feeScannerPage,
-  body.fee-scanner-open #feeScannerPage *{pointer-events:auto!important;}
-</style>
-</head><body>'+customerHTML(customerId)+'</body></html>'],{type:'application/msword;charset=utf-8'}),'customer.doc'); toast('تم تنزيل Word','success'); }catch(e){console.error(e);toast('تعذر تنزيل Word','error');} };
+  window.downloadCustomerWord = function(customerId){ try{ downloadBlob(new Blob(['\ufeff','<!doctype html><html dir="rtl"><head><meta charset="utf-8"></head><body>'+customerHTML(customerId)+'</body></html>'],{type:'application/msword;charset=utf-8'}),'customer.doc'); toast('تم تنزيل Word','success'); }catch(e){console.error(e);toast('تعذر تنزيل Word','error');} };
   window.downloadAllCustomerInvoicesPDF = async function(){ const ticket=prepareDownloadWindow('تجهيز كشف الديون'); try{ const html=reportsHTML(); const canvas=await canvasFromHTML(html,2); await pdfFromCanvas(canvas,'all_customer_debts.pdf',ticket); toast('تم تجهيز كشف الديون','success'); }catch(e){console.error(e);toast('تعذر تنزيل كشف الديون','error');try{ticket&&ticket.close();}catch{}} };
   window.downloadAllCustomerInvoicesExcel = function(){ try{ const rows=[['الزبون','الهاتف','إجمالي الدين'],...arr2('customers').filter(c=>n(c.balance)>0).map(c=>[c.name,c.phone||'',n(c.balance)])]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'ديون الزبائن'); const out=XLSX.write(wb,{bookType:'xlsx',type:'array'}); downloadBlob(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'all_customer_debts.xlsx'); toast('تم تنزيل Excel','success'); }catch(e){console.error(e);toast('تعذر تنزيل Excel','error');} };
   function currencyOpts(sel){ return arr2('currencies').map(c=>`<option value="${safeText(c.code)}" ${c.code===sel?'selected':''}>${safeText(c.name)} (${safeText(c.symbol||c.code)})</option>`).join(''); }
@@ -8405,472 +7428,178 @@
 
 
 
-<!-- fee absolutely final nav/status fix 2026-05-05 -->
-<style id="fee-absolutely-final-nav-status-fix">
-  /* إخفاء حالة الاتصال القديمة تحت اسم المحل */
-  #connectionDot,
-  #connectionText,
-  .fee-header-hidden-status{
-    display:none!important;
-    visibility:hidden!important;
-    width:0!important;
-    height:0!important;
-    overflow:hidden!important;
-  }
-
-  /* هيدر أقصر وأوضح */
-  header.glass-header{
-    min-height:56px!important;
-    padding:6px 10px!important;
-    gap:8px!important;
-    overflow:hidden!important;
-  }
-  header.glass-header > div:first-child{
-    min-width:0!important;
-    gap:8px!important;
-  }
-  header.glass-header .w-14.h-14{
-    width:42px!important;
-    height:42px!important;
-    border-radius:16px!important;
-  }
-  #header-shop-name{
-    font-size:17px!important;
-    line-height:1.15!important;
-    max-width:150px!important;
-    white-space:nowrap!important;
-    overflow:hidden!important;
-    text-overflow:ellipsis!important;
-    margin:0!important;
-  }
-  #feeMenuToggle{
-    order:-20!important;
-    width:42px!important;
-    height:42px!important;
-    min-width:42px!important;
-    display:inline-flex!important;
-    align-items:center!important;
-    justify-content:center!important;
-    border-radius:15px!important;
-    background:#fff!important;
-    border:1px solid #e5e7eb!important;
-    color:#0f172a!important;
-    box-shadow:0 8px 18px rgba(15,23,42,.06)!important;
-  }
-  header.glass-header > div:last-child{
-    gap:5px!important;
-    min-width:0!important;
-    flex-shrink:0!important;
-  }
-  header.glass-header > div:last-child button{
-    width:38px!important;
-    height:38px!important;
-    min-width:38px!important;
-    display:inline-flex!important;
-    align-items:center!important;
-    justify-content:center!important;
-    border-radius:13px!important;
-  }
-
-  /* الحالة بجانب زر المزامنة */
-  #feeConnectionChipFinal{
-    display:inline-flex!important;
-    align-items:center!important;
-    justify-content:center!important;
-    gap:6px!important;
-    height:34px!important;
-    padding:0 9px!important;
-    border-radius:999px!important;
-    background:#f8fafc!important;
-    border:1px solid #e2e8f0!important;
-    color:#334155!important;
-    font-size:11px!important;
-    font-weight:900!important;
-    line-height:1!important;
-    white-space:nowrap!important;
-    box-shadow:0 8px 16px rgba(15,23,42,.04)!important;
-  }
-  #feeConnectionChipFinal .dot{
-    width:9px!important;
-    height:9px!important;
-    min-width:9px!important;
-    border-radius:999px!important;
-    display:inline-block!important;
-    background:#22c55e!important;
-    box-shadow:0 0 0 5px rgba(34,197,94,.14)!important;
-  }
-  #feeConnectionChipFinal.offline .dot{
-    background:#ef4444!important;
-    box-shadow:0 0 0 5px rgba(239,68,68,.14)!important;
-  }
-
-  /* الشريط السفلي النهائي: الرئيسية، الكاشير، الأصناف، الفواتير، العملاء */
-  .bottom-nav{
-    height:72px!important;
-    z-index:2147482000!important;
-    display:grid!important;
-    grid-template-columns:repeat(5,minmax(0,1fr))!important;
-    gap:2px!important;
-    overflow:hidden!important;
-    justify-content:stretch!important;
-    align-items:stretch!important;
-    padding:6px 6px!important;
-  }
-  .bottom-nav .nav-btn{
-    display:flex!important;
-    min-width:0!important;
-    width:100%!important;
-    height:60px!important;
-    flex:1 1 0!important;
-    align-items:center!important;
-    justify-content:center!important;
-    border-radius:18px!important;
-    color:#6b7280!important;
-    background:transparent!important;
-    transition:.15s ease!important;
-  }
-  .bottom-nav .nav-btn i,
-  .bottom-nav .nav-btn span{
-    color:inherit!important;
-  }
-  .bottom-nav .nav-btn.fee-bottom-active,
-  .bottom-nav .nav-btn.text-blue-600{
-    color:var(--primary)!important;
-    background:rgba(45,89,216,.10)!important;
-    font-weight:1000!important;
-  }
-  .bottom-nav .nav-btn.fee-bottom-active i,
-  .bottom-nav .nav-btn.text-blue-600 i{
-    color:var(--primary)!important;
-    transform:translateY(-1px)!important;
-  }
-  .bottom-nav .nav-btn.text-gray-500:not(.fee-bottom-active){
-    color:#6b7280!important;
-  }
-
-  /* هذا يكسر القاعدة القديمة التي كانت تخفي العملاء وتظهر التقارير */
-  #appRoot.fee-sidebar-on .bottom-nav .nav-btn{
-    display:none!important;
-  }
-  #appRoot.fee-sidebar-on .bottom-nav #nav-home,
-  #appRoot.fee-sidebar-on .bottom-nav #nav-cashier,
-  #appRoot.fee-sidebar-on .bottom-nav #nav-inventory,
-  #appRoot.fee-sidebar-on .bottom-nav #nav-invoices,
-  #appRoot.fee-sidebar-on .bottom-nav #nav-customers{
-    display:flex!important;
-  }
-  #appRoot.fee-sidebar-on .bottom-nav #nav-reports,
-  .bottom-nav #nav-reports,
-  .bottom-nav #nav-settings{
-    display:none!important;
-  }
-
-  #feeSideMenu{
-    z-index:2147483000!important;
-  }
-  #feeSideBackdrop{
-    z-index:2147482998!important;
-  }
-
-  @media(max-width:520px){
-    header.glass-header{min-height:54px!important;padding:5px 8px!important;}
-    #header-shop-name{font-size:16px!important;max-width:112px!important;}
-    #feeConnectionChipFinal{font-size:10.5px!important;padding:0 7px!important;height:32px!important;}
-    header.glass-header > div:last-child button{width:35px!important;height:35px!important;min-width:35px!important;}
-    #feeMenuToggle{width:40px!important;height:40px!important;min-width:40px!important;}
-    header.glass-header .w-14.h-14{width:40px!important;height:40px!important;}
-  }
-</style>
-<script id="fee-absolutely-final-nav-status-fix-script">
+<script id="fee-program-preview-accounting-final-safe">
 (function(){
   'use strict';
-  const $ = (id) => document.getElementById(id);
-  const bottomItems = [
-    ['home','fa-home','الرئيسية'],
-    ['cashier','fa-cash-register','الكاشير'],
-    ['inventory','fa-boxes-stacked','الأصناف'],
-    ['invoices','fa-file-invoice','الفواتير'],
-    ['customers','fa-users','العملاء']
-  ];
-  const sideItems = [
-    ['home','fa-home','الرئيسية'],
-    ['cashier','fa-cash-register','الكاشير'],
-    ['inventory','fa-boxes-stacked','الأصناف والمخزون'],
-    ['customers','fa-users','العملاء والديون'],
-    ['invoices','fa-file-invoice','الفواتير'],
-    ['reports','fa-chart-pie','التقارير'],
-    ['purchases','fa-truck-ramp-box','المشتريات'],
-    ['shortages','fa-triangle-exclamation','البضاعة الناقصة'],
-    ['expenses','fa-money-bill-wave','المصاريف'],
-    ['workers','fa-users-gear','أجور العمال'],
-    ['accounts','fa-wallet','حسابات الدفع'],
-    ['supplierPayments','fa-hand-holding-dollar','دفعات التجار'],
-    ['settings','fa-cog','الإعدادات']
-  ];
-  let navLock = false;
+  function q(s,r){return (r||document).querySelector(s)}
+  function byId(id){return document.getElementById(id)}
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]})}
+  function n(v){v=Number(v||0);return Number.isFinite(v)?v:0}
+  function d(){try{return state.data||{}}catch(e){return {}}}
+  function list(k){var data=d(); if(!Array.isArray(data[k])) data[k]=[]; return data[k]}
+  function fmt(v){try{return typeof formatCurrency==='function'?formatCurrency(v):n(v).toLocaleString('en-US')+' '+((d().settings||{}).currency||'شيكل')}catch(e){return n(v).toLocaleString('en-US')+' شيكل'}}
+  function dateText(v){try{return typeof formatDate==='function'?formatDate(v):new Date(v||Date.now()).toLocaleString('ar-EG')}catch(e){return String(v||'')}}
+  function invoiceById(id){try{if(typeof getInvoiceById==='function')return getInvoiceById(id)}catch(e){} return list('invoices').find(function(x){return x.id===id||x.invoiceNumber===id})}
+  function customerById(id){try{if(typeof getCustomerById==='function')return getCustomerById(id)}catch(e){} return list('customers').find(function(x){return x.id===id})||{}}
+  function totals(inv){try{return calculateInvoiceTotals(inv)}catch(e){var total=n((inv||{}).total||(inv||{}).subtotal),paid=n((inv||{}).paidAmount||(inv||{}).paid);return {subtotal:total,discount:n((inv||{}).discount),total:total,paid:paid,remaining:Math.max(0,total-paid)}}}
+  function toast(msg,type){try{showToast(msg,type||'success')}catch(e){console.log(msg)}}
 
-  function getScreen(){
+  function recalcAccountsAndReports(){
+    try{ if(typeof rebuildCustomerBalances==='function') rebuildCustomerBalances(); }catch(e){}
+    try{ if(typeof refreshShortages==='function') refreshShortages(false); }catch(e){}
+    try{ if(typeof maybeGenerateMonthlyWages==='function') maybeGenerateMonthlyWages(); }catch(e){}
     try{
-      if (typeof state !== 'undefined' && state && state.currentScreen) return state.currentScreen;
-    }catch(e){}
-    return 'home';
-  }
-
-  function isActive(key){
-    const cur = getScreen();
-    return key === cur || (key === 'customers' && cur === 'customerDetail') || (key === 'invoices' && cur === 'invoiceDetail');
-  }
-
-  function buildBottomNav(){
-    const nav = document.querySelector('.bottom-nav');
-    if(!nav) return;
-    const wanted = bottomItems.map(([key,icon,label]) =>
-      `<button onclick="navigate('${key}')" class="flex flex-col items-center p-2 nav-btn" id="nav-${key}" type="button"><i class="fas ${icon} text-[22px]"></i><span class="text-[10px] mt-1">${label}</span></button>`
-    ).join('');
-    if(nav.getAttribute('data-fee-bottom-final-real') !== '1' || nav.innerHTML.indexOf('nav-customers') === -1 || nav.innerHTML.indexOf('nav-reports') !== -1 || nav.children.length !== 5){
-      navLock = true;
-      nav.innerHTML = wanted;
-      nav.setAttribute('data-fee-bottom-final-real','1');
-      setTimeout(()=>{navLock=false;},0);
-    }
-    applyActiveBottomNav();
-  }
-
-  function applyActiveBottomNav(){
-    const nav = document.querySelector('.bottom-nav');
-    if(!nav) return;
-    nav.querySelectorAll('.nav-btn').forEach(btn => {
-      const key = (btn.id || '').replace(/^nav-/, '');
-      const active = isActive(key);
-      btn.classList.toggle('fee-bottom-active', active);
-      btn.classList.toggle('text-blue-600', active);
-      btn.classList.toggle('text-gray-500', !active);
-      btn.style.color = active ? 'var(--primary)' : '#6b7280';
-    });
-  }
-
-  function updateConnectionChip(){
-    const header = document.querySelector('header.glass-header');
-    if(!header) return;
-
-    const oldDot = $('connectionDot');
-    const oldText = $('connectionText');
-    if(oldDot) oldDot.classList.add('fee-header-hidden-status');
-    if(oldText) oldText.classList.add('fee-header-hidden-status');
-
-    const actions = header.querySelector('div.flex.items-center.gap-2') || header.lastElementChild;
-    if(!actions) return;
-    let chip = $('feeConnectionChipFinal');
-    if(!chip){
-      chip = document.createElement('span');
-      chip.id = 'feeConnectionChipFinal';
-    }
-    const online = navigator.onLine;
-    let txt = (oldText && oldText.textContent && oldText.textContent.trim()) || (online ? 'متصل' : 'غير متصل');
-    if(!online && (txt === 'متصل' || txt === 'أونلاين')) txt = 'غير متصل';
-    chip.classList.toggle('offline', !online);
-    chip.innerHTML = `<span class="dot"></span><span>${txt}</span>`;
-
-    const syncBtn = Array.from(actions.querySelectorAll('button')).find(b => (b.getAttribute('onclick') || '').includes('openSyncCenter')) || actions.querySelector('button');
-    if(syncBtn){
-      if(chip.parentElement !== actions || syncBtn.nextElementSibling !== chip) syncBtn.insertAdjacentElement('afterend', chip);
-    }else if(chip.parentElement !== actions){
-      actions.prepend(chip);
-    }
-  }
-
-  function ensureSideMenu(){
-    let backdrop = $('feeSideBackdrop');
-    if(!backdrop){
-      backdrop = document.createElement('div');
-      backdrop.id = 'feeSideBackdrop';
-      backdrop.className = 'no-print';
-      document.body.appendChild(backdrop);
-    }
-    backdrop.onclick = closeSide;
-
-    let side = $('feeSideMenu');
-    if(!side){
-      side = document.createElement('aside');
-      side.id = 'feeSideMenu';
-      side.className = 'no-print';
-      document.body.appendChild(side);
-    }
-    const cur = getScreen();
-    side.innerHTML = `<div class="fee-side-title"><span><i class="fas fa-layer-group"></i> أقسام النظام</span><button class="fee-action-chip" type="button" id="feeCloseSideBtn"><i class="fas fa-xmark"></i></button></div>` +
-      sideItems.map(([key,icon,label]) => `<button class="fee-side-btn ${key===cur?'active':''}" type="button" data-fee-side-screen="${key}"><i class="fas ${icon}"></i><span>${label}</span></button>`).join('');
-    const closeBtn = $('feeCloseSideBtn');
-    if(closeBtn) closeBtn.onclick = closeSide;
-    side.querySelectorAll('[data-fee-side-screen]').forEach(btn => {
-      btn.onclick = () => {
-        const screen = btn.getAttribute('data-fee-side-screen');
-        closeSide();
-        if(typeof navigate === 'function') navigate(screen);
-      };
-    });
-  }
-
-  function openSide(){
-    ensureSideMenu();
-    document.body.classList.add('fee-side-open');
-    $('feeSideBackdrop')?.classList.add('show');
-    $('feeSideMenu')?.classList.add('show');
-  }
-  function closeSide(){
-    document.body.classList.remove('fee-side-open');
-    $('feeSideBackdrop')?.classList.remove('show');
-    $('feeSideMenu')?.classList.remove('show');
-  }
-
-  function compactHeader(){
-    const header = document.querySelector('header.glass-header');
-    if(!header) return;
-    const brand = header.querySelector('.flex.items-center.gap-3') || header.firstElementChild;
-    let menu = $('feeMenuToggle');
-    if(!menu){
-      menu = document.createElement('button');
-      menu.id = 'feeMenuToggle';
-      menu.type = 'button';
-      menu.innerHTML = '<i class="fas fa-bars text-lg"></i>';
-    }
-    menu.className = 'p-2 hover:bg-white rounded-full transition-colors';
-    menu.onclick = openSide;
-    if(brand && menu.parentElement !== brand) brand.prepend(menu);
-
-    const actions = header.querySelector('div.flex.items-center.gap-2') || header.lastElementChild;
-    if(actions){
-      Array.from(actions.querySelectorAll('button')).forEach(b => {
-        const on = b.getAttribute('onclick') || '';
-        if(on.includes("navigate('settings')") || on.includes('navigate("settings")')) b.style.display = 'none';
-        if(b.id === 'feeHeaderCustomersBtn') b.remove();
+      list('paymentAccounts').forEach(function(acc){
+        if(!Array.isArray(acc.movements)) acc.movements=[];
+        if(acc.openingBalance==null){
+          var movementSum=acc.movements.reduce(function(a,m){return a+(m.type==='deposit'?n(m.amount):-n(m.amount))},0);
+          acc.openingBalance=n(acc.balance)-movementSum;
+        }
+        var sum=acc.movements.reduce(function(a,m){return a+(m.type==='deposit'?n(m.amount):-n(m.amount))},0);
+        acc.balance=n(acc.openingBalance)+sum;
+        acc.totalIn=acc.movements.filter(function(m){return m.type==='deposit'}).reduce(function(a,m){return a+n(m.amount)},0);
+        acc.totalOut=acc.movements.filter(function(m){return m.type!=='deposit'}).reduce(function(a,m){return a+n(m.amount)},0);
       });
+    }catch(e){console.warn('account recalc',e)}
+    try{ if(state && state.data && state.data.meta) state.data.meta.lastRecalcAt=new Date().toISOString(); }catch(e){}
+  }
+  window.feeRecalculateEverythingFinal=recalcAccountsAndReports;
+  try{
+    var oldSave=window.saveAppState;
+    if(typeof oldSave==='function' && !oldSave.__feeFinalRecalc){
+      var ns=function(){recalcAccountsAndReports(); return oldSave.apply(this,arguments)};
+      ns.__feeFinalRecalc=true; window.saveAppState=ns;
     }
-    updateConnectionChip();
+  }catch(e){}
+  ['pushFullStateToCloud','syncQueueToCloud','manualSync'].forEach(function(name){
+    try{var old=window[name]; if(typeof old==='function'&&!old.__feeFinalRecalc){var fn=function(){recalcAccountsAndReports(); return old.apply(this,arguments)}; fn.__feeFinalRecalc=true; window[name]=fn;}}catch(e){}
+  });
+
+  function currentLicenseKey(){try{return (getCurrentLicense()||{}).key||''}catch(e){return ''}}
+  function previewUrl(kind,id){
+    var u=new URL(location.href.split('#')[0]);
+    u.searchParams.set('feePreview',kind||'reports');
+    var key=currentLicenseKey(); if(key) u.searchParams.set('key',key);
+    if(id) u.searchParams.set('id',id);
+    return u.toString();
   }
-
-  function runFixes(){
-    buildBottomNav();
-    ensureSideMenu();
-    compactHeader();
-    applyActiveBottomNav();
+  window.feePreviewUrl=previewUrl;
+  function showPreviewChip(url,label){
+    var old=byId('fee-preview-ready-chip'); if(old) old.remove();
+    var box=document.createElement('div'); box.id='fee-preview-ready-chip'; box.className='fee-preview-ready-chip no-print';
+    box.innerHTML='<b style="color:#263238">رابط معاينة جاهز</b><a target="_blank" href="'+esc(url)+'">فتح الرابط</a><button type="button">إغلاق</button>';
+    box.querySelector('button').onclick=function(){box.remove()};
+    document.body.appendChild(box);
+    setTimeout(function(){try{box.remove()}catch(e){}},18000);
   }
-
-  const oldNavigate = window.navigate;
-  if(typeof oldNavigate === 'function' && !oldNavigate.__feeFinalPatched){
-    const wrapped = function(screen, params){
-      const res = oldNavigate.call(this, screen, params || {});
-      setTimeout(runFixes, 0);
-      setTimeout(runFixes, 40);
-      return res;
-    };
-    wrapped.__feeFinalPatched = true;
-    window.navigate = wrapped;
+  async function openPreviewModal(kind,id){
+    recalcAccountsAndReports();
+    try{ if(navigator.onLine && typeof syncQueueToCloud==='function') await syncQueueToCloud(); }catch(e){}
+    var url=previewUrl(kind,id);
+    var body='<div class="space-y-3"><p class="text-sm text-slate-600 leading-7">انسخ هذا الرابط وأرسله للعميل أو الموظف. الرابط للمعاينة فقط بدون أي أزرار تحكم.</p><input id="fee-preview-link-input" class="input" readonly value="'+esc(url)+'"><div class="flex gap-2"><button id="fee-copy-preview-link" class="btn flex-1 py-3 rounded-2xl text-white" style="background:linear-gradient(135deg,var(--primary),var(--primary-2))">نسخ الرابط</button><button id="fee-open-preview-link" class="btn flex-1 py-3 rounded-2xl bg-slate-100">فتح المعاينة</button></div></div>';
+    try{openModal({title:'رابط معاينة',body:body,maxWidth:'640px'}); setTimeout(function(){var input=byId('fee-preview-link-input'); var c=byId('fee-copy-preview-link'); var o=byId('fee-open-preview-link'); if(c)c.onclick=function(){try{navigator.clipboard.writeText(input.value);toast('تم نسخ الرابط','success')}catch(e){input.select();document.execCommand('copy');toast('تم نسخ الرابط','success')}}; if(o)o.onclick=function(){window.open(input.value,'_blank')};},50)}catch(e){prompt('رابط المعاينة',url)}
+    showPreviewChip(url,'رابط معاينة');
   }
+  window.feeOpenSharePreview=openPreviewModal;
 
-  const oldRender = window.render;
-  if(typeof oldRender === 'function' && !oldRender.__feeFinalPatched){
-    const wrappedRender = function(){
-      const res = oldRender.apply(this, arguments);
-      setTimeout(runFixes, 0);
-      setTimeout(runFixes, 50);
-      return res;
-    };
-    wrappedRender.__feeFinalPatched = true;
-    window.render = wrappedRender;
+  function invoiceView(id){
+    try{if(typeof invoiceHTML==='function')return invoiceHTML(id)}catch(e){}
+    try{if(typeof buildInvoiceHTML==='function')return buildInvoiceHTML(id)}catch(e){}
+    var inv=invoiceById(id); if(!inv)return '<div class="invoice-paper"><h2>الفاتورة غير موجودة</h2></div>';
+    var c=customerById(inv.customerId),t=totals(inv),settings=d().settings||{};
+    var rows=(inv.items||[]).map(function(it){return '<tr><td>'+esc(it.name||it.productName||'')+'</td><td>'+esc(it.unitLabel||it.unit||'')+'</td><td>'+esc(it.qty||it.quantity||0)+'</td><td>'+fmt(it.priceBase!=null?it.priceBase:it.price||0)+'</td><td>'+fmt(it.totalBase!=null?it.totalBase:it.total||0)+'</td></tr>'}).join('');
+    return '<div style="background:#fff;color:#263238;font-family:Cairo,Arial,sans-serif;padding:20px;direction:rtl;width:900px;max-width:100%"><h1>'+esc(settings.shopName||settings.companyName||'فاتورة')+'</h1><h2>فاتورة '+esc(inv.invoiceNumber||inv.id)+'</h2><p>العميل: '+esc(c.name||inv.customerName||'زبون')+'</p><table style="width:100%;border-collapse:collapse" border="1" cellpadding="8"><thead><tr><th>الصنف</th><th>الوحدة</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>'+rows+'</tbody></table><h2>الإجمالي: '+fmt(t.total)+' | الواصل: '+fmt(t.paid)+' | المتبقي: '+fmt(t.remaining)+'</h2></div>';
   }
-
-  document.addEventListener('click', function(e){
-    const menu = e.target.closest && e.target.closest('#feeMenuToggle');
-    if(menu){ e.preventDefault(); openSide(); return; }
-    const bottomBtn = e.target.closest && e.target.closest('.bottom-nav .nav-btn');
-    if(bottomBtn){ setTimeout(applyActiveBottomNav, 0); setTimeout(applyActiveBottomNav, 60); }
-  }, true);
-
-  function observeBottom(){
-    const nav = document.querySelector('.bottom-nav');
-    if(!nav || nav.__feeObservedFinal) return;
-    nav.__feeObservedFinal = true;
-    new MutationObserver(() => {
-      if(navLock) return;
-      setTimeout(buildBottomNav, 0);
-    }).observe(nav, { childList:true });
+  function customerView(id){
+    try{if(typeof customerHTML==='function')return customerHTML(id)}catch(e){}
+    try{if(typeof buildCustomerStatementHTML==='function')return buildCustomerStatementHTML(id)}catch(e){}
+    var c=customerById(id); var invs=list('invoices').filter(function(i){return i.customerId===id}); var total=0,paid=0,rem=0;
+    var blocks=invs.map(function(i){var t=totals(i); total+=n(t.total); paid+=n(t.paid); rem+=n(t.remaining); return '<div class="fee-record-card"><div><div class="record-title">فاتورة '+esc(i.invoiceNumber||i.id)+'</div><div class="record-sub">'+esc(dateText(i.date))+'</div></div><div class="record-amount">'+fmt(t.remaining)+'</div></div>'}).join('');
+    return '<div style="background:#fff;color:#263238;font-family:Cairo,Arial,sans-serif;padding:20px;direction:rtl;width:900px;max-width:100%"><h1>كشف حساب '+esc(c.name||'')+'</h1>'+blocks+'<hr><h2>إجمالي: '+fmt(total)+' | الواصل: '+fmt(paid)+' | المتبقي: '+fmt(rem)+'</h2></div>';
   }
-
-  window.addEventListener('online', () => setTimeout(runFixes, 50));
-  window.addEventListener('offline', () => setTimeout(runFixes, 50));
-  window.addEventListener('DOMContentLoaded', () => setTimeout(()=>{runFixes(); observeBottom();}, 120));
-  setTimeout(()=>{runFixes(); observeBottom();}, 80);
-  setTimeout(()=>{runFixes(); observeBottom();}, 500);
-  setInterval(()=>{updateConnectionChip(); applyActiveBottomNav();}, 1500);
-})();
-</script>
-
-
-<script id="fee-scanner-open-above-modals-fix-2026-05-05">
-(function(){
-  function liftScanner(){
-    var page = document.getElementById('feeScannerPage');
-    if(!page) return;
-    try{ document.body.appendChild(page); }catch(e){}
-    page.style.setProperty('z-index','2147483600','important');
-    page.style.setProperty('position','fixed','important');
-    page.style.setProperty('inset','0','important');
-    page.style.setProperty('width','100vw','important');
-    page.style.setProperty('height','100dvh','important');
-    page.style.setProperty('overflow','hidden','important');
+  function reportView(){
+    var invs=list('invoices'), customers=list('customers'), accounts=list('paymentAccounts');
+    var sales=0,paid=0,remaining=0,cost=0;
+    invs.forEach(function(inv){var t=totals(inv); sales+=n(t.total); paid+=n(t.paid); remaining+=n(t.remaining); (inv.items||[]).forEach(function(it){cost+=n(it.costBase||it.cost||0)*n(it.qty||it.quantity||1)})});
+    var expenses=list('expenses').filter(function(e){return e.type!=='wage'}).reduce(function(a,e){return a+n(e.amount)},0);
+    var wages=list('wages').reduce(function(a,w){return a+n(w.amount)},0);
+    var purchases=list('purchases').reduce(function(a,p){return a+n(p.amount)},0);
+    var gross=sales-cost, net=gross-expenses-wages-purchases;
+    var accRows=accounts.map(function(a){return '<tr><td>'+esc(a.name)+'</td><td>'+fmt(a.balance)+'</td><td>'+fmt(a.totalIn||0)+'</td><td>'+fmt(a.totalOut||0)+'</td></tr>'}).join('');
+    var debtRows=customers.map(function(c){return '<tr><td>'+esc(c.name)+'</td><td>'+esc(c.phone||'')+'</td><td>'+fmt(c.balance||0)+'</td></tr>'}).join('');
+    return '<div style="background:#fff;color:#263238;font-family:Cairo,Arial,sans-serif;padding:20px;direction:rtl;width:900px;max-width:100%"><h1>تقرير شامل</h1><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">'+[['المبيعات',sales],['تكلفة البضاعة',cost],['إجمالي الربح',gross],['المصاريف',expenses],['أجور العمال',wages],['المشتريات',purchases],['المدفوع',paid],['صافي الربح',net]].map(function(x){return '<div style="border:1px solid #e1eaec;border-radius:16px;padding:12px"><small>'+x[0]+'</small><br><b>'+fmt(x[1])+'</b></div>'}).join('')+'</div><h2>الحسابات البنكية / الدفع</h2><table border="1" cellpadding="8" style="width:100%;border-collapse:collapse"><thead><tr><th>الحساب</th><th>الرصيد</th><th>الوارد</th><th>الصادر</th></tr></thead><tbody>'+accRows+'</tbody></table><h2>ديون العملاء</h2><table border="1" cellpadding="8" style="width:100%;border-collapse:collapse"><thead><tr><th>العميل</th><th>الجوال</th><th>الدين</th></tr></thead><tbody>'+debtRows+'</tbody></table></div>';
   }
-
-  function patchScannerFns(){
-    if(window.__feeScannerTopPatchApplied) return true;
-    if(typeof window.openFeeScanner !== 'function' || typeof window.stopFeeScanner !== 'function') return false;
-    window.__feeScannerTopPatchApplied = true;
-    var originalOpen = window.openFeeScanner;
-    var originalStop = window.stopFeeScanner;
-
-    window.openFeeScanner = async function(){
-      document.body.classList.add('fee-scanner-open');
-      liftScanner();
-      try{
-        var result = originalOpen.apply(this, arguments);
-        liftScanner();
-        setTimeout(liftScanner, 25);
-        setTimeout(liftScanner, 150);
-        setTimeout(liftScanner, 400);
-        return await result;
-      }catch(err){
-        document.body.classList.remove('fee-scanner-open');
-        throw err;
-      }
-    };
-
-    window.stopFeeScanner = async function(){
-      try{
-        return await originalStop.apply(this, arguments);
-      }finally{
-        document.body.classList.remove('fee-scanner-open');
-      }
-    };
-    return true;
-  }
-
-  function waitPatch(){
-    if(patchScannerFns()) return;
-    var tries = 0;
-    var timer = setInterval(function(){
-      tries++;
-      if(patchScannerFns() || tries > 80) clearInterval(timer);
-    }, 100);
-  }
-
-  waitPatch();
-  document.addEventListener('click', function(e){
-    var btn = e.target && e.target.closest && e.target.closest('[onclick*="openFeeScanner"]');
-    if(btn){
-      document.body.classList.add('fee-scanner-open');
-      setTimeout(liftScanner, 0);
-      setTimeout(liftScanner, 120);
+  async function waitFirebase(){for(var i=0;i<70;i++){if(window.feeFirebase)return window.feeFirebase; await new Promise(function(r){setTimeout(r,100)})}return null}
+  async function loadPreviewData(key){
+    if(key){
+      try{var fb=await waitFirebase(); if(fb){var app; try{app=fb.initializeApp(firebaseConfig,'fee_public_preview_'+Date.now())}catch(e){app=fb.initializeApp(firebaseConfig)} var db=fb.getDatabase(app); var snap=await fb.get(fb.ref(db,'fee_cloud_data/'+key+'/appState')); if(snap.exists())return snap.val();}}catch(e){console.warn(e)}
+      try{return JSON.parse(localStorage.getItem('fee_rebuild_v3_app_state__'+key)||'null')}catch(e){}
     }
-  }, true);
+    return null;
+  }
+  async function handlePublicPreview(){
+    var p=new URLSearchParams(location.search),kind=p.get('feePreview'); if(!kind)return;
+    document.body.innerHTML='<div id="fee-public-preview"><div class="public-card"><div style="text-align:center;padding:40px;font-weight:900;color:#178b82">جاري تحميل المعاينة...</div></div></div>';
+    var loaded=await loadPreviewData(p.get('key')||'');
+    if(loaded){try{state.data=Object.assign({},state.data||{},loaded)}catch(e){}}
+    recalcAccountsAndReports();
+    var id=p.get('id')||'';
+    var html=kind==='invoice'?invoiceView(id):(kind==='customer'?customerView(id):reportView());
+    document.body.innerHTML='<div id="fee-public-preview"><div style="max-width:980px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center;gap:10px"><b style="color:#178b82">معاينة فقط</b><span style="color:#71808a;font-size:13px">'+esc((d().settings||{}).shopName||(d().settings||{}).companyName||'')+'</span></div><div class="public-card">'+html+'</div></div>';
+  }
+  function injectPreviewButton(){
+    try{
+      var root=byId('app-container'); if(!root)return;
+      var existing=byId('feePreviewLinkBtn'); if(existing) existing.remove();
+      var kind='',id='',label='رابط معاينة';
+      var cur=(window.state||{}).currentScreen;
+      if(cur==='invoiceDetail' && (window.state||{}).selectedInvoiceId){kind='invoice'; id=window.state.selectedInvoiceId; label='رابط معاينة الفاتورة'}
+      else if(cur==='customerDetail' && (window.state||{}).selectedCustomerId){kind='customer'; id=window.state.selectedCustomerId; label='رابط معاينة كشف العميل'}
+      else if(cur==='reports'){kind='reports'; label='رابط معاينة التقرير'}
+      else return;
+      var b=document.createElement('button'); b.id='feePreviewLinkBtn'; b.type='button'; b.className='btn'; b.innerHTML='<i class="fas fa-link"></i> '+label; b.onclick=function(){openPreviewModal(kind,id)}; root.prepend(b);
+    }catch(e){}
+  }
+  function patchHeaderStatus(){
+    var header=q('header.glass-header'); if(!header)return;
+    var title=byId('header-shop-name'); if(!title||!title.parentElement)return;
+    var dot=byId('connectionDot'), txt=byId('connectionText'); if(dot)dot.style.display='none'; if(txt)txt.style.display='none';
+    var chip=byId('feeConnectionChip'); if(!chip){chip=document.createElement('span');chip.id='feeConnectionChip'}
+    var online=navigator.onLine; var label=(txt&&txt.textContent&&txt.textContent.trim())||(online?'متصل':'غير متصل'); if(!online) label='غير متصل';
+    chip.innerHTML='<span class="'+(online?'online-dot':'offline-dot')+'"></span><span>'+esc(label)+'</span>';
+    if(chip.parentElement!==title.parentElement || title.nextElementSibling!==chip) title.insertAdjacentElement('afterend',chip);
+  }
+  function patchHome(){
+    try{
+      var old=window.renderHome; if(typeof old!=='function'||old.__feeProgramHome)return;
+      var nh=function(el){
+        try{
+          recalcAccountsAndReports();
+          var data=d(), customers=list('customers'), invoices=list('invoices'), purchases=list('purchases'), alerts=[];
+          try{alerts=typeof getAllAlerts==='function'?getAllAlerts():[]}catch(e){}
+          var sales=invoices.reduce(function(a,i){return a+n(totals(i).total)},0);
+          var debts=customers.reduce(function(a,c){return a+n(c.balance)},0);
+          var purchaseTotal=purchases.reduce(function(a,p){return a+n(p.amount||p.price)},0);
+          var latest=invoices.slice().sort(function(a,b){return new Date(b.date||0)-new Date(a.date||0)}).slice(0,5);
+          el.innerHTML='<div class="space-y-5"><section class="fee-app-hero"><div style="position:relative;z-index:1"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><div style="opacity:.82;font-weight:800">مرحباً، '+esc(((window.state||{}).session||{}).displayName||'المدير')+'</div><div style="font-size:34px;font-weight:950;line-height:1.2;margin-top:4px">'+esc((data.settings||{}).shopName||(data.settings||{}).companyName||'النظام')+'</div></div><div style="background:rgba(255,255,255,.16);border-radius:18px;padding:10px 13px;font-weight:900"><i class="fas fa-cash-register"></i> POS</div></div><div style="margin-top:18px;opacity:.86;font-weight:800">إجمالي المبيعات</div><div style="font-size:40px;font-weight:950;line-height:1.15">'+fmt(sales)+'</div><div class="fee-app-stat-grid"><div class="fee-app-stat"><div class="k">العملاء</div><div class="v">'+customers.length+'</div></div><div class="fee-app-stat"><div class="k">الفواتير</div><div class="v">'+invoices.length+'</div></div><div class="fee-app-stat"><div class="k">الديون</div><div class="v">'+fmt(debts)+'</div></div><div class="fee-app-stat"><div class="k">المشتريات</div><div class="v">'+fmt(purchaseTotal)+'</div></div><div class="fee-app-stat"><div class="k">التنبيهات</div><div class="v">'+alerts.length+'</div></div></div></div></section><section class="fee-app-tools"><button onclick="showInvoiceModal&&showInvoiceModal()" class="fee-tool-card"><span class="fee-tool-icon"><i class="fas fa-file-invoice-dollar"></i></span><span><b>فاتورة سريعة</b><br><small class="text-slate-500">إنشاء فاتورة جديدة</small></span></button><button onclick="showAddCustomerModal&&showAddCustomerModal()" class="fee-tool-card"><span class="fee-tool-icon"><i class="fas fa-user-plus"></i></span><span><b>عميل جديد</b><br><small class="text-slate-500">إضافة عميل وحساب</small></span></button><button onclick="navigate(\'cashier\')" class="fee-tool-card"><span class="fee-tool-icon"><i class="fas fa-cash-register"></i></span><span><b>الكاشير</b><br><small class="text-slate-500">نقطة بيع مباشرة</small></span></button><button onclick="navigate(\'reports\')" class="fee-tool-card"><span class="fee-tool-icon"><i class="fas fa-chart-pie"></i></span><span><b>التقارير</b><br><small class="text-slate-500">أرباح وحسابات</small></span></button></section><section class="section-card p-4"><div class="flex items-center justify-between mb-3"><h2 class="text-lg font-extrabold m-0"><i class="fas fa-receipt"></i> سجل الفواتير</h2><button onclick="navigate(\'invoices\')" class="text-sm font-extrabold" style="color:var(--primary)">المزيد</button></div>'+(latest.length?latest.map(function(i){var c=customerById(i.customerId),t=totals(i);return '<button onclick="navigate(\'invoiceDetail\',{invoiceId:\''+esc(i.id)+'\'})" class="fee-record-card w-full text-right"><div><div class="record-title">'+esc(i.invoiceNumber||'فاتورة')+' - '+esc(c.name||i.customerName||'زبون')+'</div><div class="record-sub">'+esc(new Date(i.date||Date.now()).toLocaleDateString('ar-EG'))+'</div></div><div class="record-amount">'+fmt(t.total)+'</div></button>'}).join(''):'<div class="text-center text-slate-400 py-8">لا توجد فواتير بعد</div>')+'</section></div>';
+        }catch(e){console.error(e);old(el)}
+      };
+      nh.__feeProgramHome=true; window.renderHome=nh;
+    }catch(e){}
+  }
+  function wrapDownloadPreview(){
+    var map={downloadInvoicePDF:['invoice'],downloadInvoiceImage:['invoice'],downloadInvoiceExcel:['invoice'],downloadInvoiceWord:['invoice'],downloadCustomerPDF:['customer'],downloadCustomerImage:['customer'],downloadCustomerExcel:['customer'],downloadCustomerWord:['customer']};
+    Object.keys(map).forEach(function(fn){try{var old=window[fn]; if(typeof old==='function'&&!old.__feePreviewWrap){var w=function(id){var url=previewUrl(map[fn][0],id); showPreviewChip(url,'معاينة'); return old.apply(this,arguments)}; w.__feePreviewWrap=true; window[fn]=w;}}catch(e){}});
+    ['exportReportsPDF','exportReportsImage','exportReportsExcel','exportReportsWord'].forEach(function(fn){try{var old=window[fn]; if(typeof old==='function'&&!old.__feePreviewWrap){var w=function(){var url=previewUrl('reports',''); showPreviewChip(url,'معاينة'); return old.apply(this,arguments)}; w.__feePreviewWrap=true; window[fn]=w;}}catch(e){}});
+  }
+  function periodic(){patchHome();patchHeaderStatus();injectPreviewButton();wrapDownloadPreview();}
+  if(new URLSearchParams(location.search).get('feePreview')){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',handlePublicPreview);else handlePublicPreview();return;}
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(periodic,200);setTimeout(function(){try{recalcAccountsAndReports()}catch(e){}},700)});
+  window.addEventListener('online',function(){setTimeout(patchHeaderStatus,100)});
+  window.addEventListener('offline',function(){setTimeout(patchHeaderStatus,100)});
+  setInterval(periodic,1200);
+  setTimeout(periodic,150);
+  setTimeout(periodic,650);
 })();
 </script>
 </body>
